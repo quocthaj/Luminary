@@ -1,0 +1,35 @@
+node_modules/
+cdk.out/
+.cdk.staging/
+dist/
+*.js.map
+*.d.ts
+!jest.config.js
+
+# CDK asset staging
+be/cdk.out/
+be/.cdk.staging/
+be/node_modules/
+
+# Frontend
+fe/node_modules/
+fe/dist/
+fe/.next/
+fe/build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude settings
+.claude/

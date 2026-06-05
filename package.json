@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@aws-cdk/aws-lambda-nodejs": "^1.203.0",
+    "@aws-sdk/client-textract": "^3.1053.0",
+    "esbuild": "^0.28.0"
+  }
+}
