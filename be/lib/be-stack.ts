@@ -1,0 +1,495 @@
+import * as cdk from 'aws-cdk-lib';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as lambdaNode from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
+import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
+// aws-events / aws-events-targets reserved for future EventBridge rules
+import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
+import { Construct } from 'constructs';
+import * as path from 'path';
+
+export class VietAIScholarStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+    super(scope, id, props);
+
+    const accountId = cdk.Stack.of(this).account;
+    const region = cdk.Stack.of(this).region;
+
+    // ============================================
+    // 1. S3 BUCKETS
+    // ============================================
+    console.log('📦 Creating S3 buckets...');
+
+    // Bucket for raw PDF uploads
+    const uploadsBucket = new s3.Bucket(this, 'UploadsBucket', {
+      bucketName: `vietai-uploads-${accountId}`,
+      versioned: false,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      lifecycleRules: [
+        {
+          expiration: cdk.Duration.days(90),
+          prefix: 'temp/',
+        },
+      ],
+      cors: [
+        {
+          allowedOrigins: ['*'],
+          allowedMethods: [s3.HttpMethods.PUT],
+          allowedHeaders: ['Content-Type'],
+          maxAge: 3000,
+        },
+      ],
+    });
+
+    // Bucket for processed results (Markdown)
+    const resultsBucket = new s3.Bucket(this, 'ResultsBucket', {
+      bucketName: `vietai-results-${accountId}`,
+      versioned: false,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      lifecycleRules: [
+        {
+          expiration: cdk.Duration.days(30), // Cache 30 days
+        },
+      ],
+    });
+
+    // Bucket for frontend SPA (React build)
+    const frontendBucket = new s3.Bucket(this, 'FrontendBucket', {
+      bucketName: `vietai-frontend-${accountId}`,
+      versioned: false,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      websiteIndexDocument: 'index.html',
+      websiteErrorDocument: 'index.html', // SPA routing
+    });
+
+    // ============================================
+    // 2. DYNAMODB TABLE
+    // ============================================
+    console.log('🗄️  Creating DynamoDB table...');
+
+    const jobsTable = new dynamodb.Table(this, 'JobsTable', {
+      tableName: 'vietai-jobs',
+      partitionKey: {
+        name: 'jobId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST, // Auto-scale
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      pointInTimeRecovery: true,
+      stream: dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
+      // TTL: items must include 'expiresAt' as a Unix epoch timestamp (seconds)
+      timeToLiveAttribute: 'expiresAt',
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // For dev; use RETAIN in prod
+    });
+
+    // GSI: userId + createdAt (for listing user's jobs)
+    jobsTable.addGlobalSecondaryIndex({
+      indexName: 'userIdIndex',
+      partitionKey: {
+        name: 'userId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'createdAt',
+        type: dynamodb.AttributeType.NUMBER,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // ============================================
+    // 3. IAM ROLE FOR LAMBDA
+    // ============================================
+    console.log('🔐 Creating Lambda IAM role...');
+
+    const lambdaRole = new iam.Role(this, 'LambdaExecutionRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      description: 'Execution role for VietAI Lambda Orchestrator',
+    });
+
+    // S3 permissions
+    uploadsBucket.grantReadWrite(lambdaRole);   // cho phép cả put và get
+    resultsBucket.grantReadWrite(lambdaRole);
+
+    // DynamoDB permissions
+    jobsTable.grantReadWriteData(lambdaRole);
+
+    // Textract permissions (sync + async OCR fallback for PDF)
+    lambdaRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'textract:DetectDocumentText',
+          'textract:AnalyzeDocument',
+          'textract:StartDocumentTextDetection',
+          'textract:GetDocumentTextDetection',
+        ],
+        resources: ['*'],
+        effect: iam.Effect.ALLOW,
+      })
+    );
+
+    // Secrets Manager: reference existing secrets by name
+    const groqSecret = secretsmanager.Secret.fromSecretNameV2(
+      this, 'GroqSecret', 'vietai/groq-api-key'
+    );
+    const geminiSecret = secretsmanager.Secret.fromSecretNameV2(
+      this, 'GeminiSecret', 'vietai/gemini-api-key'
+    );
+    const deepseekSecret = secretsmanager.Secret.fromSecretNameV2(
+      this, 'DeepSeekSecret', 'viet-ai-scholar/deepseek-api-key'
+    );
+    const mistralSecret = secretsmanager.Secret.fromSecretNameV2(
+      this, 'MistralSecret', 'viet-ai-scholar/mistral-api-key'
+    );
+
+    // Grant Lambda read access to all secrets
+    groqSecret.grantRead(lambdaRole);
+    geminiSecret.grantRead(lambdaRole);
+    deepseekSecret.grantRead(lambdaRole);
+    mistralSecret.grantRead(lambdaRole);
+
+    // CloudWatch Logs
+    lambdaRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('CloudWatchLogsFullAccess')
+    );
+
+    // ============================================
+    // 4. LAMBDA FUNCTION
+    // ============================================
+    console.log('⚡ Creating Lambda function...');
+
+    const orchestratorLambda = new lambdaNode.NodejsFunction(
+      this,
+      'OrchestratorLambda',
+      {
+        functionName: 'vietai-orchestrator',
+        entry: path.join(__dirname, '../lambda/index.ts'), // esbuild tự bundle TS
+        handler: 'handler',
+        runtime: lambda.Runtime.NODEJS_20_X,
+        timeout: cdk.Duration.seconds(600), // 10 min: đủ cho Textract async polling (~90s) + AI
+        memorySize: 1024, // 1 GB for processing
+        environment: {
+          S3_UPLOADS_BUCKET: uploadsBucket.bucketName,
+          S3_RESULTS_BUCKET: resultsBucket.bucketName,
+          DYNAMODB_TABLE: jobsTable.tableName,
+          GROQ_SECRET_ARN: groqSecret.secretArn,
+          GEMINI_SECRET_ARN: geminiSecret.secretArn,
+          DEEPSEEK_SECRET_ARN: deepseekSecret.secretArn,
+          MISTRAL_SECRET_ARN: mistralSecret.secretArn,
+          // AWS_REGION is automatically available in Lambda runtime
+        },
+        description: 'Main orchestrator for PDF processing pipeline',
+        bundling: {
+          // pdfjs-dist chứa pre-built binaries → esbuild không bundle inline được
+          // → đánh dấu external, copy thủ công từ node_modules local (không dùng npm)
+          externalModules: ['@aws-sdk/*', '@smithy/*', 'pdfjs-dist'],
+          commandHooks: {
+            beforeBundling(_inputDir: string, _outputDir: string): string[] {
+              return [];
+            },
+            beforeInstall(_inputDir: string, _outputDir: string): string[] {
+              return [];
+            },
+            afterBundling(inputDir: string, outputDir: string): string[] {
+              // Copy pdfjs-dist trực tiếp — không cần npm
+              if (process.platform === 'win32') {
+                const src = path.join(inputDir, 'node_modules', 'pdfjs-dist');
+                const dest = path.join(outputDir, 'node_modules', 'pdfjs-dist');
+                return [`xcopy /E /I /Q "${src}" "${dest}"`];
+              }
+              return [
+                `mkdir -p "${outputDir}/node_modules/pdfjs-dist"`,
+                `cp -r "${inputDir}/node_modules/pdfjs-dist/." "${outputDir}/node_modules/pdfjs-dist/"`,
+              ];
+            },
+          },
+        },
+      }
+    );
+
+    // Orchestrator gets its own auto-created role to avoid circular dependency with State Machine.
+    // (lambdaRole is shared by worker Lambdas; grantStartExecution would create a cycle
+    //  if orchestrator also used lambdaRole → processingStateMachine → workers → lambdaRole)
+    uploadsBucket.grantReadWrite(orchestratorLambda);
+    resultsBucket.grantReadWrite(orchestratorLambda);
+    jobsTable.grantReadWriteData(orchestratorLambda);
+    groqSecret.grantRead(orchestratorLambda);
+    geminiSecret.grantRead(orchestratorLambda);
+    deepseekSecret.grantRead(orchestratorLambda);
+    mistralSecret.grantRead(orchestratorLambda);
+    orchestratorLambda.addToRolePolicy(new iam.PolicyStatement({
+      actions: [
+        'textract:DetectDocumentText',
+        'textract:AnalyzeDocument',
+        'textract:StartDocumentTextDetection',
+        'textract:GetDocumentTextDetection',
+      ],
+      resources: ['*'],
+      effect: iam.Effect.ALLOW,
+    }));
+    orchestratorLambda.role?.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('CloudWatchLogsFullAccess')
+    );
+
+    // ============================================
+    // 4b. STEP FUNCTION WORKER LAMBDAS
+    // ============================================
+
+    const extractLambda = new lambdaNode.NodejsFunction(this, 'ExtractLambda', {
+      functionName: 'vietai-extract',
+      entry: path.join(__dirname, '../lambda/handlers/extract.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      role: lambdaRole,
+      timeout: cdk.Duration.seconds(120),
+      memorySize: 2048,
+      environment: {
+        S3_UPLOADS_BUCKET: uploadsBucket.bucketName,
+        S3_RESULTS_BUCKET: resultsBucket.bucketName,
+        DYNAMODB_TABLE: jobsTable.tableName,
+      },
+      description: 'Extract text from PDF using Textract',
+      bundling: {
+        externalModules: ['@aws-sdk/*', '@smithy/*', 'pdfjs-dist'],
+        commandHooks: {
+          beforeBundling(_inputDir: string, _outputDir: string): string[] {
+            return [];
+          },
+          beforeInstall(_inputDir: string, _outputDir: string): string[] {
+            return [];
+          },
+          afterBundling(inputDir: string, outputDir: string): string[] {
+            if (process.platform === 'win32') {
+              const src = path.join(inputDir, 'node_modules', 'pdfjs-dist');
+              const dest = path.join(outputDir, 'node_modules', 'pdfjs-dist');
+              return [`xcopy /E /I /Q "${src}" "${dest}"`];
+            }
+            return [
+              `mkdir -p "${outputDir}/node_modules/pdfjs-dist"`,
+              `cp -r "${inputDir}/node_modules/pdfjs-dist/." "${outputDir}/node_modules/pdfjs-dist/"`,
+            ];
+          },
+        },
+      },
+    });
+
+    const translateLambda = new lambdaNode.NodejsFunction(this, 'TranslateLambda', {
+      functionName: 'vietai-translate',
+      entry: path.join(__dirname, '../lambda/handlers/translate.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      role: lambdaRole,
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 512,
+      environment: {
+        S3_RESULTS_BUCKET: resultsBucket.bucketName,
+        DYNAMODB_TABLE: jobsTable.tableName,
+        GROQ_SECRET_ARN: groqSecret.secretArn,
+        GEMINI_SECRET_ARN: geminiSecret.secretArn,
+        DEEPSEEK_SECRET_ARN: deepseekSecret.secretArn,
+        MISTRAL_SECRET_ARN: mistralSecret.secretArn,
+      },
+      description: 'Translate extracted text to Vietnamese',
+    });
+
+    const latexLambda = new lambdaNode.NodejsFunction(this, 'LaTeXLambda', {
+      functionName: 'vietai-latex',
+      entry: path.join(__dirname, '../lambda/handlers/latex.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      role: lambdaRole,
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 512,
+      environment: {
+        S3_RESULTS_BUCKET: resultsBucket.bucketName,
+        DYNAMODB_TABLE: jobsTable.tableName,
+        GROQ_SECRET_ARN: groqSecret.secretArn,
+        GEMINI_SECRET_ARN: geminiSecret.secretArn,
+      },
+      description: 'Convert LaTeX math expressions in translated text',
+    });
+
+    const mergeLambda = new lambdaNode.NodejsFunction(this, 'MergeLambda', {
+      functionName: 'vietai-merge',
+      entry: path.join(__dirname, '../lambda/handlers/merge.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      role: lambdaRole,
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 512,
+      environment: {
+        S3_RESULTS_BUCKET: resultsBucket.bucketName,
+        DYNAMODB_TABLE: jobsTable.tableName,
+      },
+      description: 'Merge translated chunks into final Markdown output',
+    });
+
+    // ============================================
+    // 5. STEP FUNCTIONS STATE MACHINE
+    // ============================================
+    console.log('🔄 Creating Step Functions State Machine...');
+
+    const extractTask = new tasks.LambdaInvoke(this, 'ExtractTask', {
+      lambdaFunction: extractLambda,
+      outputPath: '$.Payload',
+      comment: 'Extract text from PDF using Textract',
+    });
+
+    const translateChunkTask = new tasks.LambdaInvoke(this, 'TranslateChunkTask', {
+      lambdaFunction: translateLambda,
+      outputPath: '$.Payload',
+    });
+
+    const mapState = new sfn.Map(this, 'TranslateMapState', {
+      maxConcurrency: 5,
+      itemsPath: sfn.JsonPath.stringAt('$.chunks'),
+      resultPath: '$.translatedChunks',
+      comment: 'Translate each text chunk in parallel',
+    });
+    mapState.itemProcessor(translateChunkTask);
+
+    const latexTask = new tasks.LambdaInvoke(this, 'LaTeXTask', {
+      lambdaFunction: latexLambda,
+      outputPath: '$.Payload',
+      comment: 'Process LaTeX math expressions',
+    });
+
+    const parallelState = new sfn.Parallel(this, 'ParallelProcessing', {
+      resultPath: '$.parallelResults',
+      comment: 'Translate chunks and process LaTeX in parallel',
+    });
+    parallelState.branch(mapState);
+    parallelState.branch(latexTask);
+
+    const mergeTask = new tasks.LambdaInvoke(this, 'MergeTask', {
+      lambdaFunction: mergeLambda,
+      outputPath: '$.Payload',
+      comment: 'Merge translated chunks into final Markdown output',
+    });
+
+    const definition = extractTask
+      .next(parallelState)
+      .next(mergeTask);
+
+    const processingStateMachine = new sfn.StateMachine(this, 'ProcessingStateMachine', {
+      stateMachineName: 'vietai-processing-pipeline',
+      definitionBody: sfn.DefinitionBody.fromChainable(definition),
+      timeout: cdk.Duration.minutes(15),
+      comment: 'PDF processing pipeline: extract → (translate map + latex) → merge',
+    });
+
+    // Grant orchestratorLambda permission to start executions
+    processingStateMachine.grantStartExecution(orchestratorLambda);
+    orchestratorLambda.addEnvironment('STATE_MACHINE_ARN', processingStateMachine.stateMachineArn);
+
+    // S3 trigger: when PDF uploaded, trigger Lambda
+    uploadsBucket.addEventNotification(
+      s3.EventType.OBJECT_CREATED,
+      new s3n.LambdaDestination(orchestratorLambda),
+      { prefix: 'uploads/' }
+    );
+
+    // ============================================
+    // 5. API GATEWAY
+    // ============================================
+    console.log('🌐 Creating API Gateway...');
+
+    const api = new apigateway.RestApi(this, 'VietAIAPI', {
+      restApiName: 'vietai-scholar-api',
+      description: 'API for VietAI Scholar Assistant',
+      deployOptions: {
+        stageName: 'dev',
+        throttlingRateLimit: 100,   // requests per second
+        throttlingBurstLimit: 200,  // max concurrent requests
+      },
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS, // For dev; restrict in prod
+        allowMethods: apigateway.Cors.ALL_METHODS,
+      },
+    });
+
+    // ============================================
+    // CẤP QUYỀN INVOKE CHO API GATEWAY
+    // ============================================
+    orchestratorLambda.addPermission('ApiGatewayInvoke', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: api.arnForExecuteApi(),
+    });
+
+    // ============================================
+    // API Endpoint 1: POST /upload
+    // Returns: { uploadUrl, jobId }
+    // ============================================
+    const uploadResource = api.root.addResource('upload');
+    uploadResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, {
+        proxy: true, // Lambda nhận full HTTP request, tự xử lý response
+      })
+    );
+
+    // ============================================
+    // API Endpoint 2: GET /job/{jobId}
+    // Returns: { status, s3OutputKey, error? }
+    // ============================================
+    const jobResource = api.root.addResource('job');
+    const jobIdResource = jobResource.addResource('{jobId}');
+    jobIdResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(orchestratorLambda, {
+        proxy: true,
+      })
+    );
+
+    // ============================================
+    // API Endpoint 3: GET /result/{jobId}
+    // Returns: { downloadUrl } — presigned S3 URL for analysis.md
+    // ============================================
+    const resultResource = api.root.addResource('result');
+    const resultJobIdResource = resultResource.addResource('{jobId}');
+    resultJobIdResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true })
+    );
+
+    // ============================================
+    // OUTPUTS
+    // ============================================
+    new cdk.CfnOutput(this, 'UploadsBucketOutput', {
+      value: uploadsBucket.bucketName,
+      description: 'S3 bucket for PDF uploads',
+      exportName: 'VietAI-UploadsBucket',
+    });
+
+    new cdk.CfnOutput(this, 'ResultsBucketOutput', {
+      value: resultsBucket.bucketName,
+      description: 'S3 bucket for processed results',
+      exportName: 'VietAI-ResultsBucket',
+    });
+
+    new cdk.CfnOutput(this, 'DynamoDBTableOutput', {
+      value: jobsTable.tableName,
+      description: 'DynamoDB table for job tracking',
+      exportName: 'VietAI-JobsTable',
+    });
+
+    new cdk.CfnOutput(this, 'APIEndpointOutput', {
+      value: api.url,
+      description: 'API Gateway endpoint',
+      exportName: 'VietAI-APIEndpoint',
+    });
+
+    new cdk.CfnOutput(this, 'LambdaFunctionOutput', {
+      value: orchestratorLambda.functionName,
+      description: 'Lambda Orchestrator function name',
+      exportName: 'VietAI-LambdaFunction',
+    });
+  }
+}

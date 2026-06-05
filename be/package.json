@@ -1,0 +1,37 @@
+{
+  "name": "be",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "jest",
+    "cdk": "cdk"
+  },
+  "devDependencies": {
+    "@types/jest": "^30",
+    "@types/node": "^24.10.1",
+    "aws-cdk": "2.1123.0",
+    "jest": "^30",
+    "ts-jest": "^29",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.9.3"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1052.0",
+    "@aws-sdk/client-s3": "^3.1052.0",
+    "@aws-sdk/client-secrets-manager": "^3.1053.0",
+    "@aws-sdk/client-sfn": "^3.1056.0",
+    "@aws-sdk/client-textract": "^3.1056.0",
+    "@aws-sdk/s3-request-presigner": "^3.1052.0",
+    "@google/generative-ai": "^0.24.1",
+    "@mistralai/mistralai": "^2.2.5",
+    "@napi-rs/canvas": "^0.1.50",
+    "@types/uuid": "^10.0.0",
+    "aws-cdk-lib": "^2.257.0",
+    "constructs": "^10.5.0",
+    "groq-sdk": "^1.2.0",
+    "openai": "^6.39.1",
+    "pdfjs-dist": "^3.11.174",
+    "uuid": "^14.0.0"
+  }
+}
