@@ -1,0 +1,77 @@
+# generated: 2026-06-07T11:05:00Z
+# last_updated: 2026-06-07T11:05:00Z
+# project: viet-ai-scholar
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: {project-root}/_bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-06-07T11:05:00Z
+last_updated: 2026-06-07T15:36:00Z
+project: viet-ai-scholar
+project_key: NOKEY
+tracking_system: file-system
+story_location: {project-root}/_bmad-output/implementation-artifacts
+
+development_status:
+  epic-1: done
+  1-1-trinh-tai-len-tai-lieu-xac-thuc-kich-thuoc-file-file-upload-drag-drop-ui-size-validation: done
+  1-2-goi-api-upload-presigned-url-voi-xu-ly-loi-ket-noi-presigned-upload-network-error-auto-retry: done
+  1-3-theo-doi-tien-trinh-giao-dien-song-ngu-side-by-side-translation-progress-bilingual-side-by-side-layout: done
+  1-4-tich-hop-katex-de-render-cong-thuc-toan-va-sao-chep-latex-katex-formula-render-plain-latex-copy: done
+  epic-1-retrospective: optional
+
+  epic-2: in-progress
+  2-1-tich-hop-nextauth-dang-nhap-google-email-nextauth-integration-for-google-email-login: in-progress
+  2-2-tuong-dang-nhap-nut-download-tu-dong-tai-sau-khi-dang-nhap-download-login-wall-post-login-auto-download: done
+  2-3-lambda-authorizer-xac-thuc-jwt-jwt-web-crypto-lambda-authorizer: backlog
+  2-4-giao-dien-thu-vien-bo-loc-thoi-gian-voi-skeleton-loader-personal-library-dashboard-shimmer-skeleton: backlog
+  2-5-s3-streaming-proxy-xem-lai-bai-dich-cu-voi-nut-dich-lai-s3-streaming-proxy-s3-cache-loading-re-process: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-giao-dien-workspace-3-cot-3-column-workspace-ui-layout-sidebar: backlog
+  3-2-tach-doan-embedding-luu-tru-qdrant-cloud-paragraph-ingestion-qdrant-upsert-lambda: backlog
+  3-3-api-rag-chat-an-toan-secure-rag-chat-api-namespace-filter: backlog
+  3-4-giao-dien-ai-tutor-chat-ai-tutor-chat-panel-ui-source-citations: backlog
+  3-5-tich-hop-api-semantic-scholar-semantic-scholar-integration-related-papers-panel: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-tu-dong-sinh-va-lam-bai-trac-nghiem-ai-quiz-generator-play-modal: backlog
+  4-2-tu-dong-sinh-va-hoc-the-ghi-nho-ai-flashcard-generator-swiper-ui: backlog
+  4-3-tu-dong-ve-so-do-tu-duy-bang-mermaid-js-mermaid-mindmap-generator-interactive-svg-viewer: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-doi-chieu-tong-hop-cheo-nhieu-pdf-cross-paper-multi-pdf-synthesis-chat: backlog
+  5-2-che-do-kham-pha-ai-agent-tu-sinh-noi-dung-hoc-thuat-theo-chu-de-explore-mode-topic-based-generation: backlog
+  epic-5-retrospective: optional
