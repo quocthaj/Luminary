@@ -21,6 +21,8 @@
   --success-dim:   rgba(74, 222, 128, 0.10);
   --error:         #f87171;
   --error-dim:     rgba(248, 113, 113, 0.10);
+  --warning:       #f59e0b;
+  --warning-dim:   rgba(245, 158, 11, 0.10);
 }
 
 .light {
@@ -39,6 +41,8 @@
   --success-dim:   rgba(22, 163, 74, 0.10);
   --error:         #dc2626;
   --error-dim:     rgba(220, 38, 38, 0.10);
+  --warning:       #d97706;
+  --warning-dim:   rgba(217, 119, 6, 0.10);
 }
 
 body {
@@ -220,3 +224,20 @@ body {
 
 .markdown-preview :first-child { margin-top: 0; }
 .markdown-preview :last-child  { margin-bottom: 0; }
+
+/* ── KaTeX Math Formula Custom Styles ── */
+.copy-latex-btn:hover {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--accent) !important;
+}
+
+/* Ensure Katex renders mathematical font and prevents layout shifts */
+.katex-formula-wrapper .katex-display {
+  margin: 0 !important;
+}
+
+.katex-formula-wrapper .katex {
+  font-size: 1.05em;
+  text-rendering: auto;
+}

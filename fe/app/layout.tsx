@@ -21,6 +21,8 @@ export const metadata: Metadata = {
   description: "Dịch tài liệu học thuật PDF sang tiếng Việt với AI",
 };
 
+import { SessionProvider } from "next-auth/react";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -41,8 +43,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <ThemeToggle />
-        {children}
+        <SessionProvider>
+          <ThemeToggle />
+          {children}
+        </SessionProvider>
       </body>
     </html>
   );

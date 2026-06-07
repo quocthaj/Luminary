@@ -3,13 +3,13 @@ import { useState, useEffect } from 'react';
 import { getJobStatus } from '../lib/api';
 
 const STEPS = [
-  { label: 'Nhận file',  statuses: ['pending', 'queued'] },
-  { label: 'Trích xuất', statuses: ['extracting', 'extracted'] },
-  { label: 'Dịch thuật', statuses: ['orchestrating', 'processing'] },
-  { label: 'Hoàn thành', statuses: ['completed'] },
+  { label: 'Trích xuất', statuses: ['pending', 'queued', 'extracting'] },
+  { label: 'Đang dịch', statuses: ['extracted', 'orchestrating', 'processing'] },
+  { label: 'Đang gộp', statuses: ['agents_completed'] },
 ];
 
 function getCurrentStep(status: string): number {
+  if (status === 'completed') return 3;
   const idx = STEPS.findIndex(s => s.statuses.includes(status));
   return idx === -1 ? 0 : idx;
 }
@@ -20,7 +20,8 @@ const STATUS_LABELS: Record<string, string> = {
   extracting:    'Đang trích xuất văn bản...',
   extracted:     'Đã trích xuất, bắt đầu dịch...',
   orchestrating: 'Đang điều phối dịch thuật...',
-  processing:    'Đang xử lý...',
+  processing:    'Đang dịch tài liệu...',
+  agents_completed: 'Đang gộp kết quả...',
   completed:     'Hoàn thành!',
   failed:        'Xử lý thất bại.',
 };
@@ -43,7 +44,7 @@ export function ProcessingView({ jobId, onComplete }: { jobId: string; onComplet
       } catch {
         // network hiccup — retry
       }
-      if (active) setTimeout(doPoll, 3000);
+      if (active) setTimeout(doPoll, 2000);
     }
 
     doPoll();
