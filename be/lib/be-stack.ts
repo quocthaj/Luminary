@@ -416,6 +416,31 @@ export class VietAIScholarStack extends cdk.Stack {
     });
 
     // ============================================
+    // JWT LAMBDA AUTHORIZER
+    // ============================================
+    console.log('🔒 Creating Lambda Authorizer...');
+
+    const authorizerLambda = new lambdaNode.NodejsFunction(this, 'JwtAuthorizerLambda', {
+      functionName: 'vietai-jwt-authorizer',
+      entry: path.join(__dirname, '../lambda/authorizer.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      timeout: cdk.Duration.seconds(5),
+      environment: {
+        AUTH_SECRET_SECRET_NAME: 'vietai/auth-secret',
+      },
+    });
+
+    const authSecret = secretsmanager.Secret.fromSecretNameV2(this, 'AuthSecret', 'vietai/auth-secret');
+    authSecret.grantRead(authorizerLambda);
+
+    const authorizer = new apigateway.TokenAuthorizer(this, 'JwtAuthorizer', {
+      handler: authorizerLambda,
+      identitySource: 'method.request.header.Authorization',
+      resultsCacheTtl: cdk.Duration.seconds(0), // Tắt cache trong lúc phát triển/test
+    });
+
+    // ============================================
     // CẤP QUYỀN INVOKE CHO API GATEWAY
     // ============================================
     orchestratorLambda.addPermission('ApiGatewayInvoke', {
@@ -432,7 +457,10 @@ export class VietAIScholarStack extends cdk.Stack {
       'POST',
       new apigateway.LambdaIntegration(orchestratorLambda, {
         proxy: true, // Lambda nhận full HTTP request, tự xử lý response
-      })
+      }),
+      {
+        authorizer,
+      }
     );
 
     // ============================================
@@ -456,7 +484,10 @@ export class VietAIScholarStack extends cdk.Stack {
     const resultJobIdResource = resultResource.addResource('{jobId}');
     resultJobIdResource.addMethod(
       'GET',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true })
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
     );
 
     // ============================================

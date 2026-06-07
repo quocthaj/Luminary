@@ -167,19 +167,33 @@ file2.ts  - [mô tả ngắn]
 
 ---
 
-### [2026-06-07] Khởi tạo Story 2.3: Lambda Authorizer xác thực JWT
+### [2026-06-07] Hoàn thành Story 2.3: Lambda Authorizer xác thực JWT
 
-Tôi đã thực hiện chu trình `bmad-create-story` (CS) để bắt đầu Story 2.3 nhằm chuẩn bị cho việc xây dựng tính năng bảo mật API Gateway bằng Lambda Authorizer.
+Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và tích hợp hoàn chỉnh Lambda Authorizer phục vụ xác thực JWT.
 
 #### Công việc đã làm:
-1.  **Phân tích & Lập Đặc tả Story 2.3:**
-    *   Tạo file đặc tả Story tại `_bmad-output/implementation-artifacts/2-3-lambda-authorizer-xac-thuc-jwt-jwt-web-crypto-lambda-authorizer.md`.
-    *   Xác định rõ ràng các điều kiện nghiệm thu (Acceptance Criteria) và các yêu cầu kỹ thuật chi tiết: sử dụng Web Crypto API thuần của Node.js 20, không dùng thư viện ngoài để bảo đảm dung lượng bundle < 10KB.
-    *   Đưa vào tài liệu hướng dẫn cấu hình AWS Console (Secrets Manager, API Gateway, CloudWatch Logs) để thuận tiện cho việc thiết lập và chạy thử.
-2.  **Đồng bộ Sprint Status:**
-    *   Cập nhật `sprint-status.yaml` chuyển Story 2.1 từ `in-progress` thành `done`.
-    *   Chuyển Story 2.3 từ `backlog` sang trạng thái `ready-for-dev`.
-3.  **Git & Version Control:**
-    *   Đã hoàn tất push toàn bộ các thay đổi lên branch `main` của GitHub repository, giữ cho working tree luôn sạch sẽ và các file nhạy cảm/nội bộ (.agents, .agent, test results) được bỏ qua hoàn toàn thông qua `.gitignore`.
+1.  **Cài đặt Lambda Authorizer (`be/lambda/authorizer.ts`):**
+    *   Tự viết module parse và verify JWT token sử dụng thuật toán HS256 thông qua Web Crypto API thuần của Node.js 20 (`crypto.subtle`), hoàn toàn không dùng thư viện ngoài (`jsonwebtoken`, `jose`) để giữ bundle size cực nhỏ (< 10KB).
+    *   Sử dụng cơ chế Lazy Initialization cho `SecretsManagerClient` của AWS SDK v3 để truy xuất khóa bí mật `AUTH_SECRET` từ Secrets Manager (`vietai/auth-secret`).
+    *   Kiểm tra tính hợp lệ của token và thời hạn hết hạn (`exp`), tự động throw `"Unauthorized"` để API Gateway trả về mã HTTP `401` nếu token không hợp lệ hoặc hết hạn.
+2.  **Tích hợp CDK Stack (`be/lib/be-stack.ts`):**
+    *   Khai báo `JwtAuthorizerLambda` và cấp quyền read secret từ AWS Secrets Manager cho Lambda này.
+    *   Định nghĩa `TokenAuthorizer` trong API Gateway trỏ tới Lambda Authorizer.
+    *   Bảo vệ các endpoints `POST /upload` và `GET /result/{jobId}` bằng Authorizer vừa tạo.
+3.  **Bộ unit tests (`be/test/authorizer.test.ts`):**
+    *   Viết test suite dùng Jest giả lập toàn bộ các case xác thực: token hợp lệ (Allow policy + inject `userId`), token hết hạn (throw Unauthorized), sai chữ ký (throw Unauthorized), sai định dạng header (throw Unauthorized).
+    *   Sử dụng cơ chế mock runtime để bypass việc gọi thực tế lên Secrets Manager. Chạy pass 100% tất cả các tests.
+
+#### Files thay đổi:
+- `be/lambda/authorizer.ts` (Tạo mới)
+- `be/lib/be-stack.ts` (Cập nhật)
+- `be/test/authorizer.test.ts` (Tạo mới)
+- `_bmad-output/implementation-artifacts/2-3-lambda-authorizer-xac-thuc-jwt-jwt-web-crypto-lambda-authorizer.md` (Cập nhật)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (Cập nhật)
+
+#### Build & Test status:
+- npm run build: Pass (0 TypeScript errors)
+- Jest Backend test suite: Pass (2/2 test files, 5/5 tests passed)
+
 
 
