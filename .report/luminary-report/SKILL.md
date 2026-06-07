@@ -165,3 +165,21 @@ file2.ts  - [mô tả ngắn]
 - TypeScript errors: 0
 - Playwright E2E test suite: Pass (3/3 tests passed)
 
+---
+
+### [2026-06-07] Khởi tạo Story 2.3: Lambda Authorizer xác thực JWT
+
+Tôi đã thực hiện chu trình `bmad-create-story` (CS) để bắt đầu Story 2.3 nhằm chuẩn bị cho việc xây dựng tính năng bảo mật API Gateway bằng Lambda Authorizer.
+
+#### Công việc đã làm:
+1.  **Phân tích & Lập Đặc tả Story 2.3:**
+    *   Tạo file đặc tả Story tại `_bmad-output/implementation-artifacts/2-3-lambda-authorizer-xac-thuc-jwt-jwt-web-crypto-lambda-authorizer.md`.
+    *   Xác định rõ ràng các điều kiện nghiệm thu (Acceptance Criteria) và các yêu cầu kỹ thuật chi tiết: sử dụng Web Crypto API thuần của Node.js 20, không dùng thư viện ngoài để bảo đảm dung lượng bundle < 10KB.
+    *   Đưa vào tài liệu hướng dẫn cấu hình AWS Console (Secrets Manager, API Gateway, CloudWatch Logs) để thuận tiện cho việc thiết lập và chạy thử.
+2.  **Đồng bộ Sprint Status:**
+    *   Cập nhật `sprint-status.yaml` chuyển Story 2.1 từ `in-progress` thành `done`.
+    *   Chuyển Story 2.3 từ `backlog` sang trạng thái `ready-for-dev`.
+3.  **Git & Version Control:**
+    *   Đã hoàn tất push toàn bộ các thay đổi lên branch `main` của GitHub repository, giữ cho working tree luôn sạch sẽ và các file nhạy cảm/nội bộ (.agents, .agent, test results) được bỏ qua hoàn toàn thông qua `.gitignore`.
+
+
