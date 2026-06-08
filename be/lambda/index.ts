@@ -11,6 +11,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
     PutItemCommand,
     GetItemCommand,
+    QueryCommand,
 } from '@aws-sdk/client-dynamodb';
 import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
 import { v4 as uuidv4 } from 'uuid';
@@ -50,7 +51,16 @@ export const handler = async (event: any) => {
         }
 
         if (httpMethod === 'POST' && path === '/upload') {
-            return await handleGenerateUploadUrl({ fileName: requestBody.fileName || 'document.pdf' });
+            const userId = event.requestContext?.authorizer?.userId || 'guest';
+            return await handleGenerateUploadUrl({ fileName: requestBody.fileName || 'document.pdf', userId });
+        }
+
+        if (httpMethod === 'GET' && path === '/jobs') {
+            const userId = event.requestContext?.authorizer?.userId;
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            return await handleListJobs({ userId });
         }
 
         if (httpMethod === 'GET' && path?.startsWith('/job/')) {
@@ -77,8 +87,8 @@ export const handler = async (event: any) => {
 // ============================================
 // ACTION 1: Generate Presigned Upload URL
 // ============================================
-async function handleGenerateUploadUrl(event: { fileName: string }): Promise<any> {
-    console.log('📤 Generating presigned upload URL...');
+async function handleGenerateUploadUrl(event: { fileName: string; userId: string }): Promise<any> {
+    console.log(`📤 Generating presigned upload URL for user: ${event.userId}...`);
 
     const jobId = uuidv4();
     const fileName = event.fileName || 'document.pdf';
@@ -101,7 +111,7 @@ async function handleGenerateUploadUrl(event: { fileName: string }): Promise<any
                 status: { S: 'pending' },
                 fileName: { S: fileName },
                 s3Key: { S: s3Key },
-                userId: { S: 'guest' },
+                userId: { S: event.userId },
                 createdAt: { N: now.toString() },
                 expiresAt: { N: (now + 30 * 24 * 60 * 60).toString() },
             },
@@ -221,4 +231,35 @@ async function handleS3Upload(event: any): Promise<any> {
         await updateJobStatus(jobId, 'failed', { error: errMsg });
         throw err;
     }
+}
+
+// ============================================
+// ACTION 5: List Jobs for a User (GSI Query)
+// ============================================
+async function handleListJobs(event: { userId: string }): Promise<any> {
+    console.log(`🔍 Listing jobs for user: ${event.userId}`);
+    const response = await dynamodbClient.send(
+        new QueryCommand({
+            TableName: JOBS_TABLE,
+            IndexName: 'userIdIndex',
+            KeyConditionExpression: 'userId = :userId',
+            ExpressionAttributeValues: {
+                ':userId': { S: event.userId },
+            },
+            ScanIndexForward: false, // Newer first
+        })
+    );
+
+    const items = response.Items || [];
+    const jobs = items.map((item: any) => ({
+        jobId: item.jobId?.S,
+        status: item.status?.S,
+        fileName: item.fileName?.S,
+        s3OutputKey: item.s3OutputKey?.S,
+        createdAt: item.createdAt?.N ? parseInt(item.createdAt.N) : undefined,
+        completedAt: item.completedAt?.N ? parseInt(item.completedAt.N) : undefined,
+        error: item.errorMsg?.S || item.error?.S,
+    }));
+
+    return respond(200, { jobs });
 }

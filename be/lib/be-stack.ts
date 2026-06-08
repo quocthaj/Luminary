@@ -437,7 +437,8 @@ export class VietAIScholarStack extends cdk.Stack {
     const authorizer = new apigateway.TokenAuthorizer(this, 'JwtAuthorizer', {
       handler: authorizerLambda,
       identitySource: 'method.request.header.Authorization',
-      resultsCacheTtl: cdk.Duration.seconds(0), // Tắt cache trong lúc phát triển/test
+      // TODO(prod): tăng lên 300s trước khi deploy production để giảm latency và chi phí Lambda invocations
+      resultsCacheTtl: cdk.Duration.seconds(0),
     });
 
     // ============================================
@@ -483,6 +484,19 @@ export class VietAIScholarStack extends cdk.Stack {
     const resultResource = api.root.addResource('result');
     const resultJobIdResource = resultResource.addResource('{jobId}');
     resultJobIdResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+
+    // ============================================
+    // API Endpoint 4: GET /jobs
+    // Returns: { jobs: JobStatus[] }
+    // ============================================
+    const jobsResource = api.root.addResource('jobs');
+    jobsResource.addMethod(
       'GET',
       new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
       {

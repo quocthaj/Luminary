@@ -208,6 +208,13 @@ export function UploadView({ onJobCreated }: { onJobCreated: (jobId: string) => 
       <div className="absolute top-6 right-6 z-40">
         {status === 'authenticated' ? (
           <div className="flex items-center gap-3 bg-[var(--bg-surface)] border border-[var(--border-normal)] px-4 py-2 rounded-full shadow-sm">
+            <a
+              href="/library"
+              className="text-xs text-[var(--accent)] hover:underline font-bold mr-1 transition-all"
+            >
+              Thư viện
+            </a>
+            <div aria-hidden className="w-[1px] h-4 bg-[var(--border-normal)] mr-0.5" />
             <div className="flex flex-col text-right">
               <span className="text-xs font-semibold text-[var(--text-primary)] max-w-[150px] truncate">
                 {session?.user?.email}

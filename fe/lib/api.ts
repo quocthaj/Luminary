@@ -95,3 +95,11 @@ export async function fetchPreviewContent(jobId: string): Promise<string> {
   if (!res.ok) throw new Error(`Preview fetch failed: ${res.status}`);
   return res.text();
 }
+
+export async function getJobs(): Promise<JobStatus[]> {
+  const headers = await getApiHeaders();
+  const res = await fetch(`${API_BASE}/jobs`, { headers });
+  if (!res.ok) throw new ApiError(`Get jobs failed: ${res.status}`, res.status);
+  const data = await res.json();
+  return data.jobs || [];
+}

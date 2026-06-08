@@ -13,7 +13,7 @@ interface APIGatewayAuthorizerResult {
     Version: string;
     Statement: Array<{
       Action: string;
-      Effect: 'Allow' | 'Deny';
+      Effect: 'Allow';
       Resource: string;
     }>;
   };
@@ -22,9 +22,11 @@ interface APIGatewayAuthorizerResult {
 
 let secretsClient: SecretsManagerClient | null = null;
 let cachedSecret: string | null = null;
+let cacheExpiresAt = 0;
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour — allows secret rotation to take effect
 
 async function getAuthSecret(): Promise<string> {
-  if (cachedSecret) return cachedSecret;
+  if (cachedSecret && Date.now() < cacheExpiresAt) return cachedSecret;
 
   const secretName = process.env.AUTH_SECRET_SECRET_NAME;
   if (!secretName) {
@@ -43,13 +45,19 @@ async function getAuthSecret(): Promise<string> {
     throw new Error('SecretString is empty');
   }
 
-  const parsed = JSON.parse(response.SecretString);
+  let parsed: any;
+  try {
+    parsed = JSON.parse(response.SecretString);
+  } catch (err: any) {
+    throw new Error(`Failed to parse SecretString JSON: ${err.message}`);
+  }
   const secret = parsed.AUTH_SECRET || parsed.authSecret;
   if (!secret) {
     throw new Error('AUTH_SECRET not found in secrets payload');
   }
 
   cachedSecret = secret;
+  cacheExpiresAt = Date.now() + CACHE_TTL_MS;
   return secret;
 }
 
@@ -71,20 +79,27 @@ export async function handler(
 
   const [headerStr, payloadStr, signatureStr] = parts;
 
-  try {
-    // 1. Parse payload to check exp
-    const payloadJson = Buffer.from(payloadStr, 'base64url').toString('utf8');
-    const payload = JSON.parse(payloadJson);
+  // 1. Fetch AUTH_SECRET (operational call outside of verification try-catch)
+  const secret = await getAuthSecret();
 
-    if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) {
-      console.warn('Token has expired');
+  try {
+    // 2. Verify alg header is HS256
+    const header = JSON.parse(Buffer.from(headerStr, 'base64url').toString('utf8'));
+    if (header.alg !== 'HS256') {
+      console.error('Unsupported JWT algorithm:', header.alg);
       throw new Error('Unauthorized');
     }
 
-    // 2. Fetch AUTH_SECRET
-    const secret = await getAuthSecret();
+    // 3. Parse payload and enforce exp (required — no exp or non-numeric = reject)
+    const payloadJson = Buffer.from(payloadStr, 'base64url').toString('utf8');
+    const payload = JSON.parse(payloadJson);
 
-    // 3. Verify signature
+    if (typeof payload.exp !== 'number' || Math.floor(Date.now() / 1000) > payload.exp) {
+      console.warn('Token is expired, missing, or has invalid type for exp claim');
+      throw new Error('Unauthorized');
+    }
+
+    // 4. Verify signature
     const encoder = new TextEncoder();
     const keyData = encoder.encode(secret);
     const messageData = encoder.encode(`${headerStr}.${payloadStr}`);
@@ -114,7 +129,11 @@ export async function handler(
     const principalId = payload.sub || 'user';
     const userId = payload.email || principalId;
 
-    return generatePolicy(principalId, 'Allow', event.methodArn, userId);
+    // Split the ARN to create a wildcard resource (supporting API Gateway caching)
+    const arnParts = event.methodArn.split('/');
+    const wildcardResource = arnParts.length >= 2 ? `${arnParts[0]}/${arnParts[1]}/*` : event.methodArn;
+
+    return generatePolicy(principalId, wildcardResource, userId);
   } catch (err: any) {
     console.error('Authorization failed:', err.message || err);
     throw new Error('Unauthorized');
@@ -123,7 +142,6 @@ export async function handler(
 
 function generatePolicy(
   principalId: string,
-  effect: 'Allow' | 'Deny',
   resource: string,
   userId: string
 ): APIGatewayAuthorizerResult {
@@ -134,7 +152,7 @@ function generatePolicy(
       Statement: [
         {
           Action: 'execute-api:Invoke',
-          Effect: effect,
+          Effect: 'Allow',
           Resource: resource,
         },
       ],
@@ -143,4 +161,10 @@ function generatePolicy(
       userId,
     },
   };
+}
+
+export function _resetCacheForTesting(): void {
+  cachedSecret = null;
+  cacheExpiresAt = 0;
+  secretsClient = null;
 }

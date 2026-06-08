@@ -3,7 +3,10 @@ module.exports = {
   roots: ['<rootDir>/test'],
   testMatch: ['**/*.test.ts'],
   transform: {
-    '^.+\\.tsx?$': 'ts-jest'
+    '^.+\\.[tj]sx?$': 'ts-jest'
   },
+  transformIgnorePatterns: [
+    'node_modules[\\\\/](?!(uuid|@mistralai)[\\\\/])'
+  ],
   setupFilesAfterEnv: ['aws-cdk-lib/testhelpers/jest-autoclean'],
 };

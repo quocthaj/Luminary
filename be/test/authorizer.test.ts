@@ -1,4 +1,4 @@
-import { handler } from '../lambda/authorizer';
+import { handler, _resetCacheForTesting } from '../lambda/authorizer';
 import { SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
 import * as crypto from 'crypto';
 
@@ -40,6 +40,7 @@ describe('Lambda Authorizer JWT Verification', () => {
   process.env.AUTH_SECRET_SECRET_NAME = 'vietai/auth-secret';
 
   beforeEach(() => {
+    _resetCacheForTesting();
     mockSend.mockReset();
     // Default mock behavior to return the test secret
     mockSend.mockResolvedValue({
@@ -66,7 +67,7 @@ describe('Lambda Authorizer JWT Verification', () => {
     expect(response.principalId).toBe('test-user-id');
     expect(response.context?.userId).toBe('test@vietai.org');
     expect(response.policyDocument.Statement[0].Effect).toBe('Allow');
-    expect(response.policyDocument.Statement[0].Resource).toBe(event.methodArn);
+    expect(response.policyDocument.Statement[0].Resource).toBe('arn:aws:execute-api:ap-southeast-1:123456789012:api-id/dev/*');
   });
 
   it('should reject an expired JWT token by throwing Unauthorized', async () => {
@@ -111,5 +112,69 @@ describe('Lambda Authorizer JWT Verification', () => {
     };
 
     await expect(handler(event)).rejects.toThrow('Unauthorized');
+  });
+
+  it('should reject a JWT token with no exp claim', async () => {
+    const payload = { sub: 'test-user-id', email: 'test@vietai.org' }; // no exp
+    const token = await generateTestJwt(payload, SECRET);
+
+    const event = {
+      type: 'TOKEN',
+      authorizationToken: `Bearer ${token}`,
+      methodArn: 'arn:aws:execute-api:ap-southeast-1:123456789012:api-id/dev/POST/upload'
+    };
+
+    await expect(handler(event)).rejects.toThrow('Unauthorized');
+  });
+
+  it('should reject a JWT token with unsupported algorithm', async () => {
+    // Manually craft a token with alg: RS256 header
+    const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+    const payloadStr = base64url(JSON.stringify({
+      sub: 'test-user-id',
+      exp: Math.floor(Date.now() / 1000) + 120
+    }));
+    const token = `${header}.${payloadStr}.fakesignature`;
+
+    const event = {
+      type: 'TOKEN',
+      authorizationToken: `Bearer ${token}`,
+      methodArn: 'arn:aws:execute-api:ap-southeast-1:123456789012:api-id/dev/POST/upload'
+    };
+
+    await expect(handler(event)).rejects.toThrow('Unauthorized');
+  });
+
+  it('should reject a JWT token with non-numeric exp claim', async () => {
+    const payload = { sub: 'test-user-id', email: 'test@vietai.org', exp: 'not-a-number' };
+    const token = await generateTestJwt(payload, SECRET);
+
+    const event = {
+      type: 'TOKEN',
+      authorizationToken: `Bearer ${token}`,
+      methodArn: 'arn:aws:execute-api:ap-southeast-1:123456789012:api-id/dev/POST/upload'
+    };
+
+    await expect(handler(event)).rejects.toThrow('Unauthorized');
+  });
+
+  it('should bubble up Secrets Manager operational errors (not throw Unauthorized)', async () => {
+    const payload = {
+      sub: 'test-user-id',
+      email: 'test@vietai.org',
+      exp: Math.floor(Date.now() / 1000) + 120
+    };
+    const token = await generateTestJwt(payload, SECRET);
+
+    const event = {
+      type: 'TOKEN',
+      authorizationToken: `Bearer ${token}`,
+      methodArn: 'arn:aws:execute-api:ap-southeast-1:123456789012:api-id/dev/POST/upload'
+    };
+
+    // Force Secrets Manager to throw an error
+    mockSend.mockRejectedValue(new Error('Secrets Manager connection timeout'));
+
+    await expect(handler(event)).rejects.toThrow('Secrets Manager connection timeout');
   });
 });

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-07T11:05:00Z
-last_updated: 2026-06-07T16:25:00Z
+last_updated: 2026-06-08T21:42:00+07:00
 project: viet-ai-scholar
 project_key: NOKEY
 tracking_system: file-system
@@ -52,8 +52,8 @@ development_status:
   epic-2: in-progress
   2-1-tich-hop-nextauth-dang-nhap-google-email-nextauth-integration-for-google-email-login: done
   2-2-tuong-dang-nhap-nut-download-tu-dong-tai-sau-khi-dang-nhap-download-login-wall-post-login-auto-download: done
-  2-3-lambda-authorizer-xac-thuc-jwt-jwt-web-crypto-lambda-authorizer: review
-  2-4-giao-dien-thu-vien-bo-loc-thoi-gian-voi-skeleton-loader-personal-library-dashboard-shimmer-skeleton: backlog
+  2-3-lambda-authorizer-xac-thuc-jwt-jwt-web-crypto-lambda-authorizer: done
+  2-4-giao-dien-thu-vien-bo-loc-thoi-gian-voi-skeleton-loader-personal-library-dashboard-shimmer-skeleton: done
   2-5-s3-streaming-proxy-xem-lai-bai-dich-cu-voi-nut-dich-lai-s3-streaming-proxy-s3-cache-loading-re-process: backlog
   epic-2-retrospective: optional
 

@@ -185,15 +185,57 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
     *   Sử dụng cơ chế mock runtime để bypass việc gọi thực tế lên Secrets Manager. Chạy pass 100% tất cả các tests.
 
 #### Files thay đổi:
-- `be/lambda/authorizer.ts` (Tạo mới)
-- `be/lib/be-stack.ts` (Cập nhật)
-- `be/test/authorizer.test.ts` (Tạo mới)
-- `_bmad-output/implementation-artifacts/2-3-lambda-authorizer-xac-thuc-jwt-jwt-web-crypto-lambda-authorizer.md` (Cập nhật)
-- `_bmad-output/implementation-artifacts/sprint-status.yaml` (Cập nhật)
+- `be/lambda/authorizer.ts` (Cập nhật logic xác thực & xử lý lỗi hệ thống, cache reset utility)
+- `be/lib/be-stack.ts` (Cấu hình)
+- `be/test/authorizer.test.ts` (Bổ sung test suite lên 8 tests xác thực)
+- `_bmad-output/implementation-artifacts/2-3-lambda-authorizer-xac-thuc-jwt-jwt-web-crypto-lambda-authorizer.md` (Cập nhật kết quả Code Review)
+- `_bmad-output/implementation-artifacts/deferred-work.md` (Thêm 2 mục trì hoãn)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (Cập nhật trạng thái Story sang `done`)
+
+#### 🔍 Kết quả Code Review & Sửa lỗi (2026-06-08):
+- **4 bản vá đã áp dụng**:
+  1. *Wildcard Resource ARN*: Đảm bảo API Gateway Cache stage (`*`) hoạt động ổn định giữa các route, tránh lỗi 403.
+  2. *Strict exp validation*: Bắt buộc kiểu số cho exp claim của JWT.
+  3. *Error bubbling*: Đưa lỗi hệ thống/Secrets Manager ra ngoài try-catch để API Gateway trả về 500 thay vì 401.
+  4. *JSON parse safety*: Bọc try-catch khi parse payload secret từ Secrets Manager.
+- **2 mục trì hoãn (Deferred)**:
+  1. Route status `GET /job/{jobId}` tạm thời để public để test MVP, sẽ xem xét bảo vệ sau.
+  2. Bật API Gateway Cache TTL 300s khi lên môi trường Production (trong code CDK hiện để 0s để test).
 
 #### Build & Test status:
 - npm run build: Pass (0 TypeScript errors)
-- Jest Backend test suite: Pass (2/2 test files, 5/5 tests passed)
+- Jest Backend test suite: Pass (2/2 test files, 9/9 tests passed)
+
+---
+
+### ✅ Story 2.4: Giao diện Thư viện bộ lọc thời gian với Skeleton Loader
+**Status:** Done  
+**Time:** 8 hours
+
+#### Đã làm:
+- Thiết lập endpoint `GET /jobs` được bảo vệ bởi Lambda Authorizer, thực hiện truy vấn DynamoDB sử dụng chỉ mục GSI `userIdIndex` (userId + createdAt) để trả về danh sách tài liệu của người dùng, sắp xếp mới nhất lên đầu (`ScanIndexForward: false`).
+- Xây dựng trang Thư viện cá nhân (`fe/app/library/page.tsx`) tích hợp check session và tự động redirect về trang chủ kèm query `?login_required=true` nếu chưa đăng nhập.
+- Thiết kế bộ lọc thời gian ở client (Tất cả, Hôm nay, 7 ngày qua, 30 ngày qua) và hiển thị số lượng tài liệu tìm thấy.
+- Tích hợp hiệu ứng Shimmer Skeleton Loader bằng CSS animation (`shimmer-bg`) hiển thị khung xương tài liệu đẹp mắt trong lúc chờ tải dữ liệu từ API.
+- Hiển thị các nhãn trạng thái trực quan tương ứng với tiến trình dịch (`Đang dịch...`, `✓ Hoàn thành`, `✕ Lỗi dịch`).
+- Thêm các nút thao tác nhanh: **Xem kết quả** (dẫn về trang chủ kèm `jobId` để tự động mở màn hình kết quả) và **Tải Markdown** (tải trực tiếp file dịch từ S3).
+- Tích hợp nút truy cập nhanh "Thư viện" và thanh phân cách visual vào header góc trên bên phải khi người dùng đã đăng nhập thành công.
+
+#### Kết quả kiểm thử:
+- Đã chạy unit test `be/test/jobs.test.ts` cho các API `/upload` và `/jobs` với kết quả **PASS 100%**.
+- Chạy thử nghiệm thành công quy trình đăng nhập bằng DEV OTP bypass, truy cập trang thư viện, chuyển đổi bộ lọc và kiểm tra visual state hoàn toàn chính xác.
+
+#### Files thay đổi:
+- `be/lambda/index.ts` - Bổ sung route handler cho `GET /jobs` và lấy `userId` từ context trong `POST /upload`.
+- `be/lib/be-stack.ts` - Định nghĩa resource `/jobs` và method GET kèm authorizer trên API Gateway.
+- `fe/lib/api.ts` - Thêm hàm `getJobs()` gọi API backend kèm Authorization Header.
+- `fe/app/library/page.tsx` - Thiết kế toàn bộ giao diện thư viện, skeleton loader, bộ lọc thời gian và logic tải file.
+- `fe/components/UploadView.tsx` - Tích hợp link "Thư viện" vào auth status header khi đã đăng nhập.
+
+#### Build & Test status:
+- npm run build: Pass (0 TypeScript errors)
+- Jest Backend test suite: Pass (3/3 test files, 12/12 tests passed)
+
 
 
 
