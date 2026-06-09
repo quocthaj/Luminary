@@ -18,5 +18,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ['/library', '/api/preview/:path*'],
+  matcher: ['/library/:path*', '/api/preview/:path*'],
 };
