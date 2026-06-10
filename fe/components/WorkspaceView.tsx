@@ -1,0 +1,1000 @@
+'use client';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { getResultUrl, fetchPreviewContent, resetMockProgress, getJobs, JobStatus } from '../lib/api';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
+import { useSession, signOut } from 'next-auth/react';
+import { LoginModal } from './LoginModal';
+
+type Lang = 'en' | 'vi';
+type RightTab = 'tutor' | 'scholar';
+
+interface Sections {
+  en: string;
+  vi: string;
+  hasEN: boolean;
+}
+
+function splitBilingual(raw: string): Sections {
+  const enRe = /^#{1,3}[^\S\r\n]*(english|en\b|english version)/im;
+  const viRe = /^#{1,3}[^\S\r\n]*(tiếng việt|vietnamese|vi\b|bản dịch)/im;
+  const enM = enRe.exec(raw);
+  const viM = viRe.exec(raw);
+
+  if (enM && viM) {
+    const enStart = enM.index;
+    const viStart = viM.index;
+    if (enStart < viStart) {
+      return { en: raw.slice(enStart + enM[0].length, viStart).trim(), vi: raw.slice(viStart + viM[0].length).trim(), hasEN: true };
+    }
+    return { en: raw.slice(enStart + enM[0].length).trim(), vi: raw.slice(viStart + viM[0].length, enStart).trim(), hasEN: true };
+  }
+
+  const parts = raw.split(/\n---\n/);
+  if (parts.length >= 2) {
+    return { en: parts[0].trim(), vi: parts.slice(1).join('\n---\n').trim(), hasEN: true };
+  }
+
+  return { en: '', vi: raw, hasEN: false };
+}
+
+function renderMarkdown(md: string): string {
+  if (!md) return '';
+
+  const codeBlocks: string[] = [];
+  const inlineCodes: string[] = [];
+  const blockMaths: { raw: string; html: string }[] = [];
+  const inlineMaths: { raw: string; html: string }[] = [];
+
+  // Extract code blocks and inline code first
+  let h = md
+    .replace(/```[\w]*\n?([\s\S]*?)```/g, (_, c) => { codeBlocks.push(c); return `\x00CB${codeBlocks.length - 1}\x00`; })
+    .replace(/`([^`\n]+)`/g, (_, c) => { inlineCodes.push(c); return `\x00IC${inlineCodes.length - 1}\x00`; });
+
+  // Extract block math next (so we don't process internal symbols)
+  h = h.replace(/\$\$\s*([\s\S]*?)\s*\$\$/g, (_, c) => {
+    let renderedHtml = '';
+    try {
+      renderedHtml = katex.renderToString(c, { displayMode: true, throwOnError: false });
+    } catch {
+      renderedHtml = `<code class="math-error">${c}</code>`;
+    }
+    blockMaths.push({ raw: c, html: renderedHtml });
+    return `\x00BM${blockMaths.length - 1}\x00`;
+  });
+
+  // Extract inline math next
+  h = h.replace(/\$([^\$\n]+?)\$/g, (_, c) => {
+    let renderedHtml = '';
+    try {
+      renderedHtml = katex.renderToString(c, { displayMode: false, throwOnError: false });
+    } catch {
+      renderedHtml = `<code class="math-error">${c}</code>`;
+    }
+    inlineMaths.push({ raw: c, html: renderedHtml });
+    return `\x00IM${inlineMaths.length - 1}\x00`;
+  });
+
+  h = h
+    .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
+    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+    .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+    .replace(/^---$/gm, '<hr/>')
+    .split('\n\n')
+    .map(block => {
+      const t = block.trim();
+      if (!t) return '';
+      if (/^<(h[1-6]|pre|ul|ol|blockquote|hr|li)/.test(t)) return t;
+      const anchorMatch = t.match(/^\{#chunk-(\d+)\}([\s\S]*)$/);
+      if (anchorMatch) {
+        const chunkIndex = anchorMatch[1];
+        const content = anchorMatch[2].replace(/\n/g, '<br/>');
+        return `<p id="chunk-${chunkIndex}" data-chunk="${chunkIndex}">${content}</p>`;
+      }
+      return `<p>${t.replace(/\n/g, '<br/>')}</p>`;
+    })
+    .join('\n');
+
+  // Put math back
+  blockMaths.forEach((m, i) => {
+    const rawLatexEscaped = encodeURIComponent(m.raw);
+    const wrapper = `<div class="katex-formula-wrapper relative group my-4 flex justify-center items-center rounded-xl p-4 transition-colors duration-200" style="background: var(--bg-elevated); border: 1px solid var(--border-subtle);" data-latex="${rawLatexEscaped}">
+      <div class="overflow-x-auto w-full text-center py-2">${m.html}</div>
+      <button class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity p-2 rounded-lg shadow-md cursor-pointer z-10 copy-latex-btn flex items-center justify-center gap-1 transition-all duration-150 active:scale-95" style="background: var(--bg-surface); border: 1px solid var(--border-normal); color: var(--text-secondary);" title="Copy LaTeX">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+        </svg>
+      </button>
+    </div>`;
+    h = h.replace(`\x00BM${i}\x00`, wrapper);
+  });
+
+  inlineMaths.forEach((m, i) => {
+    const rawLatexEscaped = encodeURIComponent(m.raw);
+    const wrapper = `<span class="katex-formula-wrapper relative group inline-flex items-center mx-0.5 px-1 rounded transition-colors duration-200" style="background: var(--bg-elevated); border: 1px solid var(--border-subtle); cursor: default;" data-latex="${rawLatexEscaped}">
+      <span>${m.html}</span>
+      <button class="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity px-2 py-1 rounded shadow-md text-[10px] cursor-pointer z-10 copy-latex-btn flex items-center gap-1 transition-all duration-150 active:scale-95 whitespace-nowrap" style="background: var(--bg-surface); border: 1px solid var(--border-normal); color: var(--text-secondary);" title="Copy LaTeX">
+        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1" />
+        </svg>
+        <span>Copy</span>
+      </button>
+    </span>`;
+    h = h.replace(`\x00IM${i}\x00`, wrapper);
+  });
+
+  codeBlocks.forEach((c, i) => { h = h.replace(`\x00CB${i}\x00`, `<pre><code>${c}</code></pre>`); });
+  inlineCodes.forEach((c, i) => { h = h.replace(`\x00IC${i}\x00`, `<code>${c}</code>`); });
+
+  return h;
+}
+
+export function WorkspaceView({
+  jobId: initialJobId,
+  onReset,
+  onReprocess,
+}: {
+  jobId: string;
+  onReset: () => void;
+  onReprocess?: () => void;
+}) {
+  const { data: session, status } = useSession();
+  const [jobId, setJobId] = useState(initialJobId);
+
+  // Layout states
+  const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
+  const [isRightCollapsed, setIsRightCollapsed] = useState(false);
+  const [rightTab, setRightTab] = useState<RightTab>('tutor');
+
+  // Document data states
+  const [downloadUrl, setDownloadUrl] = useState('');
+  const [rawContent, setRawContent] = useState('');
+  const [sections, setSections] = useState<Sections | null>(null);
+  const [tab, setTab] = useState<Lang>('vi');
+  const [loading, setLoading] = useState(true);
+  const [loadingContent, setLoadingContent] = useState(false);
+  const [error, setError] = useState('');
+  const [copiedLang, setCopiedLang] = useState<'en' | 'vi' | 'mobile' | null>(null);
+
+  // Authentication and modal states
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [pendingDownload, setPendingDownload] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
+
+  // Personal Library state
+  const [libraryJobs, setLibraryJobs] = useState<JobStatus[]>([]);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
+
+  // Scroll Sync Refs
+  const leftScrollRef = useRef<HTMLDivElement>(null);
+  const rightScrollRef = useRef<HTMLDivElement>(null);
+  const activeScrollColRef = useRef<'left' | 'right' | null>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Alert/Modal state for coming-soon features
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+
+  // Sync current jobId to URL query params
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('jobId') !== jobId) {
+        url.searchParams.set('jobId', jobId);
+        window.history.pushState({}, '', url.toString());
+      }
+    }
+  }, [jobId]);
+
+  // Fetch Library list when authenticated
+  useEffect(() => {
+    if (status !== 'authenticated') {
+      setLibraryJobs([]);
+      return;
+    }
+
+    const fetchLib = async () => {
+      try {
+        setLoadingLibrary(true);
+        const data = await getJobs();
+        setLibraryJobs(data);
+      } catch (err) {
+        console.error('Failed to load library in workspace:', err);
+      } finally {
+        setLoadingLibrary(false);
+      }
+    };
+    fetchLib();
+  }, [status, jobId]);
+
+  // Load document content
+  useEffect(() => {
+    setLoading(true);
+    setError('');
+    setRawContent('');
+    setSections(null);
+
+    getResultUrl(jobId)
+      .then(({ downloadUrl: url }) => {
+        setDownloadUrl(url);
+        setLoadingContent(true);
+        return fetchPreviewContent(jobId)
+          .then(text => {
+            setRawContent(text);
+            const parsed = splitBilingual(text);
+            setSections(parsed);
+            setTab('vi'); // Default to Vietnamese
+          })
+          .catch(() => { /* preview unavailable */ })
+          .finally(() => setLoadingContent(false));
+      })
+      .catch((err: any) => {
+        console.error('Error fetching result details:', err);
+        setError('Không thể lấy nội dung bản dịch. Vui lòng kiểm tra lại quyền truy cập.');
+      })
+      .finally(() => setLoading(false));
+
+    return () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    };
+  }, [jobId]);
+
+  const triggerFileDownload = useCallback(() => {
+    if (!downloadUrl) return;
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = 'analysis.md';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [downloadUrl]);
+
+  const handleDownloadClick = useCallback(() => {
+    if (status === 'authenticated') {
+      triggerFileDownload();
+    } else {
+      setPendingDownload(true);
+      setShowLoginModal(true);
+    }
+  }, [status, triggerFileDownload]);
+
+  const handleReprocessClick = useCallback(async () => {
+    if (status !== 'authenticated') {
+      setShowLoginModal(true);
+      return;
+    }
+
+    try {
+      setReprocessing(true);
+      setError('');
+      const res = await fetch(`/api/jobs/${jobId}/reprocess`, {
+        method: 'POST',
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Dịch lại thất bại');
+      }
+
+      if (onReprocess) {
+        resetMockProgress();
+        onReprocess();
+      }
+    } catch (err: any) {
+      console.error('Reprocess error:', err);
+      setError(err.message || 'Không thể dịch lại tài liệu này. Vui lòng thử lại sau.');
+    } finally {
+      setReprocessing(false);
+    }
+  }, [jobId, status, onReprocess]);
+
+  const handleLoginSuccess = useCallback(() => {
+    triggerFileDownload();
+    setPendingDownload(false);
+  }, [triggerFileDownload]);
+
+  const handleCopyText = useCallback((text: string, lang: 'en' | 'vi' | 'mobile') => {
+    if (!navigator.clipboard) {
+      console.warn('Clipboard API is not available');
+      return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedLang(lang);
+      setTimeout(() => setCopiedLang(null), 2000);
+    });
+  }, []);
+
+  const handleContentClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const btn = target.closest('.copy-latex-btn');
+    if (btn) {
+      e.stopPropagation();
+      const wrapper = btn.closest('.katex-formula-wrapper');
+      const latexEscaped = wrapper?.getAttribute('data-latex');
+      if (latexEscaped) {
+        const latex = decodeURIComponent(latexEscaped);
+        if (!navigator.clipboard) {
+          console.warn('Clipboard API is not available');
+          return;
+        }
+        navigator.clipboard.writeText(latex)
+          .then(() => {
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = `
+              <svg class="h-4 w-4 text-[var(--success)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+            `;
+            setTimeout(() => {
+              btn.innerHTML = originalHTML;
+            }, 1500);
+          })
+          .catch(err => console.error('Failed to copy LaTeX:', err));
+      }
+    }
+  }, []);
+
+  const handleScrollLeft = useCallback(() => {
+    if (activeScrollColRef.current && activeScrollColRef.current !== 'left') return;
+    activeScrollColRef.current = 'left';
+
+    const source = leftScrollRef.current;
+    const target = rightScrollRef.current;
+
+    if (source && target) {
+      const percentage = source.scrollTop / (source.scrollHeight - source.clientHeight);
+      target.scrollTop = Math.round(percentage * (target.scrollHeight - target.clientHeight));
+    }
+
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+      activeScrollColRef.current = null;
+    }, 100);
+  }, []);
+
+  const handleScrollRight = useCallback(() => {
+    if (activeScrollColRef.current && activeScrollColRef.current !== 'right') return;
+    activeScrollColRef.current = 'right';
+
+    const source = rightScrollRef.current;
+    const target = leftScrollRef.current;
+
+    if (source && target) {
+      const percentage = source.scrollTop / (source.scrollHeight - source.clientHeight);
+      target.scrollTop = Math.round(percentage * (target.scrollHeight - target.clientHeight));
+    }
+
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+      activeScrollColRef.current = null;
+    }, 100);
+  }, []);
+
+  const activeContent = sections ? (tab === 'en' ? sections.en : sections.vi) : rawContent;
+  const hasPreview = !!activeContent;
+  const enDisabled = !sections?.hasEN;
+
+  return (
+    <div className="flex h-screen w-screen overflow-hidden" style={{ background: 'var(--bg-base)' }}>
+      <div aria-hidden className="dot-grid pointer-events-none fixed inset-0 z-0" />
+
+      {/* ── CSS Shimmer & Animation Styles ── */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .shimmer-bg {
+          background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--border-normal) 50%, var(--bg-elevated) 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s infinite linear;
+        }
+      `}} />
+
+      {/* ── LEFT SIDEBAR (15% on Desktop, collapsible) ── */}
+      <aside
+        className={`hidden lg:flex flex-col h-full bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] transition-all duration-300 z-10 flex-shrink-0 select-none ${
+          isLeftCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-72 opacity-100'
+        }`}
+      >
+        {/* Brand Header */}
+        <div className="p-5 border-b border-[var(--border-subtle)] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold tracking-wider text-[var(--accent)]" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>
+              Luminary
+            </span>
+            <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded border border-[var(--border-normal)] text-[var(--text-secondary)]">
+              Workspace
+            </span>
+          </div>
+          <button
+            onClick={onReset}
+            title="Dịch tài liệu mới"
+            className="p-1.5 rounded-lg border border-[var(--border-normal)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Library list section */}
+        <div className="flex-1 flex flex-col min-h-0 p-4 gap-4">
+          <div className="flex flex-col min-h-0 flex-1">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3 px-1 flex items-center gap-1.5">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2m-4-1v8m0 0l3-3m-3 3L9 8m-5 5h2.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293H16" />
+              </svg>
+              Thư viện cá nhân
+            </h3>
+
+            {status !== 'authenticated' ? (
+              <div className="text-center py-6 border border-dashed border-[var(--border-normal)] rounded-xl p-4 bg-[var(--bg-elevated)]/30">
+                <p className="text-[11px] text-[var(--text-secondary)] mb-2.5">
+                  Đăng nhập để xem lịch sử bản dịch và lưu thư viện.
+                </p>
+                <button
+                  onClick={() => setShowLoginModal(true)}
+                  className="w-full py-1.5 rounded-lg bg-[var(--accent)] text-[#080b12] text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer"
+                >
+                  Đăng nhập ngay
+                </button>
+              </div>
+            ) : loadingLibrary ? (
+              <div className="flex flex-col gap-2">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-12 w-full rounded-xl shimmer-bg" />
+                ))}
+              </div>
+            ) : libraryJobs.length === 0 ? (
+              <p className="text-xs text-[var(--text-secondary)] italic text-center py-6">
+                Chưa có tài liệu nào trong thư viện.
+              </p>
+            ) : (
+              <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2 scrollbar-thin">
+                {libraryJobs.map(job => {
+                  const isActive = job.jobId === jobId;
+                  const isCompleted = job.status === 'completed';
+                  return (
+                    <button
+                      key={job.jobId}
+                      onClick={() => isCompleted && setJobId(job.jobId)}
+                      disabled={!isCompleted}
+                      className={`text-left p-2.5 rounded-xl border transition-all text-xs flex flex-col gap-1 w-full ${
+                        isActive
+                          ? 'bg-[var(--accent-dim)] border-[var(--accent)] text-[var(--text-primary)] font-medium'
+                          : 'bg-transparent border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-normal)]'
+                      } ${!isCompleted ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <span className="truncate w-full font-semibold">{job.fileName || 'Tài liệu học thuật.pdf'}</span>
+                      <span className="text-[9px] opacity-75">
+                        {job.createdAt ? new Date(parseInt(job.createdAt) * 1000).toLocaleDateString('vi-VN') : 'Mới'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Tools List */}
+          <div className="border-t border-[var(--border-subtle)] pt-4 flex-shrink-0">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3 px-1 flex items-center gap-1.5">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+              Bộ công cụ học tập
+            </h3>
+            <div className="flex flex-col gap-2">
+              {[
+                { name: 'Kiểm tra AI (Quiz)', desc: 'Tự động tạo câu hỏi trắc nghiệm' },
+                { name: 'Thẻ ghi nhớ (Flashcard)', desc: 'Ôn tập thuật ngữ khoa học' },
+                { name: 'Sơ đồ tư duy (Mindmap)', desc: 'Vẽ mindmap cấu trúc bài viết' },
+              ].map((tool, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setAlertMessage(`Tính năng "${tool.name}" sẽ được tích hợp ở Epic 4. Hãy đón chờ!`)}
+                  className="text-left p-2.5 rounded-xl border border-[var(--border-subtle)] bg-transparent hover:bg-[var(--bg-elevated)] transition-all flex flex-col gap-0.5 cursor-pointer relative group"
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-semibold text-[var(--text-primary)]">{tool.name}</span>
+                    <span className="text-[8px] bg-[var(--border-normal)] text-[var(--text-secondary)] px-1 rounded uppercase tracking-widest scale-90">
+                      Sắp có
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-secondary)] opacity-75">{tool.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* User profile footer */}
+        <div className="p-4 border-t border-[var(--border-subtle)] bg-[var(--bg-elevated)]/20 flex items-center justify-between">
+          {status === 'authenticated' ? (
+            <div className="flex items-center gap-2 w-full justify-between">
+              <div className="flex items-center gap-2 overflow-hidden">
+                {session?.user?.image ? (
+                  <img src={session.user.image} alt="Avatar" className="h-7 w-7 rounded-full flex-shrink-0" />
+                ) : (
+                  <div className="h-7 w-7 rounded-full bg-[var(--accent)] text-[#080b12] flex items-center justify-center text-[10px] font-bold uppercase flex-shrink-0">
+                    {session?.user?.email?.[0] || 'U'}
+                  </div>
+                )}
+                <span className="text-xs font-medium text-[var(--text-primary)] truncate max-w-[120px]">
+                  {session?.user?.email}
+                </span>
+              </div>
+              <button
+                onClick={() => signOut({ redirect: false })}
+                className="text-[10px] text-[var(--text-secondary)] hover:text-red-400 font-semibold transition-colors bg-transparent border-none cursor-pointer"
+              >
+                Đăng xuất
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowLoginModal(true)}
+              className="w-full flex items-center justify-center gap-2 border border-[var(--border-normal)] bg-[var(--bg-surface)] py-2 rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-all cursor-pointer"
+            >
+              Đăng nhập tài khoản
+            </button>
+          )}
+        </div>
+      </aside>
+
+      {/* ── Left Sidebar Toggle Handle (Desktop only) ── */}
+      <button
+        onClick={() => setIsLeftCollapsed(!isLeftCollapsed)}
+        id="left-sidebar-toggle"
+        data-testid="left-sidebar-toggle"
+        className="hidden lg:flex fixed top-1/2 -translate-y-1/2 z-30 h-10 w-5 items-center justify-center rounded-r-lg border border-[var(--border-normal)] bg-[var(--bg-surface)] text-[var(--text-secondary)] shadow-md hover:text-[var(--text-primary)] hover:scale-105 transition-all cursor-pointer"
+        style={{
+          left: isLeftCollapsed ? '0px' : '288px', // matches Left Sidebar width (288px)
+          transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
+        <svg
+          className={`h-3.5 w-3.5 transform transition-transform duration-300 ${isLeftCollapsed ? 'rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2.5}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      {/* ── CENTER WORKSPACE (Bilingual Reader, expands to fill space) ── */}
+      <main className="flex-1 flex flex-col h-full min-w-0 transition-all duration-300 bg-[var(--bg-base)] z-0 relative">
+        {/* Workspace Toolbar */}
+        <header className="h-14 border-b border-[var(--border-subtle)] px-6 flex items-center justify-between bg-[var(--bg-surface)]/60 backdrop-blur-md z-10">
+          <div className="flex items-center gap-3">
+            {/* Mobile Home Button */}
+            <button
+              onClick={onReset}
+              className="lg:hidden p-2 rounded-lg border border-[var(--border-normal)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </button>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)]">Đang đọc tài liệu</span>
+              <h2 className="text-sm font-bold text-[var(--text-primary)] truncate max-w-[200px] sm:max-w-md">
+                {libraryJobs.find(j => j.jobId === jobId)?.fileName || 'Đang tải tài liệu...'}
+              </h2>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {loading ? (
+              <span className="text-xs text-[var(--text-secondary)]">Đang tải...</span>
+            ) : error ? (
+              <span className="text-xs text-[var(--error)] font-medium">Lỗi kết nối</span>
+            ) : downloadUrl ? (
+              <>
+                <button
+                  onClick={handleDownloadClick}
+                  className="flex items-center gap-1.5 rounded-lg bg-[var(--success)] text-[#080b12] px-3.5 py-1.5 text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Tải về Markdown
+                </button>
+
+                <button
+                  onClick={handleReprocessClick}
+                  disabled={reprocessing}
+                  data-authenticated={status === 'authenticated'}
+                  className="flex items-center gap-1.5 rounded-lg border border-[var(--border-normal)] bg-[var(--bg-elevated)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-subtle)] px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer"
+                >
+                  {reprocessing ? (
+                    <>
+                      <span className="inline-block w-3 h-3 rounded-full border border-[var(--border-normal)] border-t-[var(--accent)] animate-spin" />
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-3.5 w-3.5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89" />
+                      </svg>
+                      Dịch lại
+                    </>
+                  )}
+                </button>
+              </>
+            ) : null}
+          </div>
+        </header>
+
+        {/* Reader container */}
+        <div
+          onClick={handleContentClick}
+          className="flex-1 flex flex-col overflow-hidden relative"
+        >
+          {/* Tab bar header */}
+          <div
+            className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/30 backdrop-blur-sm"
+          >
+            {/* Language switches on mobile / small screen */}
+            <div className={`flex items-center gap-1 ${sections?.hasEN ? 'lg:hidden' : ''}`}>
+              {(['en', 'vi'] as Lang[]).map(lang => {
+                const active = tab === lang;
+                const disabled = lang === 'en' && enDisabled;
+                return (
+                  <button
+                    key={lang}
+                    onClick={() => !disabled && setTab(lang)}
+                    disabled={disabled}
+                    className="rounded-lg px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider transition-all"
+                    style={{
+                      color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+                      background: active ? 'var(--bg-surface)' : 'transparent',
+                      border: active ? '1px solid var(--border-normal)' : '1px solid transparent',
+                      opacity: disabled ? 0.35 : 1,
+                      cursor: disabled ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {lang === 'en' ? 'English' : 'Tiếng Việt'}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Desktop Title Indicator */}
+            {sections?.hasEN && (
+              <div className="hidden lg:flex items-center gap-2">
+                <svg className="h-4 w-4 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                <span className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Xem song ngữ song song</span>
+              </div>
+            )}
+
+            {/* Status indicators and copy text */}
+            <div className="flex items-center gap-2">
+              {hasPreview && (
+                <button
+                  onClick={() => handleCopyText(activeContent, 'mobile')}
+                  className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] bg-transparent lg:hidden cursor-pointer"
+                >
+                  {copiedLang === 'mobile' ? (
+                    <span className="text-[var(--success)] font-semibold flex items-center gap-1">
+                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      Đã chép
+                    </span>
+                  ) : (
+                    <>
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      Sao chép
+                    </>
+                  )}
+                </button>
+              )}
+
+              {sections?.hasEN ? (
+                <span className="rounded-md px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-[var(--success-dim)] text-[var(--success)] border border-green-500/10">
+                  Song Ngữ
+                </span>
+              ) : (
+                <span className="rounded-md px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-[var(--accent-dim)] text-[var(--accent)] border border-[var(--accent-glow)]">
+                  Tiếng Việt
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Core reader layout */}
+          <div className="flex-1 overflow-hidden relative">
+            {loadingContent ? (
+              <div className="flex items-center justify-center gap-3 h-full">
+                <span className="inline-block w-5 h-5 rounded-full border-2 border-[var(--border-normal)] border-t-[var(--accent)] animate-spin" />
+                <span className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Đang tải bản dịch...</span>
+              </div>
+            ) : !hasPreview ? (
+              <div className="flex flex-col items-center justify-center gap-3 h-full p-6 text-center">
+                <svg className="h-10 w-10 text-[var(--text-muted)] opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Không thể tải bản xem trước trực tuyến.<br />Hãy tải Markdown về máy để đọc trực tiếp.
+                </p>
+              </div>
+            ) : sections?.hasEN ? (
+              <>
+                {/* Desktop Side-by-Side Synced Scrolling View */}
+                <div className="hidden lg:grid lg:grid-cols-2 lg:divide-x lg:divide-[var(--border-subtle)] h-full overflow-hidden">
+                  {/* English original column */}
+                  <div
+                    ref={leftScrollRef}
+                    onScroll={handleScrollLeft}
+                    className="overflow-y-auto px-8 py-6 h-full scrollbar-thin relative"
+                  >
+                    <div className="sticky top-0 z-20 bg-[var(--bg-base)] pb-2 mb-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
+                      <span className="text-[10px] font-bold tracking-wider text-[var(--accent)] uppercase">EN · English Version</span>
+                      <button
+                        onClick={() => handleCopyText(sections.en, 'en')}
+                        className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold transition-all text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] cursor-pointer"
+                      >
+                        {copiedLang === 'en' ? (
+                          <span className="text-[var(--success)]">✓ Đã sao chép</span>
+                        ) : (
+                          'Sao chép'
+                        )}
+                      </button>
+                    </div>
+                    <div
+                      className="markdown-preview animate-fade-in"
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(sections.en) }}
+                    />
+                  </div>
+
+                  {/* Vietnamese translation column */}
+                  <div
+                    ref={rightScrollRef}
+                    onScroll={handleScrollRight}
+                    className="overflow-y-auto px-8 py-6 h-full scrollbar-thin relative"
+                  >
+                    <div className="sticky top-0 z-20 bg-[var(--bg-base)] pb-2 mb-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
+                      <span className="text-[10px] font-bold tracking-wider text-[var(--success)] uppercase">VI · Bản dịch tiếng Việt</span>
+                      <button
+                        onClick={() => handleCopyText(sections.vi, 'vi')}
+                        className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold transition-all text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] cursor-pointer"
+                      >
+                        {copiedLang === 'vi' ? (
+                          <span className="text-[var(--success)]">✓ Đã sao chép</span>
+                        ) : (
+                          'Sao chép'
+                        )}
+                      </button>
+                    </div>
+                    <div
+                      className="markdown-preview animate-fade-in"
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(sections.vi) }}
+                    />
+                  </div>
+                </div>
+
+                {/* Mobile / Tablet single column view */}
+                <div className="lg:hidden h-full overflow-y-auto px-6 py-6 scrollbar-thin">
+                  <div
+                    className="markdown-preview animate-fade-in"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(activeContent) }}
+                  />
+                </div>
+              </>
+            ) : (
+              /* Single Language Fallback View */
+              <div className="h-full overflow-y-auto px-8 py-6 scrollbar-thin">
+                <div
+                  className="markdown-preview animate-fade-in"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(activeContent) }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* ── Right Sidebar Toggle Handle (Desktop only) ── */}
+      <button
+        onClick={() => setIsRightCollapsed(!isRightCollapsed)}
+        id="right-sidebar-toggle"
+        data-testid="right-sidebar-toggle"
+        className="hidden lg:flex fixed top-1/2 -translate-y-1/2 z-30 h-10 w-5 items-center justify-center rounded-l-lg border border-[var(--border-normal)] bg-[var(--bg-surface)] text-[var(--text-secondary)] shadow-md hover:text-[var(--text-primary)] hover:scale-105 transition-all cursor-pointer"
+        style={{
+          right: isRightCollapsed ? '0px' : '384px', // matches Right Sidebar width (384px)
+          transition: 'right 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
+        <svg
+          className={`h-3.5 w-3.5 transform transition-transform duration-300 ${isRightCollapsed ? '' : 'rotate-180'}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2.5}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      {/* ── RIGHT SIDEBAR (30% on Desktop, collapsible) ── */}
+      <aside
+        className={`hidden lg:flex flex-col h-full bg-[var(--bg-surface)] border-l border-[var(--border-subtle)] transition-all duration-300 z-10 flex-shrink-0 select-none ${
+          isRightCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-96 opacity-100'
+        }`}
+      >
+        {/* Tab Headers */}
+        <div className="flex border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]/20">
+          <button
+            onClick={() => setRightTab('tutor')}
+            className={`flex-1 py-4 text-xs font-bold uppercase tracking-wider text-center transition-all cursor-pointer border-b-2 ${
+              rightTab === 'tutor'
+                ? 'border-[var(--accent)] text-[var(--accent)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            AI Tutor Chat
+          </button>
+          <button
+            onClick={() => setRightTab('scholar')}
+            className={`flex-1 py-4 text-xs font-bold uppercase tracking-wider text-center transition-all cursor-pointer border-b-2 ${
+              rightTab === 'scholar'
+                ? 'border-[var(--accent)] text-[var(--accent)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            Papers liên quan
+          </button>
+        </div>
+
+        {/* Tab content area */}
+        <div className="flex-1 flex flex-col overflow-hidden p-5">
+          {rightTab === 'tutor' ? (
+            /* AI TUTOR TAB */
+            <div className="flex-1 flex flex-col justify-between overflow-hidden gap-4">
+              {/* Chat message history container */}
+              <div className="flex-grow overflow-y-auto pr-1 flex flex-col gap-4">
+                <div className="flex items-start gap-2.5">
+                  <div className="h-6 w-6 rounded-full bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-[var(--accent)] flex items-center justify-center text-[10px] font-bold">
+                    AI
+                  </div>
+                  <div className="flex-1 bg-[var(--bg-elevated)] p-3 rounded-2xl rounded-tl-none border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] leading-relaxed">
+                    <p className="font-semibold mb-1" style={{ color: 'var(--accent)' }}>AI Tutor học thuật</p>
+                    Chào Thai! Tôi là AI Tutor. Sau khi RAG chat được tích hợp ở Story 3.4, bạn có thể đặt câu hỏi phân tích chuyên sâu về bài viết này tại đây.
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 ml-8 mt-1">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)] mb-1">Gợi ý câu hỏi:</span>
+                  {[
+                    'Tóm tắt mục Phương pháp nghiên cứu',
+                    'Giải thích công thức toán học chính',
+                    'Định nghĩa các thuật ngữ chuyên ngành',
+                  ].map((q, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setAlertMessage('Tính năng Chat RAG sẽ được phát triển đầy đủ ở Story 3.4. Hãy đón chờ!')}
+                      className="text-left text-xs p-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-normal)] transition-colors cursor-pointer"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chat input box */}
+              <div className="border-t border-[var(--border-subtle)] pt-4 flex-shrink-0">
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    placeholder="Hỏi AI Tutor..."
+                    disabled
+                    className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] text-xs px-4 py-3 rounded-xl border border-[var(--border-subtle)] pr-10 outline-none placeholder:text-[var(--text-muted)] opacity-60"
+                  />
+                  <button
+                    disabled
+                    className="absolute right-3 text-[var(--text-muted)] cursor-not-allowed"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* SEMANTIC SCHOLAR TAB */
+            <div className="flex-1 flex flex-col overflow-y-auto pr-1 gap-4 scrollbar-thin">
+              <div className="p-3 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl text-xs text-[var(--text-primary)] mb-2">
+                📌 <strong>Semantic Scholar API:</strong> Đề xuất các bài báo học thuật liên quan dựa trên citation network. Tính năng sẽ được kích hoạt ở Story 3.5.
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {[
+                  {
+                    title: 'Attention Is All You Need',
+                    authors: 'A Vaswani, N Shazeer, N Parmar...',
+                    year: '2017',
+                    citations: '120,432',
+                  },
+                  {
+                    title: 'BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding',
+                    authors: 'J Devlin, MW Chang, K Lee, K Toutanova',
+                    year: '2018',
+                    citations: '98,201',
+                  },
+                  {
+                    title: 'Language Models are Few-Shot Learners',
+                    authors: 'TB Brown, B Mann, N Ryder, M Subbiah...',
+                    year: '2020',
+                    citations: '34,510',
+                  },
+                ].map((paper, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/30 flex flex-col gap-1.5"
+                  >
+                    <h4 className="text-xs font-bold text-[var(--text-primary)] line-clamp-2 leading-snug">
+                      {paper.title}
+                    </h4>
+                    <p className="text-[10px] text-[var(--text-secondary)] truncate">
+                      {paper.authors}
+                    </p>
+                    <div className="flex items-center justify-between text-[9px] text-[var(--text-muted)] font-medium pt-1 border-t border-[var(--border-subtle)]">
+                      <span>Năm: {paper.year}</span>
+                      <span className="text-[var(--success)]">Trích dẫn: {paper.citations}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* ── Login Modal ── */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => {
+          setShowLoginModal(false);
+          setPendingDownload(false);
+        }}
+        onSuccess={handleLoginSuccess}
+      />
+
+      {/* ── Alert popup for mock elements ── */}
+      {alertMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-sm rounded-2xl p-6 bg-[var(--bg-surface)] border border-[var(--border-normal)] text-center shadow-xl animate-fade-up">
+            <div className="h-10 w-10 mx-auto rounded-full bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-[var(--accent)] flex items-center justify-center mb-3">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h4 className="text-sm font-bold text-[var(--text-primary)] mb-2">Tính năng đang phát triển</h4>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-5">{alertMessage}</p>
+            <button
+              onClick={() => setAlertMessage(null)}
+              className="px-5 py-2.5 rounded-xl bg-[var(--accent)] text-[#080b12] text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer border-none w-full"
+            >
+              Tôi đã hiểu
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -19,6 +19,7 @@ interface MergeInput {
 interface MergeOutput {
   jobId: string;
   outputKey: string;
+  chunksCount: number;
 }
 
 export const handler = async (event: MergeInput): Promise<MergeOutput> => {
@@ -27,27 +28,31 @@ export const handler = async (event: MergeInput): Promise<MergeOutput> => {
 
   console.log(`🤝 [merge] job=${jobId}`);
 
-  // Bước 1: Download original English text + translated chunks song song
-  const [originalText, ...translatedParts] = await Promise.all([
-    getResultFromS3(originalTextKey),
-    ...([...translateResult.translatedChunks]
-      .sort((a, b) => a.chunkIndex - b.chunkIndex)
-      .map(c => getResultFromS3(c.translatedKey))),
-  ]);
-  let translatedText = translatedParts.join('\n\n');
+  const sortedChunks = [...translateResult.translatedChunks].sort((a, b) => a.chunkIndex - b.chunkIndex);
 
-  // Bước 2: Apply LaTeX replacements lên bản dịch
+  // Bước 1: Download original English chunks + translated chunks song song
+  const [originalParts, translatedParts] = await Promise.all([
+    Promise.all(sortedChunks.map(c => getResultFromS3(`results/${jobId}/chunks/chunk_${c.chunkIndex}.txt`))),
+    Promise.all(sortedChunks.map(c => getResultFromS3(c.translatedKey))),
+  ]);
+
+  // Bước 2: Apply LaTeX replacements lên từng bản dịch chunk
+  let processedTranslatedParts = [...translatedParts];
   try {
     const latexJsonStr = await getResultFromS3(latexResult.latexKey);
     const latexArray: Array<{ key: string; original: string; latex: string | null }> = JSON.parse(latexJsonStr);
-    if (Array.isArray(latexArray)) {
-      for (const formula of latexArray) {
-        if (formula.key) {
-          const replacement = formula.latex ?? formula.original;
-          translatedText = translatedText.replaceAll(formula.key, replacement);
+    if (Array.isArray(latexArray) && latexArray.length > 0) {
+      processedTranslatedParts = translatedParts.map(part => {
+        let text = part;
+        for (const formula of latexArray) {
+          if (formula.key) {
+            const replacement = formula.latex ?? formula.original;
+            text = text.replaceAll(formula.key, replacement);
+          }
         }
-      }
-      console.log(`📐 [merge] Applied ${latexArray.length} LaTeX replacements`);
+        return text;
+      });
+      console.log(`📐 [merge] Applied ${latexArray.length} LaTeX replacements to chunks`);
     }
   } catch (err) {
     console.warn('⚠️ [merge] LaTeX apply failed, skipping:', err);
@@ -62,8 +67,10 @@ export const handler = async (event: MergeInput): Promise<MergeOutput> => {
       uniqueCitations.map(c => `- ${c}`).join('\n');
   }
 
-  // Bước 4: Assemble bilingual Markdown
-  const finalMarkdown = `## English\n\n${originalText}\n\n---\n\n## Tiếng Việt\n\n${translatedText}${bibliographySection}`;
+  // Bước 4: Prepend anchors và assemble bilingual Markdown
+  const englishContent = originalParts.map((part, idx) => `{#chunk-${idx}}${part}`).join('\n\n');
+  const vietnameseContent = processedTranslatedParts.map((part, idx) => `{#chunk-${idx}}${part}`).join('\n\n');
+  const finalMarkdown = `## English\n\n${englishContent}\n\n---\n\n## Tiếng Việt\n\n${vietnameseContent}${bibliographySection}`;
 
   // Bước 5: Save to S3
   const outputKey = await saveResultToS3(jobId, 'analysis', finalMarkdown, 'analysis.md');
@@ -76,5 +83,5 @@ export const handler = async (event: MergeInput): Promise<MergeOutput> => {
 
   console.log(`✅ [merge] Completed → ${outputKey}`);
 
-  return { jobId, outputKey };
+  return { jobId, outputKey, chunksCount: sortedChunks.length };
 };

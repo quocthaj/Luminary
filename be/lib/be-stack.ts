@@ -148,12 +148,16 @@ export class VietAIScholarStack extends cdk.Stack {
     const mistralSecret = secretsmanager.Secret.fromSecretNameV2(
       this, 'MistralSecret', 'viet-ai-scholar/mistral-api-key'
     );
+    const qdrantSecret = secretsmanager.Secret.fromSecretNameV2(
+      this, 'QdrantSecret', 'vietai/qdrant-config'
+    );
 
     // Grant Lambda read access to all secrets
     groqSecret.grantRead(lambdaRole);
     geminiSecret.grantRead(lambdaRole);
     deepseekSecret.grantRead(lambdaRole);
     mistralSecret.grantRead(lambdaRole);
+    qdrantSecret.grantRead(lambdaRole);
 
     // CloudWatch Logs
     lambdaRole.addManagedPolicy(
@@ -331,6 +335,23 @@ export class VietAIScholarStack extends cdk.Stack {
       description: 'Merge translated chunks into final Markdown output',
     });
 
+    const ingestLambda = new lambdaNode.NodejsFunction(this, 'IngestLambda', {
+      functionName: 'vietai-ingest',
+      entry: path.join(__dirname, '../lambda/handlers/ingest.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      role: lambdaRole,
+      timeout: cdk.Duration.seconds(120),
+      memorySize: 512,
+      environment: {
+        S3_RESULTS_BUCKET: resultsBucket.bucketName,
+        DYNAMODB_TABLE: jobsTable.tableName,
+        GEMINI_SECRET_ARN: geminiSecret.secretArn,
+        QDRANT_SECRET_ARN: qdrantSecret.secretArn,
+      },
+      description: 'Ingest bilingual Markdown and upsert vectors to Qdrant Cloud',
+    });
+
     // ============================================
     // 5. STEP FUNCTIONS STATE MACHINE
     // ============================================
@@ -374,9 +395,16 @@ export class VietAIScholarStack extends cdk.Stack {
       comment: 'Merge translated chunks into final Markdown output',
     });
 
+    const ingestTask = new tasks.LambdaInvoke(this, 'IngestTask', {
+      lambdaFunction: ingestLambda,
+      outputPath: '$.Payload',
+      comment: 'Ingest bilingual Markdown and upsert vectors to Qdrant Cloud',
+    });
+
     const definition = extractTask
       .next(parallelState)
-      .next(mergeTask);
+      .next(mergeTask)
+      .next(ingestTask);
 
     const processingStateMachine = new sfn.StateMachine(this, 'ProcessingStateMachine', {
       stateMachineName: 'vietai-processing-pipeline',

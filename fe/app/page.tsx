@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { UploadView } from '../components/UploadView';
 import { ProcessingView } from '../components/ProcessingView';
-import { ResultView } from '../components/ResultView';
+import { WorkspaceView } from '../components/WorkspaceView';
 
 type AppState = 'upload' | 'processing' | 'result';
 
@@ -39,5 +39,5 @@ export default function Home() {
   if (state === 'processing') {
     return <ProcessingView jobId={jobId} onComplete={handleComplete} />;
   }
-  return <ResultView jobId={jobId} onReset={handleReset} onReprocess={handleReprocess} />;
+  return <WorkspaceView jobId={jobId} onReset={handleReset} onReprocess={handleReprocess} />;
 }

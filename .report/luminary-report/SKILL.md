@@ -301,4 +301,130 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 - Playwright E2E test suite: Pass (4/4 tests passed)
 - Jest Backend test suite: Pass (12/12 tests passed)
 
+---
+
+### ✅ Story 3.1: Giao diện Workspace 3 cột
+**Status:** Done  
+**Time:** 8 hours  
+**Date:** 2026-06-10
+
+#### Đã làm:
+- Thiết kế cấu trúc giao diện `WorkspaceView.tsx` làm layout 3 cột chính thức trên Desktop: Cột trái (Sidebar 15% - Thư viện và danh sách công cụ), Cột giữa (Bilingual Reader 55% - Đọc song ngữ), Cột phải (AI Tutor Panel 30% - Chat và Semantic Scholar).
+- Tích hợp các nút điều khiển đóng/mở (Collapse/Expand handles) với mã định danh `#left-sidebar-toggle` và `#right-sidebar-toggle`.
+- Triển khai hiệu ứng chuyển đổi mượt mà bằng CSS transitions (`transition-all duration-300`) khi đóng/mở để cột giữa tự động mở rộng/thu gọn.
+- Xử lý giao diện responsive trên Mobile/Tablet (< 1024px): tự động ẩn 2 sidebar trái/phải để ưu tiên không gian cho Bilingual Reader cuộn đồng bộ.
+- Tích hợp `WorkspaceView.tsx` vào trang hiển thị chính `fe/app/page.tsx`.
+- Cập nhật các test suites hiện có để thích ứng với giao diện mới (tìm kiếm nút Dịch lại bằng thuộc tính `data-authenticated` và kiểm tra sự hiển thị của thẻ `span:text-is("Song Ngữ")` thay vì tiêu đề H2 tĩnh).
+- Xây dựng suite E2E tests mới `fe/tests/workspace.spec.ts` dùng Playwright để tự động kiểm thử khả năng đóng/mở sidebar, sự giãn rộng của cột chính và ẩn sidebar trên môi trường mobile.
+
+#### Kết quả kiểm thử:
+- **Playwright E2E:** 5/5 tests PASS (`auth.spec.ts`, `download.spec.ts`, `katex.spec.ts`, `reprocess.spec.ts`, `workspace.spec.ts`).
+- **npm run build:** Pass (0 TypeScript errors).
+
+#### Vấn đề gặp phải:
+- Lỗi Strict Mode của Playwright do trùng lặp chuỗi "Song ngữ" ở phần mô tả landing page và tiêu đề. → **Giải pháp:** Sử dụng chính xác selector `span:text-is("Song Ngữ")` cho các xác thực loader.
+- Độ trễ biên dịch Next.js trong môi trường E2E dễ gây timeout khi chạy nhiều worker song song. → **Giải pháp:** Chạy với cấu hình `--workers=1` để đảm bảo độ ổn định.
+
+#### Bước tiếp theo:
+- Triển khai Story 3.2: Tách đoạn & Embedding lưu trữ Qdrant Cloud (Paragraph Ingestion & Qdrant Upsert Lambda).
+
+#### Files thay đổi:
+- `fe/components/WorkspaceView.tsx` - Thiết kế và xây dựng giao diện layout 3 cột.
+- `fe/app/page.tsx` - Tích hợp WorkspaceView thay thế ResultView.
+- `fe/tests/workspace.spec.ts` - (NEW) Playwright E2E tests cho Workspace.
+- `fe/tests/download.spec.ts` - Cập nhật selector xác thực tiêu đề.
+- `fe/tests/katex.spec.ts` - Cập nhật selector xác thực loader.
+- `fe/tests/reprocess.spec.ts` - Cập nhật selector xác thực loader.
+
+#### Build status:
+- npm run build: Pass
+- TypeScript errors: 0
+- Playwright E2E test suite: Pass (5/5 tests passed)
+- Jest Backend test suite: Pass (12/12 tests passed)
+
+---
+
+### ✅ Story 3.2: Tách đoạn & Embedding lưu trữ Qdrant Cloud (Paragraph Ingestion & Qdrant Upsert Lambda)
+**Status:** Done  
+**Time:** 10 hours  
+**Date:** 2026-06-10
+
+#### Đã làm:
+1. **Cấu hình cơ sở hạ tầng & Secrets (CDK - `be/lib/be-stack.ts`):**
+   - Đăng ký và cấu hình CDK tham chiếu đến secret `vietai/qdrant-config` lưu trữ trên AWS Secrets Manager.
+   - Cấp quyền đọc secret `vietai/qdrant-config` cho shared `lambdaRole` thông qua `.grantRead()`.
+   - Khởi tạo Lambda `vietai-ingest` mới với timeout 120s và biến môi trường chứa secret ARN cần thiết (`GEMINI_SECRET_ARN`, `QDRANT_SECRET_ARN`).
+   - Cập nhật định nghĩa Step Functions State Machine `vietai-processing-pipeline`, xích thêm `IngestTask` chạy tiếp nối sau `MergeTask`.
+2. **Backend – Sửa đổi Merge Lambda (`be/lambda/handlers/merge.ts`):**
+   - Thay đổi logic gộp Markdown song ngữ: tải riêng từng đoạn gốc tiếng Anh và bản dịch tương ứng thay vì tải cả file text lớn.
+   - Chèn mã định vị anchor ẩn `{#chunk-index}` vào đầu mỗi đoạn nguyên bản tiếng Anh và đoạn dịch tương ứng (sau khi thay thế các ký tự LaTeX).
+   - Trả về số lượng chunk thực tế (`chunksCount`) làm đầu vào cho task tiếp theo.
+3. **Backend – Lambda Ingest mới (`be/lambda/handlers/ingest.ts`):**
+   - Đọc và phân tích file Markdown song ngữ hoàn chỉnh từ S3, trích xuất chính xác các cặp đoạn văn gốc-dịch dựa trên cú pháp anchor `{#chunk-index}`.
+   - Tải API Key cho Google Gemini và gọi batch API `text-embedding-004` (chia nhóm batch 50 items để tránh quá giới hạn request) lấy vector 768 chiều cho toàn bộ văn bản gốc tiếng Anh.
+   - Khởi tạo Qdrant REST Client (`@qdrant/js-client-rest`), tự động tạo collection `vietai-scholar-chunks` nếu chưa tồn tại (distance: Cosine, dimension: 768).
+   - Sinh UUIDv5 deterministic cho từng điểm (point) để đảm bảo ghi đè/đồng bộ khi người dùng kích hoạt "Dịch lại".
+   - Upsert dữ liệu point gồm vector và payload metadata (`userId`, `jobId`, `chunkIndex`, `text_original`, `text_translated`) lên Qdrant Cloud.
+4. **Backend – DynamoDB Helpers (`be/lambda/utils/dynamodb-helpers.ts`):**
+   - Viết hàm `getJobItem` để truy xuất nhanh bản ghi job từ table `vietai-jobs` phục vụ trích xuất `userId`.
+5. **Frontend – Hiển thị & Highlight đoạn (`fe/components/ResultView.tsx`):**
+   - Nâng cấp hàm `renderMarkdown` ở frontend để nhận biết cú pháp `{#chunk-index}` và render thành thuộc tính `id="chunk-index"` và `data-chunk="index"` trên thẻ `<p>`, ẩn ký tự thô khỏi màn hình đọc của người dùng.
+6. **Backend Unit Tests (`be/test/ingest.test.ts`):**
+   - Viết test suite cho `ingest.ts` giả lập S3, DynamoDB, Secrets Manager, Gemini và Qdrant SDK. Kết quả chạy thành công 100% tất cả các trường hợp kiểm tra.
+
+#### Kết quả kiểm thử:
+- **Backend Jest Unit Tests:** 4/4 suites PASS (bao gồm suite mới `ingest.test.ts` chứa các kiểm tra phân tích Markdown, gọi Gemini Embeddings và đẩy Qdrant).
+- **TypeScript compiles:** Pass hoàn toàn ở cả backend và frontend.
+
+#### Files thay đổi:
+- `be/package.json` - Cài đặt thêm `@qdrant/js-client-rest`.
+- `be/lib/be-stack.ts` - Thêm Lambda `vietai-ingest`, grant permissions, cập nhật pipeline Step Functions.
+- `be/lambda/handlers/merge.ts` - Gộp cặp đoạn và prepend anchor `{#chunk-X}`, trả về `chunksCount`.
+- `be/lambda/handlers/ingest.ts` - (NEW) Phân tích markdown, sinh embedding và upsert lên Qdrant Cloud.
+- `be/lambda/utils/ai-providers.ts` - Viết hàm `getGeminiEmbeddingsBatch` xử lý sinh vector embedding hàng loạt.
+- `be/lambda/utils/dynamodb-helpers.ts` - Thêm hàm `getJobItem`.
+- `be/test/ingest.test.ts` - (NEW) Viết suite test mock cho ingest handler.
+- `fe/components/ResultView.tsx` - Sửa `renderMarkdown` để ẩn ký tự anchor và gán id/data-chunk.
+
+#### Build status:
+- npm run build: Pass
+- TypeScript errors: 0
+- Jest Backend test suite: Pass (18/18 tests passed)
+
+---
+
+### ✅ Tinh chỉnh Story 3.2 & Dọn dẹp Codebase
+**Status:** Done  
+**Time:** 4 hours  
+**Date:** 2026-06-10
+
+#### Đã làm:
+1. **Khôi phục và cập nhật cấu hình Qdrant Cloud:**
+   - Khôi phục (restore) secret `vietai/qdrant-config` trong AWS Secrets Manager đang ở trạng thái chờ xóa (marked for deletion).
+   - Cập nhật secret string với URL và API key thực tế của Qdrant Cloud instance mới.
+2. **Đồng bộ hóa Model và Số chiều Vector (Embedding & Collection):**
+   - Cấu hình sử dụng model **`gemini-embedding-001`** trong `be/lambda/utils/ai-providers.ts` để tối ưu hóa hiệu năng và chi phí.
+   - Điều chỉnh cấu hình kích thước vector của Qdrant collection trong `be/lambda/handlers/ingest.ts` về **`768`** chiều để khớp hoàn toàn với số chiều đầu ra của `gemini-embedding-001`, ngăn ngừa lỗi lệch số chiều (dimension mismatch).
+3. **Làm sạch cấu trúc mã nguồn TypeScript (Clean codebase):**
+   - Loại bỏ toàn bộ các file `.js` và `.d.ts` thừa thãi biên dịch tại chỗ (in-place) bên trong các thư mục mã nguồn `be/lambda/`, `be/lib/`, và `be/bin/`.
+   - Cấu hình `"outDir": "dist"` trong `be/tsconfig.json` để gom toàn bộ mã nguồn JS biên dịch vào thư mục `be/dist/`.
+   - Thêm `dist` vào `be/.gitignore` và phần `exclude` của `tsconfig.json` nhằm đảm bảo môi trường phát triển sạch sẽ.
+
+#### Kết quả kiểm thử:
+- Đã chạy biên dịch lại toàn bộ dự án (`npm run build`) và deploy thành công qua `npx cdk deploy --all`.
+- Không còn lỗi biên dịch tại chỗ gây nhiễu trình soạn thảo (editor).
+
+#### Files thay đổi:
+- `be/lambda/utils/ai-providers.ts` - Thay đổi cấu hình sử dụng model `gemini-embedding-001` để sinh vector.
+- `be/lambda/handlers/ingest.ts` - Chuyển kích thước Qdrant collection về 768 chiều.
+- `be/tsconfig.json` - Bổ sung `"outDir": "dist"` và loại trừ thư mục `dist`.
+- `be/.gitignore` - Bổ sung loại trừ thư mục `dist`.
+
+#### Build status:
+- npm run build: Pass
+- TypeScript errors: 0
+- CDK deploy: Success
+
+
+
 

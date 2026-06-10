@@ -91,6 +91,12 @@ function renderMarkdown(md: string): string {
       const t = block.trim();
       if (!t) return '';
       if (/^<(h[1-6]|pre|ul|ol|blockquote|hr|li)/.test(t)) return t;
+      const anchorMatch = t.match(/^\{#chunk-(\d+)\}([\s\S]*)$/);
+      if (anchorMatch) {
+        const chunkIndex = anchorMatch[1];
+        const content = anchorMatch[2].replace(/\n/g, '<br/>');
+        return `<p id="chunk-${chunkIndex}" data-chunk="${chunkIndex}">${content}</p>`;
+      }
       return `<p>${t.replace(/\n/g, '<br/>')}</p>`;
     })
     .join('\n');

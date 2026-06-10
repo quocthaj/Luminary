@@ -21,6 +21,9 @@ export class ApiError extends Error {
   }
 }
 
+let cachedSession: any = null;
+let cacheExpiry = 0;
+
 // Helper to get standard API headers including Authorization token
 async function getApiHeaders(extraHeaders: Record<string, string> = {}): Promise<HeadersInit> {
   const headers: Record<string, string> = {
@@ -28,9 +31,13 @@ async function getApiHeaders(extraHeaders: Record<string, string> = {}): Promise
     ...extraHeaders
   };
   try {
-    const session = await getSession();
-    if (session?.accessToken) {
-      headers['Authorization'] = `Bearer ${session.accessToken}`;
+    const now = Date.now();
+    if (!cachedSession || now > cacheExpiry) {
+      cachedSession = await getSession();
+      cacheExpiry = now + 10000; // Cache for 10 seconds
+    }
+    if (cachedSession?.accessToken) {
+      headers['Authorization'] = `Bearer ${cachedSession.accessToken}`;
     }
   } catch (err) {
     console.warn('Failed to retrieve session for API headers:', err);

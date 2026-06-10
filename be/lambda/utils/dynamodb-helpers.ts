@@ -18,6 +18,16 @@ export async function getJobStatus(jobId: string): Promise<{ status: string } | 
     return { status: response.Item.status?.S ?? 'unknown' };
 }
 
+export async function getJobItem(jobId: string): Promise<Record<string, any> | null> {
+    const response = await dynamodbClient.send(
+        new GetItemCommand({
+            TableName: JOBS_TABLE,
+            Key: { jobId: { S: jobId } },
+        })
+    );
+    return response.Item || null;
+}
+
 export async function updateJobStatus(
     jobId: string,
     status: string,

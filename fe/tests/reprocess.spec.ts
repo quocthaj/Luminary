@@ -7,8 +7,8 @@ test.describe('Reprocess Job Flow', () => {
     // 1. Navigate to homepage with a mock jobId
     await page.goto('/?jobId=mock-reprocess-test&test_mode=true');
 
-    // Wait for the translation to complete and ResultView to load
-    await expect(page.locator('h2')).toHaveText('Dịch hoàn tất!', { timeout: 15000 });
+    // Wait for the translation to complete and WorkspaceView to load
+    await expect(page.locator('span:text-is("Song Ngữ")')).toBeVisible({ timeout: 15000 });
 
     // 2. Locate the reprocess button
     const reprocessBtn = page.locator('button:has-text("Dịch lại")');

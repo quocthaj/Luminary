@@ -5,11 +5,11 @@ test.describe('Download Login Wall & Post-Login Auto-Download', () => {
     // 1. Navigate to homepage with a mock jobId and test_mode enabled
     await page.goto('/?jobId=mock-download-wall&test_mode=true');
 
-    // Wait for the translation to complete and ResultView to load
-    await expect(page.locator('h2')).toHaveText('Dịch hoàn tất!', { timeout: 15000 });
+    // Wait for the translation to complete and WorkspaceView to load
+    await expect(page.locator('span:text-is("Song Ngữ")')).toBeVisible({ timeout: 15000 });
 
     // 2. Locate the download button
-    const downloadBtn = page.locator('button:has-text("Tải về analysis.md")');
+    const downloadBtn = page.locator('button:has-text("Tải về Markdown")');
     await expect(downloadBtn).toBeVisible({ timeout: 15000 });
 
     // 3. Click the download button (user is guest/unauthenticated)

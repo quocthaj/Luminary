@@ -10,8 +10,8 @@ test.describe('KaTeX Mathematical Formula Rendering & Copying', () => {
     // Navigate to local app with a mock job ID
     await page.goto('/?jobId=mock-123');
 
-    // Wait for the ResultView component to load and render
-    await expect(page.locator('h2')).toHaveText('Dịch hoàn tất!', { timeout: 15000 });
+    // Wait for the WorkspaceView component to load and render
+    await expect(page.locator('span:text-is("Song Ngữ")')).toBeVisible({ timeout: 15000 });
 
     // Check if the bilingual views are visible (on Desktop)
     const englishColumn = page.locator('.markdown-preview').first();

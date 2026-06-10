@@ -120,3 +120,37 @@ export async function processWithAI(
 
 // Alias giữ backward-compat cho các caller cũ nếu có
 export { processWithAI as callAIWithPrompt };
+
+// ============================================
+// GEMINI EMBEDDING
+// ============================================
+export async function getGeminiEmbeddingsBatch(texts: string[]): Promise<number[][]> {
+    if (texts.length === 0) return [];
+
+    console.log(`🤖 Generating Gemini embeddings for ${texts.length} texts...`);
+    const apiKey = await getSecret(GEMINI_SECRET_ARN);
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
+
+    const batchSize = 50; // Use a conservative batch size to avoid payload/rate limits
+    const allEmbeddings: number[][] = [];
+
+    for (let i = 0; i < texts.length; i += batchSize) {
+        const chunk = texts.slice(i, i + batchSize);
+        console.log(`📡 Fetching embedding batch ${Math.floor(i / batchSize) + 1} (${chunk.length} items)...`);
+        const result = await model.batchEmbedContents({
+            requests: chunk.map(t => ({
+                content: { role: 'user', parts: [{ text: t }] },
+                model: 'models/gemini-embedding-001',
+            })),
+        });
+
+        if (!result.embeddings) {
+            throw new Error('No embeddings returned from Gemini API batch request');
+        }
+
+        allEmbeddings.push(...result.embeddings.map(e => e.values));
+    }
+
+    return allEmbeddings;
+}
