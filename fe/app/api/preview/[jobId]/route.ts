@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/auth';
 
 const API_BASE = 'https://5c2wlnvtsh.execute-api.ap-southeast-1.amazonaws.com/dev';
 
@@ -46,11 +47,24 @@ export async function GET(
 
   if (jobId.startsWith('mock-')) {
     return new NextResponse(MOCK_CONTENT, {
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'public, max-age=3600, must-revalidate',
+      },
     });
   }
 
-  const metaRes = await fetch(`${API_BASE}/result/${jobId}`);
+  const session = await auth();
+  if (!session || !session.accessToken) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const metaRes = await fetch(`${API_BASE}/result/${jobId}`, {
+    headers: {
+      'Authorization': `Bearer ${session.accessToken}`,
+    },
+  });
+
   if (!metaRes.ok) {
     return NextResponse.json({ error: 'result fetch failed' }, { status: metaRes.status });
   }
@@ -61,8 +75,11 @@ export async function GET(
     return NextResponse.json({ error: 's3 fetch failed' }, { status: contentRes.status });
   }
 
-  const text = await contentRes.text();
-  return new NextResponse(text, {
-    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+  // Stream the response directly to optimize memory usage (Serverless RAM)
+  return new NextResponse(contentRes.body, {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'public, max-age=3600, must-revalidate',
+    },
   });
 }

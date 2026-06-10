@@ -478,6 +478,19 @@ export class VietAIScholarStack extends cdk.Stack {
     );
 
     // ============================================
+    // API Endpoint 2.5: POST /job/{jobId}/reprocess
+    // Returns: { message } — restarts translation pipeline
+    // ============================================
+    const reprocessResource = jobIdResource.addResource('reprocess');
+    reprocessResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+
+    // ============================================
     // API Endpoint 3: GET /result/{jobId}
     // Returns: { downloadUrl } — presigned S3 URL for analysis.md
     // ============================================

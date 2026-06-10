@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getResultUrl, fetchPreviewContent } from '../lib/api';
+import { getResultUrl, fetchPreviewContent, resetMockProgress } from '../lib/api';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { useSession, signOut } from 'next-auth/react';
@@ -129,10 +129,11 @@ function renderMarkdown(md: string): string {
   return h;
 }
 
-export function ResultView({ jobId, onReset }: { jobId: string; onReset: () => void }) {
+export function ResultView({ jobId, onReset, onReprocess }: { jobId: string; onReset: () => void; onReprocess?: () => void }) {
   const { data: session, status } = useSession();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [pendingDownload, setPendingDownload] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
 
   const [downloadUrl, setDownloadUrl] = useState('');
   const [rawContent, setRawContent] = useState('');
@@ -166,6 +167,36 @@ export function ResultView({ jobId, onReset }: { jobId: string; onReset: () => v
       setShowLoginModal(true);
     }
   }, [status, triggerFileDownload]);
+
+  const handleReprocessClick = useCallback(async () => {
+    if (status !== 'authenticated') {
+      setShowLoginModal(true);
+      return;
+    }
+
+    try {
+      setReprocessing(true);
+      setError('');
+      const res = await fetch(`/api/jobs/${jobId}/reprocess`, {
+        method: 'POST',
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Dịch lại thất bại');
+      }
+
+      if (onReprocess) {
+        resetMockProgress();
+        onReprocess();
+      }
+    } catch (err: any) {
+      console.error('Reprocess error:', err);
+      setError(err.message || 'Không thể dịch lại tài liệu này. Vui lòng thử lại sau.');
+    } finally {
+      setReprocessing(false);
+    }
+  }, [jobId, status, onReprocess]);
 
   const handleLoginSuccess = useCallback(() => {
     triggerFileDownload();
@@ -358,16 +389,42 @@ export function ResultView({ jobId, onReset }: { jobId: string; onReset: () => v
           ) : error ? (
             <p className="text-sm" style={{ color: 'var(--error)' }}>{error}</p>
           ) : downloadUrl ? (
-            <button
-              onClick={handleDownloadClick}
-              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 cursor-pointer border-none"
-              style={{ background: 'var(--success)', color: '#080b12', letterSpacing: '0.01em' }}
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Tải về analysis.md
-            </button>
+            <>
+              <button
+                onClick={handleDownloadClick}
+                className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 cursor-pointer border-none"
+                style={{ background: 'var(--success)', color: '#080b12', letterSpacing: '0.01em' }}
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Tải về analysis.md
+              </button>
+
+              <button
+                onClick={handleReprocessClick}
+                disabled={reprocessing}
+                data-authenticated={status === 'authenticated'}
+                className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 cursor-pointer"
+                style={{ background: 'transparent', border: '1px solid var(--border-normal)', color: 'var(--text-secondary)' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-normal)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+              >
+                {reprocessing ? (
+                  <>
+                    <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', border: '2px solid var(--border-normal)', borderTopColor: 'var(--accent)', animation: 'spin-cw 0.75s linear infinite' }} />
+                    Đang khởi tạo...
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-4 w-4 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89" />
+                    </svg>
+                    Dịch lại
+                  </>
+                )}
+              </button>
+            </>
           ) : null}
 
           <button

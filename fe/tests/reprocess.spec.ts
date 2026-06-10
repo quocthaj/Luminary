@@ -1,19 +1,21 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Download Login Wall & Post-Login Auto-Download', () => {
-  test('should block download for guest, show login modal, and auto-download after login', async ({ page }) => {
-    // 1. Navigate to homepage with a mock jobId and test_mode enabled
-    await page.goto('/?jobId=mock-download-wall&test_mode=true');
+test.describe('Reprocess Job Flow', () => {
+  test('should require login for reprocess and transition to processing view after triggering', async ({ page }) => {
+    page.on('console', msg => console.log(`[BROWSER @ ${Math.floor(Date.now() / 1000)}s] ${msg.text()}`));
+
+    // 1. Navigate to homepage with a mock jobId
+    await page.goto('/?jobId=mock-reprocess-test&test_mode=true');
 
     // Wait for the translation to complete and ResultView to load
     await expect(page.locator('h2')).toHaveText('Dịch hoàn tất!', { timeout: 15000 });
 
-    // 2. Locate the download button
-    const downloadBtn = page.locator('button:has-text("Tải về analysis.md")');
-    await expect(downloadBtn).toBeVisible({ timeout: 15000 });
+    // 2. Locate the reprocess button
+    const reprocessBtn = page.locator('button:has-text("Dịch lại")');
+    await expect(reprocessBtn).toBeVisible({ timeout: 15000 });
 
-    // 3. Click the download button (user is guest/unauthenticated)
-    await downloadBtn.click();
+    // 3. Click the reprocess button (user is guest/unauthenticated)
+    await reprocessBtn.click();
 
     // 4. Verify login modal appears
     const modalTitle = page.locator('h3:has-text("Chào mừng đến với VietAI")');
@@ -22,7 +24,7 @@ test.describe('Download Login Wall & Post-Login Auto-Download', () => {
     // 5. Fill email and request OTP
     const emailInput = page.locator('#login-email-input');
     await expect(emailInput).toBeVisible();
-    await emailInput.fill('download-wall-test@vietai.org');
+    await emailInput.fill('reprocess-test@vietai.org');
 
     const submitEmailBtn = page.locator('button[type="submit"]');
     await expect(submitEmailBtn).toHaveText('Gửi mã OTP');
@@ -37,28 +39,30 @@ test.describe('Download Login Wall & Post-Login Auto-Download', () => {
     const bypassText = await bypassNotice.innerText();
     const otpCode = bypassText.replace(/\D/g, '').trim();
 
-    // 7. Input OTP and watch for download event simultaneously
+    // 7. Input OTP
     const otpInput = page.locator('#login-otp-input');
     await expect(otpInput).toBeVisible();
     await otpInput.fill(otpCode);
 
     const submitOtpBtn = page.locator('button[type="submit"]');
     await expect(submitOtpBtn).toHaveText('Xác minh & Đăng nhập');
-
-    // Prepare to intercept the download event
-    const downloadPromise = page.waitForEvent('download');
-
     await submitOtpBtn.click();
 
     // 8. Verify modal closes
     await expect(modalTitle).not.toBeVisible({ timeout: 15000 });
 
-    // 9. Verify the download event completed successfully post-login
-    const download = await downloadPromise;
-    expect(download.suggestedFilename()).toBe('analysis.md');
-    
-    // Check that we are logged in
-    const userEmailSpan = page.locator('span:has-text("download-wall-test@vietai.org")');
+    // Verify user is logged in
+    const userEmailSpan = page.locator('span:has-text("reprocess-test@vietai.org")');
     await expect(userEmailSpan).toBeVisible({ timeout: 15000 });
+
+    // 9. Click "Dịch lại" again now that user is logged in (wait for data-authenticated="true")
+    const authReprocessBtn = page.locator('button:has-text("Dịch lại")[data-authenticated="true"]');
+    await expect(authReprocessBtn).toBeVisible({ timeout: 15000 });
+    await authReprocessBtn.click();
+
+    // 10. Verify that we transition to the processing/stepper page
+    // (displays status text and the job ID)
+    const processingLabel = page.locator('p:has-text("Đang trích xuất văn bản"), p:has-text("Đang dịch tài liệu")');
+    await expect(processingLabel).toBeVisible({ timeout: 30000 });
   });
 });

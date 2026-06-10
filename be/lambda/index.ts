@@ -6,6 +6,7 @@
 import {
     PutObjectCommand,
     GetObjectCommand,
+    HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
@@ -61,6 +62,16 @@ export const handler = async (event: any) => {
                 return respond(401, { error: 'Unauthorized' });
             }
             return await handleListJobs({ userId });
+        }
+
+        if (httpMethod === 'POST' && path?.startsWith('/job/') && path?.endsWith('/reprocess')) {
+            const userId = event.requestContext?.authorizer?.userId;
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const parts = path.split('/');
+            const jobId = parts[2];
+            return await handleReprocessJob({ jobId, userId });
         }
 
         if (httpMethod === 'GET' && path?.startsWith('/job/')) {
@@ -262,4 +273,71 @@ async function handleListJobs(event: { userId: string }): Promise<any> {
     }));
 
     return respond(200, { jobs });
+}
+
+// ============================================
+// ACTION 6: Reprocess a Job (Start Pipeline Again)
+// ============================================
+async function handleReprocessJob(event: { jobId: string; userId: string }): Promise<any> {
+    const { jobId, userId } = event;
+    console.log(`🔄 Reprocessing job: ${jobId} for user: ${userId}...`);
+
+    // 1. Fetch job from DynamoDB
+    const response = await dynamodbClient.send(
+        new GetItemCommand({
+            TableName: JOBS_TABLE,
+            Key: { jobId: { S: jobId } },
+        })
+    );
+
+    if (!response.Item) {
+        return respond(404, { error: 'Job not found' });
+    }
+
+    // 2. Validate ownership
+    const ownerId = response.Item.userId?.S;
+    if (ownerId !== userId) {
+        return respond(403, { error: 'Forbidden' });
+    }
+
+    const s3Key = response.Item.s3Key?.S;
+    const fileName = response.Item.fileName?.S || 'document.pdf';
+
+    if (!s3Key) {
+        return respond(400, { error: 'Job does not have an associated source file' });
+    }
+
+    // 3. Verify original file still exists in S3
+    try {
+        await s3Client.send(
+            new HeadObjectCommand({
+                Bucket: UPLOADS_BUCKET,
+                Key: s3Key,
+            })
+        );
+    } catch (err: any) {
+        if (err.name === 'NotFound' || err.$metadata?.httpStatusCode === 404) {
+            return respond(410, { error: 'Original document has expired and cannot be re-translated' });
+        }
+        throw err;
+    }
+
+    // 4. Start Step Functions or fallback
+    if (STATE_MACHINE_ARN) {
+        await updateJobStatus(jobId, 'queued');
+        await sfnClient.send(
+            new StartExecutionCommand({
+                stateMachineArn: STATE_MACHINE_ARN,
+                name: `job-${jobId}-${Date.now()}`,
+                input: JSON.stringify({ jobId, bucket: UPLOADS_BUCKET, key: s3Key }),
+            })
+        );
+        console.log(`✅ Reprocess Job ${jobId} → Step Functions started`);
+        return respond(200, { message: 'Reprocessing started' });
+    }
+
+    // Fallback mode
+    await updateJobStatus(jobId, 'queued');
+    console.log(`⚠️ Local mode: Reprocess Job ${jobId} status set to queued`);
+    return respond(200, { message: 'Reprocessing queued (local fallback)' });
 }

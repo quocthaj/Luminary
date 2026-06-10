@@ -63,6 +63,10 @@ export async function uploadFile(uploadUrl: string, file: File, signal?: AbortSi
 let mockProgressIndex = 0;
 const mockStates = ['extracting', 'processing', 'agents_completed', 'completed'];
 
+export function resetMockProgress(): void {
+  mockProgressIndex = 0;
+}
+
 export async function getJobStatus(jobId: string): Promise<JobStatus> {
   if (jobId.startsWith('mock-')) {
     const status = mockStates[mockProgressIndex];

@@ -31,6 +31,7 @@ export default function Home() {
 
   const handleComplete = useCallback(() => setState('result'), []);
   const handleReset = useCallback(() => setState('upload'), []);
+  const handleReprocess = useCallback(() => setState('processing'), []);
 
   if (state === 'upload') {
     return <UploadView onJobCreated={handleJobCreated} />;
@@ -38,5 +39,5 @@ export default function Home() {
   if (state === 'processing') {
     return <ProcessingView jobId={jobId} onComplete={handleComplete} />;
   }
-  return <ResultView jobId={jobId} onReset={handleReset} />;
+  return <ResultView jobId={jobId} onReset={handleReset} onReprocess={handleReprocess} />;
 }

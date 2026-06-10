@@ -4,7 +4,7 @@ baseline_commit: 5ac71d1
 
 # Story 2.5: S3 Streaming Proxy & Xem lại bài dịch cũ với Nút dịch lại (S3 Streaming Proxy, S3 Cache Loading & Re-process)
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -32,25 +32,25 @@ so that tôi không bị mất thời gian chờ đợi dịch lại từ đầu
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Cấu hình và bổ sung API Backend cho tính năng Dịch lại (AC: 7)
-  - [ ] Thêm route `POST /job/{jobId}/reprocess` vào API Gateway trong `be/lib/be-stack.ts` được bảo vệ bằng JWT Authorizer.
-  - [ ] Triển khai hàm handler `handleReprocessJob` trong `be/lambda/index.ts`:
-    - [ ] Lấy `userId` từ context authorizer và kiểm tra quyền sở hữu đối với `jobId` trong DynamoDB.
-    - [ ] Sử dụng `HeadObjectCommand` từ S3 SDK kiểm tra sự tồn tại của file gốc (`s3Key`). Trả về lỗi `410 Gone` nếu file không tồn tại.
-    - [ ] Gửi lệnh `StartExecutionCommand` của Step Functions với tên execution mới `job-{jobId}-{timestamp}` để bắt đầu lại tiến trình dịch thuật.
-    - [ ] Cập nhật trạng thái job thành `queued` trong DynamoDB thông qua `updateJobStatus`.
-- [ ] Task 2: Cập nhật Next.js API Proxy `/api/preview/[jobId]` (AC: 3, 4, 5, 6)
-  - [ ] Import `auth` từ `@/auth` để kiểm tra session và lấy `accessToken` (JWT).
-  - [ ] Nếu không hợp lệ, trả về HTTP 401.
-  - [ ] Gửi fetch request đến backend `GET /result/{jobId}` có đính kèm header `Authorization: Bearer <accessToken>`.
-  - [ ] Đọc response body dưới dạng stream và trả về client với header `Cache-Control` tối ưu.
-- [ ] Task 3: Tích hợp API Route và UI nút Dịch lại trên Frontend (AC: 7)
-  - [ ] Tạo mới Next.js API route `fe/app/api/jobs/[jobId]/reprocess/route.ts` xác thực NextAuth session và chuyển tiếp yêu cầu đến backend.
-  - [ ] Cập nhật `ResultView.tsx` hoặc header view hiển thị nút "Dịch lại" (Re-translate) kèm loading state.
-  - [ ] Khi click nút dịch lại, kích hoạt API call, sau đó chuyển client về màn hình loading tiến trình `ProcessingView` tương ứng với `jobId` hiện tại.
-- [ ] Task 4: Kiểm thử và Rà soát bảo mật (AC: 3, 5, 7)
-  - [ ] Viết unit/integration tests cho endpoint `POST /job/{jobId}/reprocess` của backend để kiểm tra xác thực quyền sở hữu và lỗi file gốc hết hạn.
-  - [ ] Viết tests cho Next.js API routes để xác thực luồng truyền access token và stream dữ liệu.
+- [x] Task 1: Cấu hình và bổ sung API Backend cho tính năng Dịch lại (AC: 7)
+  - [x] Thêm route `POST /job/{jobId}/reprocess` vào API Gateway trong `be/lib/be-stack.ts` được bảo vệ bằng JWT Authorizer.
+  - [x] Triển khai hàm handler `handleReprocessJob` trong `be/lambda/index.ts`:
+    - [x] Lấy `userId` từ context authorizer và kiểm tra quyền sở hữu đối với `jobId` trong DynamoDB.
+    - [x] Sử dụng `HeadObjectCommand` từ S3 SDK kiểm tra sự tồn tại của file gốc (`s3Key`). Trả về lỗi `410 Gone` nếu file không tồn tại.
+    - [x] Gửi lệnh `StartExecutionCommand` của Step Functions với tên execution mới `job-{jobId}-{timestamp}` để bắt đầu lại tiến trình dịch thuật.
+    - [x] Cập nhật trạng thái job thành `queued` trong DynamoDB thông qua `updateJobStatus`.
+- [x] Task 2: Cập nhật Next.js API Proxy `/api/preview/[jobId]` (AC: 3, 4, 5, 6)
+  - [x] Import `auth` từ `@/auth` để kiểm tra session và lấy `accessToken` (JWT).
+  - [x] Nếu không hợp lệ, trả về HTTP 401.
+  - [x] Gửi fetch request đến backend `GET /result/{jobId}` có đính kèm header `Authorization: Bearer <accessToken>`.
+  - [x] Đọc response body dưới dạng stream và trả về client với header `Cache-Control` tối ưu.
+- [x] Task 3: Tích hợp API Route và UI nút Dịch lại trên Frontend (AC: 7)
+  - [x] Tạo mới Next.js API route `fe/app/api/jobs/[jobId]/reprocess/route.ts` xác thực NextAuth session và chuyển tiếp yêu cầu đến backend.
+  - [x] Cập nhật `ResultView.tsx` hoặc header view hiển thị nút "Dịch lại" (Re-translate) kèm loading state.
+  - [x] Khi click nút dịch lại, kích hoạt API call, sau đó chuyển client về màn hình loading tiến trình `ProcessingView` tương ứng với `jobId` hiện tại.
+- [x] Task 4: Kiểm thử và Rà soát bảo mật (AC: 3, 5, 7)
+  - [x] Viết unit/integration tests cho endpoint `POST /job/{jobId}/reprocess` của backend để kiểm tra xác thực quyền sở hữu và lỗi file gốc hết hạn.
+  - [x] Viết tests cho Next.js API routes để xác thực luồng truyền access token và stream dữ liệu.
 
 ## Dev Notes
 
