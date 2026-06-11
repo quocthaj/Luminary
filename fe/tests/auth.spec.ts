@@ -34,8 +34,8 @@ test.describe('NextAuth Stateless Email OTP Authentication Flow', () => {
     await expect(emailInput).toBeVisible();
     await emailInput.fill('developer-test@vietai.org');
 
-    const submitEmailBtn = page.locator('button[type="submit"]');
-    await expect(submitEmailBtn).toHaveText('Gửi mã OTP');
+    const submitEmailBtn = page.locator('button:has-text("Gửi mã OTP")');
+    await expect(submitEmailBtn).toBeVisible();
     await submitEmailBtn.click();
 
     // 5. Verify transition to OTP verification screen
@@ -54,8 +54,8 @@ test.describe('NextAuth Stateless Email OTP Authentication Flow', () => {
     await expect(otpInput).toBeVisible();
     await otpInput.fill(otpCode);
 
-    const submitOtpBtn = page.locator('button[type="submit"]');
-    await expect(submitOtpBtn).toHaveText('Xác minh & Đăng nhập');
+    const submitOtpBtn = page.locator('button:has-text("Xác minh & Đăng nhập")');
+    await expect(submitOtpBtn).toBeVisible();
     await submitOtpBtn.click();
 
     // 7. Verify login modal is closed and top-right session status shows logged-in user

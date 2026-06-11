@@ -296,6 +296,23 @@ So that tôi có thể dễ dàng mở rộng mạng lưới tài liệu nghiên
 - **Then** API Route lấy metadata tiêu đề bài báo hiện tại từ DynamoDB, gửi truy vấn tìm kiếm đến Semantic Scholar API (`https://api.semanticscholar.org/graph/v1/paper/search`).
 - **And** Trả về danh sách top 5 bài viết liên quan (chứa: Tiêu đề, Tác giả, Năm xuất bản, Tóm tắt sơ bộ, và Link PDF nếu có) hiển thị đẹp mắt dưới dạng các thẻ nhỏ bên cột phải để người dùng click mở đọc trực tiếp.
 
+### Story 3.6: Hệ thống Chat Agentic RAG Tự động Định tuyến và Truy vấn (Active Agentic RAG & Dynamic Tool Routing)
+As a nhà nghiên cứu khoa học đọc tài liệu song ngữ,
+I want trợ lý AI tự động phân tích câu hỏi để lựa chọn phương pháp truy vấn thông tin phù hợp (tìm kiếm vector cục bộ hoặc đọc tài liệu toàn cục) và tự động kéo thêm ngữ cảnh liền kề khi phát hiện thông tin bị cắt đứt,
+So that tôi nhận được câu trả lời chính xác, toàn diện, không bị mất ngữ nghĩa hay bỏ sót dữ liệu do giới hạn chia nhỏ đoạn văn (chunking).
+
+**Acceptance Criteria:**
+- **Given** Người dùng gửi câu hỏi trong AI Tutor Chat Panel,
+- **When** API Route `/api/chat/[jobId]` tiếp nhận câu hỏi của người dùng,
+- **Then** Hệ thống khởi tạo mô hình Gemini 2.0 Flash kèm theo danh sách các Tools được định nghĩa dưới dạng JSON Schema.
+- **And** Agent thực hiện phân tích ý định câu hỏi để kích hoạt một hoặc nhiều Tool sau (Reasoning Loop):
+  - `vectorSearch(query)`: Thực hiện tìm kiếm vector tương đồng trên Qdrant Cloud để lấy top 4 đoạn có liên quan (dành cho câu hỏi chi tiết, cục bộ).
+  - `fetchAdjacentParagraphs(chunkIndex, direction, count)`: Lấy thêm `count` đoạn văn liền trước hoặc liền sau của `chunkIndex` hiện tại từ S3/DynamoDB để bù đắp ngữ cảnh bị đứt gãy.
+  - `readExecutiveSummary()`: Trích xuất bản tóm tắt toàn bộ tài liệu (Executive Summary) đã được sinh sẵn dưới dạng cấu trúc JSON trong DynamoDB (dành cho câu hỏi tổng quan, toàn cục).
+- **And** Bản tóm tắt (Executive Summary) tự động sinh ra trong pha Ingestion bằng Gemini Structured Outputs với cấu trúc: `tldr` (tóm tắt 1 câu), `keyContributions` (mảng đóng góp), `methodology` (phương pháp), `limitations` (hạn chế).
+- **And** Agent tự động tổng hợp thông tin thu thập được từ các Tool, kiểm chứng tính hợp lý của ngữ cảnh trước khi đưa ra câu trả lời cuối cùng.
+- **Then** Câu trả lời hiển thị trên UI sử dụng Markdown chuẩn và đính kèm liên kết trích dẫn ngược `[Đoạn X]`.
+
 
 ## Epic 4: Bộ Công cụ Học tập Thông minh (Learning Tools: Quiz, Flashcard, Mind Map)
 

@@ -1,0 +1,10 @@
+{
+  "userIgnoreFilters": [
+    "**/node_modules",
+    "**/.next",
+    "**/.git",
+    "**/cdk.out",
+    "fe/",
+    "be/"
+  ]
+}

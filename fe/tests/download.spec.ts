@@ -24,8 +24,8 @@ test.describe('Download Login Wall & Post-Login Auto-Download', () => {
     await expect(emailInput).toBeVisible();
     await emailInput.fill('download-wall-test@vietai.org');
 
-    const submitEmailBtn = page.locator('button[type="submit"]');
-    await expect(submitEmailBtn).toHaveText('Gửi mã OTP');
+    const submitEmailBtn = page.locator('button:has-text("Gửi mã OTP")');
+    await expect(submitEmailBtn).toBeVisible();
     await submitEmailBtn.click();
 
     // 6. Verify transition to OTP input
@@ -42,8 +42,8 @@ test.describe('Download Login Wall & Post-Login Auto-Download', () => {
     await expect(otpInput).toBeVisible();
     await otpInput.fill(otpCode);
 
-    const submitOtpBtn = page.locator('button[type="submit"]');
-    await expect(submitOtpBtn).toHaveText('Xác minh & Đăng nhập');
+    const submitOtpBtn = page.locator('button:has-text("Xác minh & Đăng nhập")');
+    await expect(submitOtpBtn).toBeVisible();
 
     // Prepare to intercept the download event
     const downloadPromise = page.waitForEvent('download');

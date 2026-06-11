@@ -1,0 +1,133 @@
+# VietAI Scholar — Agent Rules
+
+## Project
+
+Nền tảng dịch tài liệu học thuật PDF (EN→VI) bằng AI, với RAG chat, thư viện cá nhân và bộ công cụ học tập thông minh. Target users: sinh viên/nghiên cứu sinh Việt Nam.
+
+## Tech Stack
+
+- **Frontend**: Next.js 16 + React 19 + TailwindCSS 4 (App Router) — deploy Vercel
+- **Backend**: AWS Lambda Node.js 20 + Step Functions — deploy CDK
+- **DB**: DynamoDB PAY_PER_REQUEST, table `vietai-jobs`
+- **Storage**: S3 (`vietai-uploads-*`, `vietai-results-*`, `vietai-frontend-*`)
+- **Vector DB**: Qdrant Cloud, collection `vietai-scholar-chunks`
+- **AI translate**: Mistral → Groq (Llama 3.3 70B) → Gemini 2.0 Flash (triple fallback)
+- **AI embed**: Gemini `text-embedding-004` (768 dims)
+- **AI chat**: Gemini Pro/Flash (RAG)
+- **Auth**: NextAuth (Google OAuth + Email OTP) + Lambda Authorizer JWT HS256
+- **Region**: ap-southeast-1 (Singapore)
+
+## Cấu trúc repo
+
+```
+fe/              Next.js frontend
+be/
+  lambda/        index.ts (Orchestrator) + handlers/ (extract, translate, latex, merge, ingest, chat)
+  lib/           be-stack.ts (CDK stack)
+docs/            Architecture docs
+_bmad-output/    BMAD planning + story specs
+Obisidian/       Project knowledge base (Obsidian vault)
+```
+
+## Obsidian — Project Brain
+
+**Quy trình mở đầu ngày dev:**
+- Mỗi buổi dev mới, luôn mở `Obisidian/00-Dashboard.md` trước.
+- Copy file session cũ hoặc template để tạo file session mới cho ngày hôm nay tại `Obisidian/50-Sessions/<YYYY-MM-DD>.md`.
+- Ghi chép đầy đủ các quyết định nhỏ trong ngày vào file session.
+- **Lưu ý về ADR (Architectural Decision Record):** Chỉ viết ADR mới (trong thư mục `Obisidian/30-Decisions/`) khi quyết định đó đủ quan trọng hoặc bạn lo lắng sau này sẽ quên lý do đưa ra lựa chọn đó.
+
+**Trước khi bắt đầu task mới, đọc:**
+- `Obisidian/00-Dashboard.md` — trạng thái epic/story hiện tại.
+- `Obisidian/50-Sessions/<ngày-hôm-nay>.md` — context buổi làm việc gần nhất.
+
+**Khi cần context kỹ thuật, đọc:**
+- `Obisidian/30-Decisions/` — các tài liệu ADR của dự án.
+- `Obisidian/40-Research/` — các tài liệu nghiên cứu.
+- `Obisidian/10-Project/Architecture.md` — sơ đồ kiến trúc hệ thống.
+
+**Story spec chi tiết luôn nằm tại:**
+- `_bmad-output/implementation-artifacts/<story-id>-*.md`
+
+**Sau khi hoàn thành task, cập nhật:**
+- `Obisidian/50-Sessions/<ngày-hôm-nay>.md` — ghi lại đã làm gì, các quyết định nhỏ, blocker và bài học.
+- `Obisidian/00-Dashboard.md` — chuyển trạng thái story tương ứng sang `✅ Done`.
+- `.report/luminary-report/SKILL.md` — append báo cáo tiến độ tích lũy (xem format bên dưới).
+
+### Format báo cáo `.report/luminary-report/SKILL.md`
+
+File này là nhật ký triển khai tích lũy của toàn dự án. Mỗi lần hoàn thành task, **append** (không ghi đè) một block mới theo format:
+
+```markdown
+## <YYYY-MM-DD> — <Tên story / tên task>
+
+### Đã triển khai
+- <file hoặc component đã tạo/sửa>: mô tả ngắn thay đổi
+- ...
+
+### Quyết định kỹ thuật
+- <quyết định>: lý do ngắn gọn
+
+### Lệnh đã chạy
+- `<command>` — mục đích
+
+### Kết quả
+- ✅ / ❌ <kết quả kiểm thử hoặc deploy>
+```
+
+## Conventions
+
+### Code
+- TypeScript strict mode toàn bộ (fe + be).
+- Không dùng `any` — nếu cần dùng `unknown` + type guard.
+- Lambda handlers: export `handler` function, không side effects ở top level.
+- Secrets: **không hardcode** — luôn đọc từ Secrets Manager qua ARN trong env vars.
+- Error responses Lambda: `{ statusCode, body: JSON.stringify({ error: message }) }`.
+- **Chat Memory**: Sử dụng cơ chế **Client-side Sliding Window** (lưu mảng tin nhắn trong React state, cắt trượt tối đa `N = 6` tin nhắn gần nhất và gửi kèm lên API). Không dùng Redis/ElastiCache nhằm đảm bảo backend hoàn toàn stateless và giảm chi phí vận hành.
+- **Executive Summary**: Tự động sinh bản tóm tắt có cấu trúc (JSON Schema: `tldr`, `keyContributions`, `methodology`, `limitations`) bằng Gemini API ngay trong pha **Ingest** sau khi dịch xong tài liệu. Lưu kết quả vào trường `summary` của DynamoDB `vietai-jobs` để truy xuất tức thì (< 20ms) thay vì sinh động khi chat.
+
+### Git
+- Branch: `feat/story-<id>-<slug>` hoặc `fix/<slug>`.
+- Commit: `feat(3.x): mô tả ngắn` theo Conventional Commits.
+- PR title: `feat(3.x): tên story`.
+
+### Testing
+- E2E tests: Playwright tại `fe/tests/`.
+- Mock API routes trong tests, không call external APIs thật.
+- Backend tests: `be/` dùng Jest.
+- **Playwright Button Selectors**: **TUYỆT ĐỐI KHÔNG** dùng selector tag chung như `button[type="submit"]` trong kịch bản E2E vì sẽ gây lỗi strict-mode vi phạm (do giao diện Workspace có cả chat form lẫn login/reprocess modals). Luôn xác định phần tử submit bằng text định vị chi tiết, ví dụ: `button:has-text("Gửi mã OTP")` hoặc `button:has-text("Xác minh & Đăng nhập")`.
+
+## Commands hay dùng
+
+```bash
+# Frontend
+cd fe && pnpm dev
+cd fe && pnpm tsc --noEmit
+
+# Backend deploy
+cd be && npx cdk deploy --require-approval never
+
+# Lambda logs (tail)
+aws logs tail /aws/lambda/vietai-orchestrator --follow --region ap-southeast-1
+aws logs tail /aws/lambda/vietai-ingest --follow --region ap-southeast-1
+
+# New feature branch
+git checkout -b feat/story-3-6-agentic-rag
+```
+
+## Luồng xử lý chính
+
+```
+Upload PDF → S3 → Orchestrator Lambda → Step Functions:
+  Extract (pdfjs → Textract fallback)
+  → Parallel [ Translate chunks (concurrency=5) | LaTeX normalize ]
+  → Merge → Markdown song ngữ → S3 Results
+  → Ingest Lambda: embed (Gemini) → upsert Qdrant
+→ Frontend polling → hiển thị kết quả + RAG chat
+```
+
+## Story hiện tại
+
+**Story 3.6: Agentic RAG & Summary Routing** — In Progress
+
+Xem spec đầy đủ tại `_bmad-output/implementation-artifacts/` (tìm file 3-6-*).

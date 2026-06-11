@@ -241,3 +241,15 @@ body {
   font-size: 1.05em;
   text-rendering: auto;
 }
+
+/* ── Chunk Highlight for RAG Citations ── */
+.chunk-highlight {
+  outline: 2px solid var(--accent);
+  background-color: var(--accent-dim) !important;
+  box-shadow: 0 0 12px var(--accent-glow);
+  transition: all 0.3s ease;
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin: -4px -8px;
+}
+

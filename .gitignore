@@ -45,3 +45,8 @@ _bmad-output/
 fe/test-results/
 fe/playwright-report/
 fe/blob-report/
+
+# Obsidian
+Obisidian/.obsidian/workspace.json
+Obisidian/.obsidian/workspace-mobile.json
+Obisidian/.obsidian/graph.json

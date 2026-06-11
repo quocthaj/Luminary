@@ -26,8 +26,8 @@ test.describe('Reprocess Job Flow', () => {
     await expect(emailInput).toBeVisible();
     await emailInput.fill('reprocess-test@vietai.org');
 
-    const submitEmailBtn = page.locator('button[type="submit"]');
-    await expect(submitEmailBtn).toHaveText('Gửi mã OTP');
+    const submitEmailBtn = page.locator('button:has-text("Gửi mã OTP")');
+    await expect(submitEmailBtn).toBeVisible();
     await submitEmailBtn.click();
 
     // 6. Verify transition to OTP input
@@ -44,8 +44,8 @@ test.describe('Reprocess Job Flow', () => {
     await expect(otpInput).toBeVisible();
     await otpInput.fill(otpCode);
 
-    const submitOtpBtn = page.locator('button[type="submit"]');
-    await expect(submitOtpBtn).toHaveText('Xác minh & Đăng nhập');
+    const submitOtpBtn = page.locator('button:has-text("Xác minh & Đăng nhập")');
+    await expect(submitOtpBtn).toBeVisible();
     await submitOtpBtn.click();
 
     // 8. Verify modal closes

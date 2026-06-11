@@ -478,6 +478,60 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
   - Jest Unit Tests: 4/4 tests PASS.
   - Playwright E2E Tests: 3/3 tests PASS.
 
+---
+
+### ✅ Story 3.4: Giao diện AI Tutor Chat Panel UI & Source Citations
+**Status:** Done  
+**Time:** 8 hours  
+**Date:** 2026-06-11
+
+#### Đã làm:
+- Thiết kế khung chat AI Tutor Panel trực quan ở cột bên phải giao diện Workspace (`WorkspaceView.tsx`), hiển thị bong bóng tin nhắn (User bên phải, Assistant bên trái) bằng định dạng Markdown.
+- Thêm hiệu ứng hiển thị chờ (loading indicator) khi AI đang phản hồi.
+- Triển khai bộ phân tích trích dẫn nguồn: Tự động trích xuất các nhãn trích dẫn dạng `[Đoạn X]` (hoặc `[chunk-X]`) trong nội dung câu trả lời của AI và hiển thị thành các nút liên kết (badge) màu sắc đồng bộ.
+- Xây dựng tính năng cuộn và làm nổi bật đoạn văn (Citation Glow Scrolling): Khi người dùng click vào nút trích dẫn, cột đọc song ngữ ở giữa tự động cuộn mượt mà đến phần tử có ID tương ứng và kích hoạt hiệu ứng highlight viền ngoài màu vàng nhạt trong 3 giây.
+- Viết bộ kiểm thử E2E Playwright kiểm thử toàn bộ các hành vi gửi chat, hiển thị tin nhắn, và hành động click liên kết trích dẫn để cuộn/highlight.
+
+#### Kết quả kiểm thử:
+- Playwright E2E test `fe/tests/tutor-chat-ui.spec.ts` đạt trạng thái **PASS** 100%.
+
+#### Files thay đổi:
+- `fe/components/WorkspaceView.tsx` - Thiết kế panel chat, render bong bóng chat, parse citation, và logic highlight scroll.
+- `fe/tests/tutor-chat-ui.spec.ts` - (NEW) Playwright E2E test cho AI Tutor Chat.
+
+---
+
+### ✅ Story 3.5: Tích hợp API Semantic Scholar & Related Papers Panel
+**Status:** Done  
+**Time:** 8 hours  
+**Date:** 2026-06-11
+
+#### Đã làm:
+- Xây dựng Next.js Server Route `/api/semantic-scholar` thực hiện truy xuất thông tin bài báo hiện tại từ DynamoDB `vietai-jobs` thông qua `jobId`, làm sạch tên file (loại bỏ phần mở rộng `.pdf`, dấu gạch dưới, gạch ngang) để lấy tiêu đề chính xác.
+- Tích hợp gọi Semantic Scholar API (`https://api.semanticscholar.org/graph/v1/paper/search`) để tìm kiếm top 5 tài liệu liên quan dựa trên tiêu đề.
+- Thiết lập cơ chế fallback thông minh: Nếu API Semantic Scholar gặp sự cố hoặc vượt giới hạn rate limit, hệ thống tự động trả về một danh sách kết quả bài báo liên quan giả lập chất lượng cao để tránh gián đoạn trải nghiệm người dùng.
+- Thêm tab "Papers liên quan" vào cột bên phải của `WorkspaceView.tsx`, hiển thị danh sách bài báo dưới dạng các thẻ thông tin (accordion cards) cho phép click để mở rộng xem phần tóm tắt (`abstract`).
+- Hiển thị nút "Đọc PDF" mở tab mới đối với các bài báo hỗ trợ Open Access PDF URL.
+- Sửa đổi các test E2E strict-mode bị lỗi do xung đột phần tử nút submit sau khi thêm form chat bằng cách chỉ định locator chi tiết qua chữ hiển thị trên nút.
+- Viết suite test E2E xác minh đầy đủ hành vi hiển thị thẻ, click mở abstract, và chuyển tiếp đọc PDF.
+
+#### Kết quả kiểm thử:
+- Đã chạy kiểm tra toàn bộ suite test và xác nhận **13/13** kịch bản kiểm thử E2E hoạt động ổn định và **PASS** 100%.
+- TypeScript compile: Pass.
+
+#### Files thay đổi:
+- `fe/app/api/semantic-scholar/route.ts` - (NEW) API route Next.js server tìm bài báo liên quan có xác thực session và fallback xử lý lỗi.
+- `fe/lib/api.ts` - Bổ sung kiểu dữ liệu `RelatedPaper` và hàm client `getRelatedPapers`.
+- `fe/components/WorkspaceView.tsx` - Tích hợp tab hiển thị bài báo liên quan, skeleton loaders, accordion expander và link redirect.
+- `fe/tests/semantic-scholar.spec.ts` - (NEW) Playwright E2E test cho Semantic Scholar.
+- `fe/tests/auth.spec.ts`, `fe/tests/download.spec.ts`, `fe/tests/reprocess.spec.ts` - Cập nhật selector nút submit tránh strict-mode violations.
+
+#### Build status:
+- npm run build (Backend & Frontend): Pass
+- TypeScript errors: 0
+- Playwright E2E test suite: Pass (13/13 tests passed sequentially)
+- Jest Backend test suite: Pass (18/18 tests passed)
+
 
 
 

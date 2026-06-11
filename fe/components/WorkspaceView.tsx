@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { getResultUrl, fetchPreviewContent, resetMockProgress, getJobs, JobStatus } from '../lib/api';
+import { getResultUrl, fetchPreviewContent, resetMockProgress, getJobs, JobStatus, sendRAGChatMessage, RelatedPaper, getRelatedPapers } from '../lib/api';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { useSession, signOut } from 'next-auth/react';
@@ -136,6 +136,25 @@ function renderMarkdown(md: string): string {
   return h;
 }
 
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  citations?: number[];
+}
+
+function parseCitations(text: string): { cleanText: string; citations: number[] } {
+  const citations: number[] = [];
+  const regex = /\[(?:Đoạn\s*|chunk-)(\d+)\]/gi;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const num = parseInt(match[1], 10);
+    if (!isNaN(num) && !citations.includes(num)) {
+      citations.push(num);
+    }
+  }
+  return { cleanText: text, citations: citations.sort((a, b) => a - b) };
+}
+
 export function WorkspaceView({
   jobId: initialJobId,
   onReset,
@@ -152,6 +171,18 @@ export function WorkspaceView({
   const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
   const [isRightCollapsed, setIsRightCollapsed] = useState(false);
   const [rightTab, setRightTab] = useState<RightTab>('tutor');
+
+  // AI Tutor Chat states
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Semantic Scholar states
+  const [relatedPapers, setRelatedPapers] = useState<RelatedPaper[]>([]);
+  const [isLoadingPapers, setIsLoadingPapers] = useState(false);
+  const [papersError, setPapersError] = useState<string | null>(null);
+  const [expandedPaperId, setExpandedPaperId] = useState<string | null>(null);
 
   // Document data states
   const [downloadUrl, setDownloadUrl] = useState('');
@@ -244,6 +275,107 @@ export function WorkspaceView({
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
   }, [jobId]);
+
+  // Dynamic greeting message based on session user
+  const userName = useMemo(() => {
+    if (session?.user?.name) return session.user.name;
+    if (session?.user?.email) {
+      return session.user.email.split('@')[0];
+    }
+    return 'Thai';
+  }, [session]);
+
+  // Reset or initialize messages when userName changes
+  useEffect(() => {
+    setMessages([
+      {
+        role: 'assistant',
+        content: `Chào ${userName}! Tôi là AI Tutor. Tôi có thể giúp bạn giải đáp, tóm tắt và phân tích chuyên sâu về bài báo này. Hãy thử đặt câu hỏi bên dưới nhé!`,
+      },
+    ]);
+  }, [userName]);
+
+  // Auto-scroll chat container to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isSending]);
+
+  // Fetch papers from Semantic Scholar
+  const fetchRelatedPapers = useCallback(async (targetJobId: string) => {
+    if (!targetJobId) return;
+    setIsLoadingPapers(true);
+    setPapersError(null);
+    try {
+      const papers = await getRelatedPapers(targetJobId);
+      setRelatedPapers(papers);
+    } catch (err: any) {
+      console.error('Error fetching related papers:', err);
+      setPapersError(err.message || 'Không thể tải bài báo liên quan.');
+    } finally {
+      setIsLoadingPapers(false);
+    }
+  }, []);
+
+  // Fetch automatically when the scholar tab is selected and papers are not yet loaded
+  useEffect(() => {
+    if (rightTab === 'scholar' && relatedPapers.length === 0 && !isLoadingPapers && !papersError && jobId) {
+      fetchRelatedPapers(jobId);
+    }
+  }, [rightTab, relatedPapers.length, isLoadingPapers, papersError, jobId, fetchRelatedPapers]);
+
+  // Reset papers when jobId changes
+  useEffect(() => {
+    setRelatedPapers([]);
+    setPapersError(null);
+    setExpandedPaperId(null);
+  }, [jobId]);
+
+  // Handle click on citations to scroll-into-view and highlight target paragraph
+  const handleCitationClick = useCallback((chunkIndex: number) => {
+    const elements = document.querySelectorAll(`[data-chunk="${chunkIndex}"]`);
+    if (elements.length === 0) {
+      console.warn(`No chunk elements found with index ${chunkIndex}`);
+      return;
+    }
+
+    elements.forEach(el => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('chunk-highlight');
+      setTimeout(() => {
+        el.classList.remove('chunk-highlight');
+      }, 3000);
+    });
+  }, []);
+
+  // Handle sending RAG chat message
+  const handleSendMessage = useCallback(async (text: string) => {
+    if (!text.trim() || isSending || loading) return;
+
+    const userMsg: Message = { role: 'user', content: text };
+    setMessages(prev => [...prev, userMsg]);
+    setChatInput('');
+    setIsSending(true);
+
+    try {
+      const res = await sendRAGChatMessage(jobId, text);
+      const parsed = parseCitations(res.answer);
+      const assistantMsg: Message = {
+        role: 'assistant',
+        content: parsed.cleanText,
+        citations: parsed.citations,
+      };
+      setMessages(prev => [...prev, assistantMsg]);
+    } catch (err: any) {
+      console.error('Chat failed:', err);
+      const errorMsg: Message = {
+        role: 'assistant',
+        content: 'Xin lỗi, đã xảy ra lỗi khi gửi câu hỏi tới AI Tutor. Vui lòng thử lại sau.',
+      };
+      setMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setIsSending(false);
+    }
+  }, [jobId, isSending, loading]);
 
   const triggerFileDownload = useCallback(() => {
     if (!downloadUrl) return;
@@ -866,100 +998,238 @@ export function WorkspaceView({
             /* AI TUTOR TAB */
             <div className="flex-1 flex flex-col justify-between overflow-hidden gap-4">
               {/* Chat message history container */}
-              <div className="flex-grow overflow-y-auto pr-1 flex flex-col gap-4">
-                <div className="flex items-start gap-2.5">
-                  <div className="h-6 w-6 rounded-full bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-[var(--accent)] flex items-center justify-center text-[10px] font-bold">
-                    AI
-                  </div>
-                  <div className="flex-1 bg-[var(--bg-elevated)] p-3 rounded-2xl rounded-tl-none border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] leading-relaxed">
-                    <p className="font-semibold mb-1" style={{ color: 'var(--accent)' }}>AI Tutor học thuật</p>
-                    Chào Thai! Tôi là AI Tutor. Sau khi RAG chat được tích hợp ở Story 3.4, bạn có thể đặt câu hỏi phân tích chuyên sâu về bài viết này tại đây.
-                  </div>
-                </div>
+              <div className="flex-grow overflow-y-auto pr-1 flex flex-col gap-4 scrollbar-thin" id="chat-messages-container">
+                {messages.map((msg, idx) => (
+                  <div key={idx} className={`flex items-start gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                    {msg.role === 'assistant' ? (
+                      <div className="h-6 w-6 rounded-full bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-[var(--accent)] flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                        AI
+                      </div>
+                    ) : (
+                      <div className="h-6 w-6 rounded-full bg-[var(--accent)] text-[#080b12] flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                        U
+                      </div>
+                    )}
+                    <div className={`flex-1 p-3 rounded-2xl border text-xs leading-relaxed max-w-[85%] ${
+                      msg.role === 'user'
+                        ? 'bg-[var(--accent-dim)] border-[var(--accent-glow)] rounded-tr-none text-[var(--text-primary)] self-end'
+                        : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] rounded-tl-none text-[var(--text-primary)]'
+                    }`}>
+                      {msg.role === 'assistant' && (
+                        <p className="font-semibold mb-1" style={{ color: 'var(--accent)' }}>AI Tutor học thuật</p>
+                      )}
+                      {msg.role === 'user' ? (
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      ) : (
+                        <div
+                          className="markdown-preview"
+                          dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                        />
+                      )}
 
-                <div className="flex flex-col gap-1.5 ml-8 mt-1">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)] mb-1">Gợi ý câu hỏi:</span>
-                  {[
-                    'Tóm tắt mục Phương pháp nghiên cứu',
-                    'Giải thích công thức toán học chính',
-                    'Định nghĩa các thuật ngữ chuyên ngành',
-                  ].map((q, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setAlertMessage('Tính năng Chat RAG sẽ được phát triển đầy đủ ở Story 3.4. Hãy đón chờ!')}
-                      className="text-left text-xs p-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-normal)] transition-colors cursor-pointer"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
+                      {/* Source Citations Badges */}
+                      {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && (
+                        <div className="mt-2.5 pt-2 border-t border-[var(--border-subtle)] flex flex-wrap gap-1.5 items-center">
+                          <span className="text-[9px] uppercase font-bold tracking-wider text-[var(--text-secondary)]">Nguồn trích dẫn:</span>
+                          {msg.citations.map((citationIndex) => (
+                            <button
+                              key={citationIndex}
+                              onClick={() => handleCitationClick(citationIndex)}
+                              className="px-2 py-0.5 rounded bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-[10px] font-medium text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[#080b12] transition-all cursor-pointer"
+                              data-testid={`citation-${citationIndex}`}
+                            >
+                              Đoạn {citationIndex}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Suggestions shown only when there is only 1 message (the greeting) */}
+                {messages.length === 1 && (
+                  <div className="flex flex-col gap-1.5 ml-8 mt-1">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)] mb-1">Gợi ý câu hỏi:</span>
+                    {[
+                      'Tóm tắt mục Phương pháp nghiên cứu',
+                      'Giải thích công thức toán học chính',
+                      'Định nghĩa các thuật ngữ chuyên ngành',
+                    ].map((q, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setChatInput(q);
+                          handleSendMessage(q);
+                        }}
+                        disabled={loading}
+                        className="text-left text-xs p-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-normal)] transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Typing Indicator */}
+                {isSending && (
+                  <div className="flex items-start gap-2.5 animate-pulse">
+                    <div className="h-6 w-6 rounded-full bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-[var(--accent)] flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                      AI
+                    </div>
+                    <div className="bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-3 rounded-2xl rounded-tl-none text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
+                      <span>AI Tutor đang suy nghĩ</span>
+                      <span className="flex gap-0.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '0s' }}></span>
+                        <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '0.15s' }}></span>
+                        <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '0.3s' }}></span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={chatEndRef} />
               </div>
 
               {/* Chat input box */}
               <div className="border-t border-[var(--border-subtle)] pt-4 flex-shrink-0">
-                <div className="relative flex items-center">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSendMessage(chatInput);
+                  }}
+                  className="relative flex items-center"
+                >
                   <input
                     type="text"
-                    placeholder="Hỏi AI Tutor..."
-                    disabled
-                    className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] text-xs px-4 py-3 rounded-xl border border-[var(--border-subtle)] pr-10 outline-none placeholder:text-[var(--text-muted)] opacity-60"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder={loading ? "Đang tải tài liệu..." : "Hỏi AI Tutor..."}
+                    disabled={loading || isSending}
+                    className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] text-xs px-4 py-3 rounded-xl border border-[var(--border-subtle)] pr-10 outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] transition-colors disabled:opacity-60"
                   />
                   <button
-                    disabled
-                    className="absolute right-3 text-[var(--text-muted)] cursor-not-allowed"
+                    type="submit"
+                    disabled={loading || isSending || !chatInput.trim()}
+                    className="absolute right-3 text-[var(--text-secondary)] hover:text-[var(--accent)] disabled:text-[var(--text-muted)] disabled:hover:text-[var(--text-muted)] cursor-pointer disabled:cursor-not-allowed transition-colors"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                     </svg>
                   </button>
-                </div>
+                </form>
               </div>
             </div>
           ) : (
             /* SEMANTIC SCHOLAR TAB */
-            <div className="flex-1 flex flex-col overflow-y-auto pr-1 gap-4 scrollbar-thin">
-              <div className="p-3 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl text-xs text-[var(--text-primary)] mb-2">
-                📌 <strong>Semantic Scholar API:</strong> Đề xuất các bài báo học thuật liên quan dựa trên citation network. Tính năng sẽ được kích hoạt ở Story 3.5.
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-3 bg-[var(--accent-dim)] border border-[var(--accent-glow)] rounded-xl text-xs text-[var(--text-primary)] mb-4 flex-shrink-0">
+                📌 <strong>Semantic Scholar API:</strong> Đề xuất các bài báo học thuật liên quan mật thiết dựa trên tiêu đề nghiên cứu của bài đang đọc.
               </div>
 
-              <div className="flex flex-col gap-3">
-                {[
-                  {
-                    title: 'Attention Is All You Need',
-                    authors: 'A Vaswani, N Shazeer, N Parmar...',
-                    year: '2017',
-                    citations: '120,432',
-                  },
-                  {
-                    title: 'BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding',
-                    authors: 'J Devlin, MW Chang, K Lee, K Toutanova',
-                    year: '2018',
-                    citations: '98,201',
-                  },
-                  {
-                    title: 'Language Models are Few-Shot Learners',
-                    authors: 'TB Brown, B Mann, N Ryder, M Subbiah...',
-                    year: '2020',
-                    citations: '34,510',
-                  },
-                ].map((paper, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/30 flex flex-col gap-1.5"
-                  >
-                    <h4 className="text-xs font-bold text-[var(--text-primary)] line-clamp-2 leading-snug">
-                      {paper.title}
-                    </h4>
-                    <p className="text-[10px] text-[var(--text-secondary)] truncate">
-                      {paper.authors}
-                    </p>
-                    <div className="flex items-center justify-between text-[9px] text-[var(--text-muted)] font-medium pt-1 border-t border-[var(--border-subtle)]">
-                      <span>Năm: {paper.year}</span>
-                      <span className="text-[var(--success)]">Trích dẫn: {paper.citations}</span>
+              {isLoadingPapers ? (
+                /* Shimmer Loader */
+                <div className="flex-grow overflow-y-auto pr-1 flex flex-col gap-3 scrollbar-thin">
+                  {[1, 2, 3].map((n) => (
+                    <div key={n} className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/30 animate-pulse flex flex-col gap-2">
+                      <div className="h-4 bg-[var(--border-normal)] rounded w-5/6"></div>
+                      <div className="h-3 bg-[var(--border-subtle)] rounded w-1/2"></div>
+                      <div className="flex justify-between pt-2 border-t border-[var(--border-subtle)]">
+                        <div className="h-2 bg-[var(--border-subtle)] rounded w-1/4"></div>
+                        <div className="h-2 bg-[var(--border-subtle)] rounded w-1/4"></div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : papersError ? (
+                /* Error State */
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+                  <p className="text-xs text-[var(--text-secondary)] mb-3">{papersError}</p>
+                  <button
+                    onClick={() => fetchRelatedPapers(jobId)}
+                    className="px-4 py-2 rounded-lg bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-xs text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[#080b12] font-semibold transition-all cursor-pointer"
+                  >
+                    Thử lại
+                  </button>
+                </div>
+              ) : relatedPapers.length === 0 ? (
+                /* Empty/Initial State */
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+                  <p className="text-xs text-[var(--text-secondary)] mb-4">Chưa tải thông tin bài báo liên quan.</p>
+                  <button
+                    onClick={() => fetchRelatedPapers(jobId)}
+                    className="px-4 py-2 rounded-lg bg-[var(--accent)] text-[#080b12] text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer border-none"
+                    data-testid="find-related-btn"
+                  >
+                    Tìm bài báo liên quan
+                  </button>
+                </div>
+              ) : (
+                /* Papers List */
+                <div className="flex-grow overflow-y-auto pr-1 flex flex-col gap-3 scrollbar-thin" data-testid="related-papers-list">
+                  {relatedPapers.map((paper) => {
+                    const isExpanded = expandedPaperId === paper.paperId;
+                    return (
+                      <div
+                        key={paper.paperId}
+                        className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/30 hover:bg-[var(--bg-elevated)]/50 transition-colors flex flex-col overflow-hidden"
+                        data-testid={`paper-card-${paper.paperId}`}
+                      >
+                        {/* Header/Summary View */}
+                        <div
+                          onClick={() => setExpandedPaperId(isExpanded ? null : paper.paperId)}
+                          className="p-3.5 cursor-pointer flex flex-col gap-1.5"
+                        >
+                          <div className="flex justify-between items-start gap-2">
+                            <h4 className="text-xs font-bold text-[var(--text-primary)] leading-snug hover:text-[var(--accent)] transition-colors pr-2">
+                              {paper.title}
+                            </h4>
+                            <span className="text-[var(--text-muted)] mt-0.5 flex-shrink-0 transition-transform duration-200">
+                              <svg
+                                className={`h-3.5 w-3.5 transform ${isExpanded ? 'rotate-180' : ''}`}
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-[var(--text-secondary)] truncate">
+                            {paper.authors.length > 0 ? paper.authors.join(', ') : 'Unknown Authors'}
+                          </p>
+                          <div className="flex items-center justify-between text-[9px] text-[var(--text-muted)] font-medium pt-1 border-t border-[var(--border-subtle)]/50">
+                            <span>Năm: {paper.year || 'N/A'}</span>
+                            {paper.pdfUrl && (
+                              <a
+                                href={paper.pdfUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[var(--accent)] hover:underline flex items-center gap-0.5 font-bold"
+                                data-testid={`pdf-link-${paper.paperId}`}
+                              >
+                                Đọc PDF
+                                <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Expanded Abstract */}
+                        {isExpanded && (
+                          <div className="px-3.5 pb-3.5 pt-1 border-t border-[var(--border-subtle)]/50 text-[10px] text-[var(--text-secondary)] leading-relaxed bg-[var(--bg-surface)]/50">
+                            <p className="font-semibold text-[9px] uppercase tracking-wider text-[var(--text-muted)] mb-1">Tóm tắt:</p>
+                            <p className="whitespace-pre-wrap">{paper.abstract || 'Không có tóm tắt tiếng Anh.'}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>

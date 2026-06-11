@@ -134,3 +134,22 @@ export async function sendRAGChatMessage(jobId: string, message: string): Promis
   }
   return res.json();
 }
+
+export interface RelatedPaper {
+  paperId: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  abstract: string | null;
+  pdfUrl: string | null;
+}
+
+export async function getRelatedPapers(jobId: string): Promise<RelatedPaper[]> {
+  const res = await fetch(`/api/semantic-scholar?jobId=${jobId}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch related papers: ${res.status}`);
+  }
+  const data = await res.json();
+  return data.papers || [];
+}
