@@ -114,3 +114,23 @@ export async function getJobs(): Promise<JobStatus[]> {
   const data = await res.json();
   return data.jobs || [];
 }
+
+export async function sendRAGChatMessage(jobId: string, message: string): Promise<{ answer: string }> {
+  if (jobId.startsWith('mock-')) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ answer: `Đây là câu trả lời thử nghiệm từ tài liệu mock cho câu hỏi "${message}" [Đoạn 1].` });
+      }, 1000);
+    });
+  }
+  const res = await fetch(`/api/chat/${jobId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Chat failed: ${res.status}`);
+  }
+  return res.json();
+}

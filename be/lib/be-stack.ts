@@ -187,6 +187,8 @@ export class VietAIScholarStack extends cdk.Stack {
           GEMINI_SECRET_ARN: geminiSecret.secretArn,
           DEEPSEEK_SECRET_ARN: deepseekSecret.secretArn,
           MISTRAL_SECRET_ARN: mistralSecret.secretArn,
+          QDRANT_SECRET_ARN: qdrantSecret.secretArn,
+          AUTH_SECRET_SECRET_NAME: 'vietai/auth-secret',
           // AWS_REGION is automatically available in Lambda runtime
         },
         description: 'Main orchestrator for PDF processing pipeline',
@@ -228,6 +230,7 @@ export class VietAIScholarStack extends cdk.Stack {
     geminiSecret.grantRead(orchestratorLambda);
     deepseekSecret.grantRead(orchestratorLambda);
     mistralSecret.grantRead(orchestratorLambda);
+    qdrantSecret.grantRead(orchestratorLambda);
     orchestratorLambda.addToRolePolicy(new iam.PolicyStatement({
       actions: [
         'textract:DetectDocumentText',
@@ -461,6 +464,7 @@ export class VietAIScholarStack extends cdk.Stack {
 
     const authSecret = secretsmanager.Secret.fromSecretNameV2(this, 'AuthSecret', 'vietai/auth-secret');
     authSecret.grantRead(authorizerLambda);
+    authSecret.grantRead(orchestratorLambda);
 
     const authorizer = new apigateway.TokenAuthorizer(this, 'JwtAuthorizer', {
       handler: authorizerLambda,
@@ -486,10 +490,7 @@ export class VietAIScholarStack extends cdk.Stack {
       'POST',
       new apigateway.LambdaIntegration(orchestratorLambda, {
         proxy: true, // Lambda nhận full HTTP request, tự xử lý response
-      }),
-      {
-        authorizer,
-      }
+      })
     );
 
     // ============================================
@@ -519,6 +520,19 @@ export class VietAIScholarStack extends cdk.Stack {
     );
 
     // ============================================
+    // API Endpoint 2.6: POST /job/{jobId}/chat
+    // Returns: { answer } — RAG QA chat assistant
+    // ============================================
+    const chatResource = jobIdResource.addResource('chat');
+    chatResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+
+    // ============================================
     // API Endpoint 3: GET /result/{jobId}
     // Returns: { downloadUrl } — presigned S3 URL for analysis.md
     // ============================================
@@ -526,10 +540,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const resultJobIdResource = resultResource.addResource('{jobId}');
     resultJobIdResource.addMethod(
       'GET',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
-      {
-        authorizer,
-      }
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true })
     );
 
     // ============================================

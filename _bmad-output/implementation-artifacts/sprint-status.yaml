@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-07T11:05:00Z
-last_updated: 2026-06-10T09:10:00+07:00
+last_updated: 2026-06-11T10:43:00+07:00
 project: viet-ai-scholar
 project_key: NOKEY
 tracking_system: file-system
@@ -60,7 +60,7 @@ development_status:
   epic-3: in-progress
   3-1-giao-dien-workspace-3-cot-3-column-workspace-ui-layout-sidebar: done
   3-2-tach-doan-embedding-luu-tru-qdrant-cloud-paragraph-ingestion-qdrant-upsert-lambda: done
-  3-3-api-rag-chat-an-toan-secure-rag-chat-api-namespace-filter: backlog
+  3-3-api-rag-chat-an-toan-secure-rag-chat-api-namespace-filter: review
   3-4-giao-dien-ai-tutor-chat-ai-tutor-chat-panel-ui-source-citations: backlog
   3-5-tich-hop-api-semantic-scholar-semantic-scholar-integration-related-papers-panel: backlog
   epic-3-retrospective: optional

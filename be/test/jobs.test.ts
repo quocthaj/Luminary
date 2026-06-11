@@ -45,6 +45,15 @@ jest.mock('@aws-sdk/s3-request-presigner', () => ({
   getSignedUrl: jest.fn().mockResolvedValue('https://mock-s3-upload-url.com/file.pdf'),
 }));
 
+jest.mock('../lambda/utils/auth-helpers', () => ({
+  verifyToken: jest.fn().mockImplementation(async (header?: string) => {
+    if (header && header.startsWith('Bearer ')) {
+      return header.replace('Bearer ', '');
+    }
+    return 'guest';
+  }),
+}));
+
 import { handler } from '../lambda/index';
 
 describe('Jobs Handler - Upload & List Jobs', () => {
@@ -61,10 +70,8 @@ describe('Jobs Handler - Upload & List Jobs', () => {
       httpMethod: 'POST',
       path: '/upload',
       body: JSON.stringify({ fileName: 'test-paper.pdf' }),
-      requestContext: {
-        authorizer: {
-          userId: 'user-123',
-        },
+      headers: {
+        Authorization: 'Bearer user-123',
       },
     };
 
@@ -265,5 +272,88 @@ describe('Jobs Handler - Reprocess Job', () => {
 
     expect(response.statusCode).toBe(200);
     expect(body.message).toBeDefined();
+  });
+});
+
+describe('Jobs Handler - Result URL Authorization', () => {
+  beforeEach(() => {
+    mockDynamodbSend.mockReset();
+    mockS3Send.mockReset();
+  });
+
+  it('should return result URL for guest job without authorization', async () => {
+    mockDynamodbSend.mockResolvedValue({
+      Item: {
+        jobId: { S: 'job-123' },
+        userId: { S: 'guest' },
+        s3OutputKey: { S: 'results/job-123/analysis.md' },
+      },
+    });
+
+    const event = {
+      httpMethod: 'GET',
+      path: '/result/job-123',
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(200);
+    expect(body.downloadUrl).toBeDefined();
+  });
+
+  it('should return result URL for registered user job with matching authorization', async () => {
+    mockDynamodbSend.mockResolvedValue({
+      Item: {
+        jobId: { S: 'job-123' },
+        userId: { S: 'user-123' },
+        s3OutputKey: { S: 'results/job-123/analysis.md' },
+      },
+    });
+
+    const event = {
+      httpMethod: 'GET',
+      path: '/result/job-123',
+      headers: {
+        Authorization: 'Bearer user-123',
+      },
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(200);
+    expect(body.downloadUrl).toBeDefined();
+  });
+
+  it('should return 403 for registered user job when authorization is missing or wrong', async () => {
+    mockDynamodbSend.mockResolvedValue({
+      Item: {
+        jobId: { S: 'job-123' },
+        userId: { S: 'user-123' },
+        s3OutputKey: { S: 'results/job-123/analysis.md' },
+      },
+    });
+
+    // 1. Missing Authorization header (defaults to guest)
+    const event1 = {
+      httpMethod: 'GET',
+      path: '/result/job-123',
+    };
+
+    const response1 = await handler(event1);
+    expect(response1.statusCode).toBe(403);
+
+    // 2. Wrong Authorization token
+    const event2 = {
+      httpMethod: 'GET',
+      path: '/result/job-123',
+      headers: {
+        Authorization: 'Bearer wrong-user',
+      },
+    };
+
+    const response2 = await handler(event2);
+    expect(response2.statusCode).toBe(403);
   });
 });
