@@ -425,6 +425,49 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 - TypeScript errors: 0
 - CDK deploy: Success
 
+---
+
+### ✅ Story 3.3: API RAG Chat an toàn (Secure RAG Chat API & Namespace Filter)
+**Status:** Done  
+**Time:** 6 hours  
+**Date:** 2026-06-11
+
+#### Đã làm:
+1. **Backend – Route `POST /job/{jobId}/chat` (`be/lambda/index.ts`):**
+   - Triển khai handler `handleChatJob` xác thực quyền sở hữu `jobId` với `userId` trong DynamoDB. Trả về `403 Forbidden` nếu người dùng khác truy cập.
+   - Sử dụng cơ chế Singleton Qdrant Client và Gemini API Client ngoài global scope để duy trì connection pool và tránh TLS latency do cold start.
+   - Sinh vector cho câu hỏi sử dụng Gemini Embedding Model `gemini-embedding-001`.
+   - Tìm kiếm vector tương đồng trên Qdrant Cloud collection `vietai-scholar-chunks` kèm bộ lọc `{ userId, jobId }`.
+   - Gọi Gemini `gemini-2.0-flash` sinh phản hồi định dạng Markdown kèm trích dẫn nguồn `[Đoạn X]`.
+2. **Backend – CDK Stack (`be/lib/be-stack.ts`):**
+   - Cấu hình route `POST /job/{jobId}/chat` trên API Gateway tích hợp với `OrchestratorLambda` và bảo vệ bằng `authorizer`.
+   - Cấp quyền đọc secret `vietai/qdrant-config` trong AWS Secrets Manager cho `OrchestratorLambda`.
+3. **Frontend – Next.js API Proxy `/api/chat/[jobId]` (`fe/app/api/chat/[jobId]/route.ts`):**
+   - Thiết lập route proxy xác thực NextAuth session, chuyển tiếp request đến backend kèm Authorization Header.
+   - Thêm mock response cho mock jobs phục vụ kiểm thử offline.
+4. **Backend Unit Tests (`be/test/chat.test.ts`) (NEW):**
+   - Viết 4 test cases cho chat handler: thành công, lỗi `JOB_NOT_FOUND`, lỗi `FORBIDDEN`, và lỗi `Message is empty`. Chạy pass 100%.
+5. **Playwright E2E Test (`fe/tests/rag-chat.spec.ts`) (NEW):**
+   - Viết test suite kiểm thử hoạt động proxy API route với mock session. Chạy pass 100%.
+
+#### Kết quả kiểm thử:
+- **Frontend Playwright E2E:** 3/3 tests PASS (`tests/rag-chat.spec.ts`).
+- **Backend Jest Unit Tests:** 4/4 tests PASS (`test/chat.test.ts`).
+
+#### Files thay đổi:
+- `be/lib/be-stack.ts` – Cấu hình API Gateway route và cấp quyền Secrets.
+- `be/lambda/index.ts` – Định tuyến cho endpoint chat.
+- `be/lambda/handlers/chat.ts` – (NEW) RAG Chat handler.
+- `be/test/chat.test.ts` – (NEW) Unit test backend cho chat handler.
+- `fe/app/api/chat/[jobId]/route.ts` – (NEW) API proxy cho Next.js server.
+- `fe/lib/api.ts` – Thêm client function `sendRAGChatMessage` kèm mock support.
+- `fe/tests/rag-chat.spec.ts` – (NEW) E2E test cho chat proxy route.
+
+#### Build status:
+- npm run build (Backend & Frontend): Pass
+- TypeScript errors: 0
+- CDK deploy: Success
+
 
 
 
