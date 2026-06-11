@@ -10,7 +10,10 @@ export async function POST(
   const { jobId } = await context.params;
 
   let session = await auth();
-  if (jobId.startsWith('mock-') && (process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT_TEST === 'true' || req.headers.get('x-playwright-test') === 'true')) {
+  const isTestOrDev = process.env.NODE_ENV !== 'production' || process.env.PLAYWRIGHT_TEST === 'true';
+  const hasPlaywrightHeader = req.headers.get('x-playwright-test') === 'true';
+
+  if (jobId.startsWith('mock-') && (process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT_TEST === 'true' || (isTestOrDev && hasPlaywrightHeader))) {
     session = { accessToken: 'mock-token-123' } as any;
   }
 
@@ -37,6 +40,9 @@ export async function POST(
   const backendUrl = `${API_BASE}/job/${jobId}/chat`;
   console.log(`📡 [NextJS API Chat] Forwarding request to API Gateway: ${backendUrl}`);
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
   try {
     const res = await fetch(backendUrl, {
       method: 'POST',
@@ -45,7 +51,9 @@ export async function POST(
         'Authorization': `Bearer ${session.accessToken}`,
       },
       body: JSON.stringify({ message }),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     if (!res.ok) {
       const errorText = await res.text();
@@ -61,6 +69,14 @@ export async function POST(
     const data = await res.json();
     return NextResponse.json(data);
   } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      console.error('❌ [NextJS API Chat] request timed out after 15s');
+      return NextResponse.json(
+        { error: 'Yêu cầu kết nối máy chủ backend bị quá hạn (Timeout)' },
+        { status: 504 }
+      );
+    }
     console.error('❌ [NextJS API Chat] error forwarding request:', err);
     return NextResponse.json(
       { error: err.message || 'Internal server error' },

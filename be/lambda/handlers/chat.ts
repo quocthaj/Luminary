@@ -74,13 +74,18 @@ export const handleChatJob = async (event: ChatInput): Promise<ChatOutput> => {
     throw new Error('FORBIDDEN');
   }
 
+  const totalStart = performance.now();
+
   // 2. Generate question embedding
+  const embedStart = performance.now();
   const [embedding] = await getGeminiEmbeddingsBatch([message]);
   if (!embedding) {
     throw new Error('Failed to generate embedding for the question');
   }
+  console.log(`⏱️ [chat] Embedding generated in ${(performance.now() - embedStart).toFixed(0)}ms`);
 
   // 3. Connect to Qdrant and search
+  const qdrantStart = performance.now();
   const qdrantClient = await getQdrantClient();
   console.log(`🔍 [chat] Querying Qdrant collection=${COLLECTION_NAME} for user=${userId}, job=${jobId}`);
   
@@ -94,8 +99,7 @@ export const handleChatJob = async (event: ChatInput): Promise<ChatOutput> => {
     },
     limit: 4,
   });
-
-  console.log(`📦 [chat] Retrieved ${searchResults.length} chunks from Qdrant`);
+  console.log(`⏱️ [chat] Qdrant search completed in ${(performance.now() - qdrantStart).toFixed(0)}ms (retrieved ${searchResults.length} chunks)`);
 
   // 4. Formulate Prompt context
   let contextString = '';
@@ -130,11 +134,24 @@ Quy tắc trả lời:
 4. Phản hồi bằng tiếng Việt thân thiện và chuyên nghiệp.`;
 
   // 5. Generate answer using Gemini 2.0 Flash
-  const genAI = await getGeminiClient();
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-  const responseResult = await model.generateContent(systemMessage);
-  const answer = responseResult.response.text() || 'Không có phản hồi từ mô hình AI.';
+  const geminiStart = performance.now();
+  let answer = 'Không có phản hồi từ mô hình AI.';
+  try {
+    const genAI = await getGeminiClient();
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const responseResult = await model.generateContent(systemMessage);
+    const candidate = responseResult.response.candidates?.[0];
+    if (candidate?.finishReason === 'SAFETY' || candidate?.finishReason === 'RECITATION') {
+      answer = 'Câu trả lời bị chặn bởi bộ lọc an toàn hoặc bản quyền của mô hình AI.';
+    } else {
+      answer = responseResult.response.text() || answer;
+    }
+  } catch (err: any) {
+    console.error('❌ [chat] Error generating content from Gemini:', err);
+    answer = `Không thể tạo câu trả lời do lỗi hệ thống AI: ${err.message || err}`;
+  }
+  console.log(`⏱️ [chat] Gemini text generation completed in ${(performance.now() - geminiStart).toFixed(0)}ms`);
+  console.log(`⏱️ [chat] Total RAG Chat completed in ${(performance.now() - totalStart).toFixed(0)}ms`);
 
-  console.log(`✅ [chat] Answer generated: ${answer.length} chars`);
   return { answer };
 };

@@ -468,6 +468,16 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 - TypeScript errors: 0
 - CDK deploy: Success
 
+#### Cập nhật sau Code Review (2026-06-11):
+- **Đã vá lỗi:**
+  - Bọc khối gọi Gemini `generateContent` vào try-catch để phòng ngừa lỗi crash khi bị chặn bởi bộ lọc an toàn/bản quyền.
+  - Bảo vệ điều kiện mock-bypass ở route proxy Next.js để không thể kích hoạt trên môi trường Production qua header.
+  - Cấu hình Timeout 15 giây cho request fetch proxy Next.js Server sử dụng `AbortController`.
+  - Bổ sung ghi log đo lường thời gian thực thi chi tiết các bước (performance duration logging) đáp ứng yêu cầu SLA dưới 3 giây (NFR-5).
+- **Kiểm thử sau vá lỗi:**
+  - Jest Unit Tests: 4/4 tests PASS.
+  - Playwright E2E Tests: 3/3 tests PASS.
+
 
 
 

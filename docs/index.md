@@ -31,6 +31,7 @@
 
 ### Tổng Quan
 - [Tổng quan dự án](./project-overview.md)
+- [Tóm tắt dự án & Hướng dẫn hợp tác](./project-summary.md)
 - [Phân tích cây mã nguồn](./source-tree-analysis.md)
 
 ### Kiến Trúc

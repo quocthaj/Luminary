@@ -55,14 +55,13 @@ export async function GET(
   }
 
   const session = await auth();
-  if (!session || !session.accessToken) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const headers: Record<string, string> = {};
+  if (session?.accessToken) {
+    headers['Authorization'] = `Bearer ${session.accessToken}`;
   }
 
   const metaRes = await fetch(`${API_BASE}/result/${jobId}`, {
-    headers: {
-      'Authorization': `Bearer ${session.accessToken}`,
-    },
+    headers,
   });
 
   if (!metaRes.ok) {

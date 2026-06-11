@@ -4,7 +4,7 @@ baseline_commit: ff555c6be4fd17f2d68dca450812661023ccc4e3
 
 # Story 3.3: API RAG Chat an toàn (Secure RAG Chat API & Namespace Filter)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -121,3 +121,11 @@ Antigravity (Gemini 2.5)
 - fe/app/api/chat/[jobId]/route.ts (Created)
 - fe/lib/api.ts (Modified)
 - fe/tests/rag-chat.spec.ts (Created)
+
+### Review Findings
+
+- [x] [Review][Patch] Potential crash when calling responseResult.response.text() [be/lambda/handlers/chat.ts:135]
+- [x] [Review][Patch] Mock bypass active on production environments via header [fe/app/api/chat/[jobId]/route.ts:13]
+- [x] [Review][Patch] Missing timeout configuration on Next.js API proxy fetch [fe/app/api/chat/[jobId]/route.ts:41]
+- [x] [Review][Patch] Lack of latency logging for NFR-5 verification (3-second target) [be/lambda/handlers/chat.ts:58]
+- [x] [Review][Defer] Hardcoded AWS Secrets Manager ARN in CDK stack [be/lib/be-stack.ts:217] — deferred, pre-existing
