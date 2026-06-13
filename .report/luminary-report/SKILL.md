@@ -532,6 +532,34 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 - Playwright E2E test suite: Pass (13/13 tests passed sequentially)
 - Jest Backend test suite: Pass (18/18 tests passed)
 
+---
 
+### ✅ Story 2.6: Tích hợp API Nomic Embeddings & Cấu hình Qdrant Vector Size
+**Status:** Done  
+**Time:** 6 hours  
+**Date:** 2026-06-13
 
+#### Đã làm:
+- **Thay thế Gemini Embeddings bằng Nomic Embeddings**: Thay đổi hàm `getEmbeddingsBatch` và `getEmbeddings` trong `ai-providers.ts` để gọi endpoint `https://api-atlas.nomic.ai/v1/embedding/text` của Nomic Atlas API sử dụng model `nomic-embed-text-v1.5`. Cấu hình `task_type` là `search_document` khi đánh chỉ mục tài liệu (Ingest Lambda) và `search_query` khi sinh vector truy vấn (Chat Lambda).
+- **Tích hợp AWS Secrets Manager**: Khai báo secret `vietai/nomic-api-key` để lấy API Key động, cấp quyền đọc `nomicSecret.grantRead(lambdaRole)` trong stack CDK và truyền qua biến môi trường `NOMIC_SECRET_ARN`.
+- **Cập nhật Vector Size trên Qdrant**: Cấu hình vector size là `768` tương thích với Nomic Embeddings. Thêm logic tự động kiểm tra kích thước vector hiện tại của collection và recreate collection nếu phát hiện mismatch.
+- **Tối ưu hóa Playwright E2E Suite**: Tăng giá trị default expect timeout lên `30000ms` và cấu hình local retries là `1` giúp giảm thiểu tình trạng timeout do thời gian biên dịch (cold-start Next.js Dev Server compilation) khi chạy song song nhiều worker.
 
+#### Kết quả kiểm thử:
+- **Backend Unit Tests (Jest):** 100% PASS (bao gồm các test case cho Ingest Lambda và Chat Lambda).
+- **Frontend E2E Tests (Playwright):** 14/14 tests PASS (bao gồm auth, download wall, reprocess, tutor chat, semantic scholar, v.v.).
+
+#### Files thay đổi:
+- `be/lib/be-stack.ts` – Tích hợp Secrets Manager và cấp quyền Lambda Role.
+- `be/lambda/utils/ai-providers.ts` – Đổi từ Gemini Embeddings sang Nomic Embeddings API.
+- `be/lambda/handlers/ingest.ts` – Sử dụng Nomic Embeddings và thêm logic auto-recreate collection khi dimension mismatch.
+- `be/lambda/handlers/chat.ts` – Sử dụng Nomic Embeddings.
+- `be/test/ingest.test.ts` & `be/test/chat.test.ts` – Cập nhật mock dữ liệu vector dimension 768.
+- `fe/playwright.config.ts` – Tăng default expect timeout lên 30s và thiết lập retries lên 1.
+- `fe/tests/*` – Cập nhật explicit timeout và cấu hình tương thích.
+
+#### Build status:
+- npm run build (Backend & Frontend): Pass
+- TypeScript errors: 0
+- Playwright E2E test suite: Pass (14/14 tests passed)
+- Jest Backend test suite: Pass (18/18 tests passed)
