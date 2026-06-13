@@ -9,6 +9,7 @@ const mockCreateCollection = jest.fn();
 const mockGetCollections = jest.fn();
 const mockUpsert = jest.fn();
 const mockGenerateContent = jest.fn();
+const mockCreatePayloadIndex = jest.fn();
 
 const mockGetGenerativeModel = jest.fn().mockImplementation(() => {
   return {
@@ -40,6 +41,7 @@ jest.mock('@qdrant/js-client-rest', () => {
       return {
         getCollections: () => mockGetCollections(),
         createCollection: (name: string, config: any) => mockCreateCollection(name, config),
+        createPayloadIndex: (name: string, config: any) => mockCreatePayloadIndex(name, config),
         upsert: (name: string, payload: any) => mockUpsert(name, payload),
       };
     }),
@@ -75,6 +77,7 @@ describe('Ingest Handler', () => {
     mockCreateCollection.mockReset();
     mockUpsert.mockReset();
     mockGenerateContent.mockReset();
+    mockCreatePayloadIndex.mockReset();
 
     process.env.QDRANT_SECRET_ARN = 'arn:aws:secretsmanager:ap-southeast-1:123456789012:secret:vietai/qdrant-config';
     process.env.GEMINI_SECRET_ARN = 'arn:aws:secretsmanager:ap-southeast-1:123456789012:secret:vietai/gemini-key';

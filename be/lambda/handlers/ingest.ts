@@ -133,6 +133,17 @@ export const handler = async (event: IngestInput): Promise<IngestOutput> => {
           distance: 'Cosine',
         },
       });
+
+      // Tạo payload index cho filter để tăng tốc và đảm bảo RAG tìm kiếm chính xác
+      await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+        field_name: 'userId',
+        field_schema: 'keyword'
+      });
+      await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+        field_name: 'jobId',
+        field_schema: 'keyword'
+      });
+      console.log('✅ [ingest] Payload indexes created for userId and jobId');
     }
   } catch (err) {
     console.warn(`⚠️ [ingest] Error checking/creating collection ${COLLECTION_NAME}:`, err);
