@@ -1,12 +1,12 @@
 // ============================================
-// HANDLER: RAG Chat Assistant
+// HANDLER: RAG Chat Assistant (Agentic RAG)
 // ============================================
 
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { getJobItem } from '../utils/dynamodb-helpers';
 import { getSecret, GEMINI_SECRET_ARN } from '../utils/aws-clients';
-import { getGeminiEmbeddingsBatch } from '../utils/ai-providers';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getEmbeddingsBatch } from '../utils/ai-providers';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 
 interface ChatInput {
   jobId: string;
@@ -54,6 +54,101 @@ async function getGeminiClient(): Promise<GoogleGenerativeAI> {
   return geminiGenAIInstance;
 }
 
+// ============================================
+// TOOL IMPLEMENTATIONS
+// ============================================
+
+async function vectorSearch(jobId: string, userId: string, query: string): Promise<any[]> {
+  const [embedding] = await getEmbeddingsBatch([query], 'search_query');
+  if (!embedding) {
+    throw new Error('Failed to generate embedding for the search query');
+  }
+
+  const qdrantClient = await getQdrantClient();
+  const searchResults = await qdrantClient.search(COLLECTION_NAME, {
+    vector: embedding,
+    filter: {
+      must: [
+        { key: 'userId', match: { value: userId } },
+        { key: 'jobId', match: { value: jobId } }
+      ]
+    },
+    limit: 4,
+  });
+
+  return searchResults.map((hit) => {
+    const payload = hit.payload || {};
+    return {
+      chunkIndex: payload.chunkIndex ?? 'unknown',
+      text_original: payload.text_original ?? '',
+      text_translated: payload.text_translated ?? ''
+    };
+  });
+}
+
+async function fetchAdjacentParagraphs(
+  jobId: string,
+  chunkIndex: number,
+  direction: 'prev' | 'next' | 'both',
+  count: number
+): Promise<any[]> {
+  const qdrantClient = await getQdrantClient();
+  const targetIndices: number[] = [];
+
+  const capCount = Math.min(count, 3); // Giới hạn tối đa 3 đoạn lân cận để tránh quá tải token
+
+  if (direction === 'prev' || direction === 'both') {
+    for (let i = 1; i <= capCount; i++) {
+      if (chunkIndex - i >= 0) {
+        targetIndices.push(chunkIndex - i);
+      }
+    }
+  }
+  if (direction === 'next' || direction === 'both') {
+    for (let i = 1; i <= capCount; i++) {
+      targetIndices.push(chunkIndex + i);
+    }
+  }
+
+  if (targetIndices.length === 0) return [];
+
+  const response = await qdrantClient.scroll(COLLECTION_NAME, {
+    filter: {
+      must: [
+        { key: 'jobId', match: { value: jobId } },
+        { key: 'chunkIndex', match: { any: targetIndices } }
+      ]
+    },
+    limit: targetIndices.length,
+    with_payload: true,
+    with_vector: false
+  });
+
+  return response.points.map(point => ({
+    chunkIndex: point.payload?.chunkIndex as number,
+    text_original: point.payload?.text_original as string,
+    text_translated: point.payload?.text_translated as string
+  })).sort((a, b) => a.chunkIndex - b.chunkIndex);
+}
+
+async function readExecutiveSummary(jobItem: Record<string, any>): Promise<any> {
+  const summaryAttr = jobItem.summary?.M;
+  if (!summaryAttr) {
+    return { error: 'Không tìm thấy bản tóm tắt Executive Summary của tài liệu này.' };
+  }
+
+  return {
+    tldr: summaryAttr.tldr?.S || '',
+    keyContributions: summaryAttr.keyContributions?.L?.map((item: any) => item.S || '') || [],
+    methodology: summaryAttr.methodology?.S || '',
+    limitations: summaryAttr.limitations?.S || ''
+  };
+}
+
+// ============================================
+// CHAT HANDLER
+// ============================================
+
 export const handleChatJob = async (event: ChatInput): Promise<ChatOutput> => {
   const { jobId, userId, message } = event;
   console.log(`💬 [chat] Processing RAG chat for job=${jobId}, user=${userId}`);
@@ -76,81 +171,142 @@ export const handleChatJob = async (event: ChatInput): Promise<ChatOutput> => {
 
   const totalStart = performance.now();
 
-  // 2. Generate question embedding
-  const embedStart = performance.now();
-  const [embedding] = await getGeminiEmbeddingsBatch([message]);
-  if (!embedding) {
-    throw new Error('Failed to generate embedding for the question');
-  }
-  console.log(`⏱️ [chat] Embedding generated in ${(performance.now() - embedStart).toFixed(0)}ms`);
-
-  // 3. Connect to Qdrant and search
-  const qdrantStart = performance.now();
-  const qdrantClient = await getQdrantClient();
-  console.log(`🔍 [chat] Querying Qdrant collection=${COLLECTION_NAME} for user=${userId}, job=${jobId}`);
-  
-  const searchResults = await qdrantClient.search(COLLECTION_NAME, {
-    vector: embedding,
-    filter: {
-      must: [
-        { key: 'userId', match: { value: userId } },
-        { key: 'jobId', match: { value: jobId } }
+  // 2. Define Tools JSON Schema
+  // 2. Define Tools JSON Schema
+  const tools: any[] = [
+    {
+      functionDeclarations: [
+        {
+          name: 'vectorSearch',
+          description: 'Tìm kiếm ngữ cảnh tương đồng từ bài báo dựa trên câu hỏi chi tiết, cục bộ.',
+          parameters: {
+            type: SchemaType.OBJECT,
+            properties: {
+              query: { type: SchemaType.STRING, description: 'Câu truy vấn tiếng Anh để tìm kiếm vector' }
+            },
+            required: ['query']
+          }
+        },
+        {
+          name: 'fetchAdjacentParagraphs',
+          description: 'Lấy thêm các đoạn văn liền trước hoặc liền sau của một đoạn văn cụ thể để bù đắp ngữ cảnh bị đứt gãy.',
+          parameters: {
+            type: SchemaType.OBJECT,
+            properties: {
+              chunkIndex: { type: SchemaType.INTEGER, description: 'Chỉ số đoạn văn hiện tại' },
+              direction: { type: SchemaType.STRING, enum: ['prev', 'next', 'both'], description: 'Hướng lấy các đoạn văn lân cận' },
+              count: { type: SchemaType.INTEGER, description: 'Số lượng đoạn văn cần lấy' }
+            },
+            required: ['chunkIndex', 'direction', 'count']
+          }
+        },
+        {
+          name: 'readExecutiveSummary',
+          description: 'Đọc bản tóm tắt toàn bộ tài liệu bao gồm tldr, key contributions, methodology, limitations cho câu hỏi tổng quan, toàn cục.',
+          parameters: {
+            type: SchemaType.OBJECT,
+            properties: {}
+          }
+        }
       ]
-    },
-    limit: 4,
-  });
-  console.log(`⏱️ [chat] Qdrant search completed in ${(performance.now() - qdrantStart).toFixed(0)}ms (retrieved ${searchResults.length} chunks)`);
+    }
+  ];
 
-  // 4. Formulate Prompt context
-  let contextString = '';
-  if (searchResults.length > 0) {
-    contextString = searchResults.map((hit) => {
-      const payload = hit.payload || {};
-      const chunkIndex = payload.chunkIndex ?? 'unknown';
-      const original = payload.text_original ?? '';
-      const translated = payload.text_translated ?? '';
-      return `[Đoạn ${chunkIndex}]:
-English: ${original}
-Tiếng Việt: ${translated}`;
-    }).join('\n\n---\n\n');
-  } else {
-    contextString = '(Không tìm thấy đoạn trích dẫn phù hợp nào)';
-  }
-
-  const systemMessage = `Bạn là một trợ lý học thuật thông minh hỗ trợ người dùng đọc và hiểu tài liệu khoa học song ngữ.
-Dưới đây là một số đoạn trích dẫn có liên quan được tìm thấy trong bài báo hiện tại:
-
----
-${contextString}
----
-
-Hãy trả lời câu hỏi sau của người dùng dựa trên thông tin trích dẫn trên.
-Câu hỏi: "${message}"
-
-Quy tắc trả lời:
-1. Chỉ trả lời dựa trên các đoạn trích dẫn được cung cấp ở trên. Nếu không thể trả lời từ ngữ cảnh đó, hãy lịch sự thông báo cho người dùng.
-2. Sử dụng định dạng Markdown phong phú để câu trả lời dễ đọc.
-3. Ở cuối câu trả lời hoặc tại các luận điểm quan trọng, hãy bắt buộc chèn số thứ tự đoạn trích dẫn nguồn dưới dạng [Đoạn X] (với X là số của chunkIndex từ đoạn trích dẫn tương ứng). Ví dụ: "...như đã được mô tả [Đoạn 3]".
-4. Phản hồi bằng tiếng Việt thân thiện và chuyên nghiệp.`;
-
-  // 5. Generate answer using Gemini 2.0 Flash
+  // 3. Initialize Gemini Client and Model with Tools
   const geminiStart = performance.now();
-  let answer = 'Không có phản hồi từ mô hình AI.';
+  let answer = 'Không có phản hồi từ trợ lý học thuật.';
+
   try {
     const genAI = await getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const responseResult = await model.generateContent(systemMessage);
-    const candidate = responseResult.response.candidates?.[0];
-    if (candidate?.finishReason === 'SAFETY' || candidate?.finishReason === 'RECITATION') {
-      answer = 'Câu trả lời bị chặn bởi bộ lọc an toàn hoặc bản quyền của mô hình AI.';
-    } else {
-      answer = responseResult.response.text() || answer;
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      systemInstruction: `Bạn là trợ lý AI học thuật song ngữ. Nhiệm vụ của bạn là hỗ trợ người dùng đọc và hiểu tài liệu khoa học song ngữ.
+Bạn có quyền truy cập vào các công cụ tìm kiếm ngữ cảnh cục bộ (vectorSearch), lấy thêm đoạn văn lân cận để tránh đứt gãy ngữ nghĩa (fetchAdjacentParagraphs), hoặc đọc bản tóm tắt toàn diện của bài báo (readExecutiveSummary).
+
+Quy tắc làm việc:
+1. Đánh giá câu hỏi để quyết định xem cần gọi công cụ nào. Ví dụ:
+   - Các câu hỏi chi tiết hoặc tìm thông tin cụ thể nên dùng 'vectorSearch'.
+   - Nếu ngữ cảnh tìm được từ 'vectorSearch' bị ngắt quãng ở đầu hoặc cuối câu, hãy dùng 'fetchAdjacentParagraphs' để lấy thêm đoạn liền kề.
+   - Các câu hỏi bao quát toàn tài liệu (như tóm tắt, đóng góp chính, hạn chế, phương pháp) nên sử dụng 'readExecutiveSummary'.
+2. Trình bày câu trả lời rõ ràng bằng Markdown (bôi đậm, vẽ bảng, bullet points).
+3. Đính kèm liên kết trích dẫn ngược dưới dạng [Đoạn X] (với X là chunkIndex) trỏ đúng về nguồn của thông tin đó. Ví dụ: "...như đã được thảo luận [Đoạn 5]".
+4. Phản hồi hoàn toàn bằng tiếng Việt thân thiện và chuyên nghiệp.`,
+      tools
+    });
+
+    let contents: any[] = [{ role: 'user', parts: [{ text: message }] }];
+    let loopCount = 0;
+    const MAX_LOOPS = 3;
+
+    while (loopCount < MAX_LOOPS) {
+      console.log(`🤖 [chat] Executing reasoning loop ${loopCount + 1}/${MAX_LOOPS}...`);
+      const result = await model.generateContent({ contents });
+      const candidate = result.response.candidates?.[0];
+      const content = candidate?.content;
+
+      if (!content) {
+        break;
+      }
+
+      // Check for safety block
+      if (candidate.finishReason === 'SAFETY' || candidate.finishReason === 'RECITATION') {
+        answer = 'Câu trả lời bị chặn bởi bộ lọc an toàn hoặc bản quyền của mô hình AI.';
+        break;
+      }
+
+      contents.push(content);
+
+      const functionCalls = result.response.functionCalls();
+      if (!functionCalls || functionCalls.length === 0) {
+        // No more tool calls needed, this is the final text answer
+        answer = result.response.text() || answer;
+        break;
+      }
+
+      // Execute tool calls in parallel/sequence
+      const toolResponseParts: any[] = [];
+      for (const call of functionCalls) {
+        console.log(`⚙️ [chat] Tool call requested: ${call.name} with args:`, call.args);
+        let callResult;
+        const args = call.args as any;
+        try {
+          if (call.name === 'vectorSearch') {
+            callResult = await vectorSearch(jobId, userId, args.query as string);
+          } else if (call.name === 'fetchAdjacentParagraphs') {
+            callResult = await fetchAdjacentParagraphs(
+              jobId,
+              Number(args.chunkIndex),
+              args.direction as any,
+              Number(args.count)
+            );
+          } else if (call.name === 'readExecutiveSummary') {
+            callResult = await readExecutiveSummary(jobItem);
+          } else {
+            callResult = { error: `Unknown tool: ${call.name}` };
+          }
+        } catch (err: any) {
+          console.error(`❌ [chat] Tool ${call.name} execution failed:`, err);
+          callResult = { error: err.message || String(err) };
+        }
+
+        toolResponseParts.push({
+          functionResponse: {
+            name: call.name,
+            response: { result: callResult }
+          }
+        });
+      }
+
+      contents.push({ role: 'user', parts: toolResponseParts });
+      loopCount++;
     }
+
   } catch (err: any) {
     console.error('❌ [chat] Error generating content from Gemini:', err);
     answer = `Không thể tạo câu trả lời do lỗi hệ thống AI: ${err.message || err}`;
   }
-  console.log(`⏱️ [chat] Gemini text generation completed in ${(performance.now() - geminiStart).toFixed(0)}ms`);
+
+  console.log(`⏱️ [chat] Gemini reasoning loop completed in ${(performance.now() - geminiStart).toFixed(0)}ms`);
   console.log(`⏱️ [chat] Total RAG Chat completed in ${(performance.now() - totalStart).toFixed(0)}ms`);
 
   return { answer };

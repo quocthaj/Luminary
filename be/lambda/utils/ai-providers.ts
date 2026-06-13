@@ -6,7 +6,7 @@ import Groq from 'groq-sdk';
 import OpenAI from 'openai';
 import { Mistral } from '@mistralai/mistralai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getSecret, GROQ_SECRET_ARN, GEMINI_SECRET_ARN, DEEPSEEK_SECRET_ARN, MISTRAL_SECRET_ARN } from './aws-clients';
+import { getSecret, GROQ_SECRET_ARN, GEMINI_SECRET_ARN, DEEPSEEK_SECRET_ARN, MISTRAL_SECRET_ARN, GEMINI_EMBEDDING_SECRET_ARN, NOMIC_SECRET_ARN } from './aws-clients';
 
 // ============================================
 // MISTRAL
@@ -122,34 +122,48 @@ export async function processWithAI(
 export { processWithAI as callAIWithPrompt };
 
 // ============================================
-// GEMINI EMBEDDING
+// NOMIC EMBEDDING
 // ============================================
-export async function getGeminiEmbeddingsBatch(texts: string[]): Promise<number[][]> {
+export async function getEmbeddingsBatch(
+    texts: string[],
+    taskType: 'search_document' | 'search_query' = 'search_document'
+): Promise<number[][]> {
     if (texts.length === 0) return [];
 
-    console.log(`🤖 Generating Gemini embeddings for ${texts.length} texts...`);
-    const apiKey = await getSecret(GEMINI_SECRET_ARN);
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
+    console.log(`🤖 Generating Nomic embeddings for ${texts.length} texts (task_type: ${taskType})...`);
+    const apiKey = await getSecret(NOMIC_SECRET_ARN);
 
-    const batchSize = 50; // Use a conservative batch size to avoid payload/rate limits
+    const batchSize = 50;
     const allEmbeddings: number[][] = [];
 
     for (let i = 0; i < texts.length; i += batchSize) {
         const chunk = texts.slice(i, i + batchSize);
-        console.log(`📡 Fetching embedding batch ${Math.floor(i / batchSize) + 1} (${chunk.length} items)...`);
-        const result = await model.batchEmbedContents({
-            requests: chunk.map(t => ({
-                content: { role: 'user', parts: [{ text: t }] },
-                model: 'models/gemini-embedding-001',
-            })),
+        console.log(`📡 Fetching Nomic embedding batch ${Math.floor(i / batchSize) + 1} (${chunk.length} items)...`);
+
+        const res = await fetch('https://api-atlas.nomic.ai/v1/embedding/text', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                texts: chunk,
+                model: 'nomic-embed-text-v1.5',
+                task_type: taskType
+            })
         });
 
-        if (!result.embeddings) {
-            throw new Error('No embeddings returned from Gemini API batch request');
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Nomic API error: ${res.status} - ${errText}`);
         }
 
-        allEmbeddings.push(...result.embeddings.map(e => e.values));
+        const data: any = await res.json();
+        if (!data.embeddings) {
+            throw new Error('No embeddings returned from Nomic API');
+        }
+
+        allEmbeddings.push(...data.embeddings);
     }
 
     return allEmbeddings;

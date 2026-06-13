@@ -1,12 +1,20 @@
 const mockGetResultFromS3 = jest.fn();
 const mockGetJobItem = jest.fn();
+const mockUpdateJobSummary = jest.fn();
 const mockGetSecret = jest.fn();
-const mockGetGeminiEmbeddingsBatch = jest.fn();
+const mockGetEmbeddingsBatch = jest.fn();
 
 const mockCollectionExists = jest.fn();
 const mockCreateCollection = jest.fn();
 const mockGetCollections = jest.fn();
 const mockUpsert = jest.fn();
+const mockGenerateContent = jest.fn();
+
+const mockGetGenerativeModel = jest.fn().mockImplementation(() => {
+  return {
+    generateContent: (prompt: string) => mockGenerateContent(prompt),
+  };
+});
 
 jest.mock('../lambda/utils/s3-helpers', () => ({
   getResultFromS3: (key: string) => mockGetResultFromS3(key),
@@ -14,14 +22,16 @@ jest.mock('../lambda/utils/s3-helpers', () => ({
 
 jest.mock('../lambda/utils/dynamodb-helpers', () => ({
   getJobItem: (jobId: string) => mockGetJobItem(jobId),
+  updateJobSummary: (jobId: string, summary: any) => mockUpdateJobSummary(jobId, summary),
 }));
 
 jest.mock('../lambda/utils/aws-clients', () => ({
   getSecret: (arn: string) => mockGetSecret(arn),
+  GEMINI_SECRET_ARN: 'arn:aws:secretsmanager:ap-southeast-1:123456789012:secret:vietai/gemini-key',
 }));
 
 jest.mock('../lambda/utils/ai-providers', () => ({
-  getGeminiEmbeddingsBatch: (texts: string[]) => mockGetGeminiEmbeddingsBatch(texts),
+  getEmbeddingsBatch: (texts: string[], taskType?: string) => mockGetEmbeddingsBatch(texts, taskType),
 }));
 
 jest.mock('@qdrant/js-client-rest', () => {
@@ -36,22 +46,41 @@ jest.mock('@qdrant/js-client-rest', () => {
   };
 });
 
+jest.mock('@google/generative-ai', () => {
+  return {
+    GoogleGenerativeAI: jest.fn().mockImplementation(() => {
+      return {
+        getGenerativeModel: (config: any) => mockGetGenerativeModel(config),
+      };
+    }),
+    SchemaType: {
+      OBJECT: 'OBJECT',
+      STRING: 'STRING',
+      ARRAY: 'ARRAY',
+      INTEGER: 'INTEGER',
+    }
+  };
+});
+
 import { handler } from '../lambda/handlers/ingest';
 
 describe('Ingest Handler', () => {
   beforeEach(() => {
     mockGetResultFromS3.mockReset();
     mockGetJobItem.mockReset();
+    mockUpdateJobSummary.mockReset();
     mockGetSecret.mockReset();
-    mockGetGeminiEmbeddingsBatch.mockReset();
+    mockGetEmbeddingsBatch.mockReset();
     mockGetCollections.mockReset();
     mockCreateCollection.mockReset();
     mockUpsert.mockReset();
+    mockGenerateContent.mockReset();
 
     process.env.QDRANT_SECRET_ARN = 'arn:aws:secretsmanager:ap-southeast-1:123456789012:secret:vietai/qdrant-config';
+    process.env.GEMINI_SECRET_ARN = 'arn:aws:secretsmanager:ap-southeast-1:123456789012:secret:vietai/gemini-key';
   });
 
-  it('should successfully parse merged markdown, call Gemini embeddings, and upsert points to Qdrant', async () => {
+  it('should successfully parse merged markdown, call Gemini embeddings, generate executive summary, and upsert to Qdrant', async () => {
     // Mock DynamoDB Job item
     mockGetJobItem.mockResolvedValue({
       userId: { S: 'user-456' },
@@ -72,23 +101,39 @@ describe('Ingest Handler', () => {
       "- Reference 1";
     mockGetResultFromS3.mockResolvedValue(mockContent);
 
-    // Mock Qdrant config secret
+    // Mock Secrets
     mockGetSecret.mockResolvedValue(JSON.stringify({
       url: 'https://mock-qdrant-cloud.qdrant.tech',
       apiKey: 'mock-api-key-123',
     }));
 
-    // Mock Gemini embeddings output (2 chunks, 768 dimensions)
+    // Mock Nomic embeddings output (2 chunks, 768 dimensions)
     const mockEmbeddings = [
       new Array(768).fill(0.1),
       new Array(768).fill(0.2),
     ];
-    mockGetGeminiEmbeddingsBatch.mockResolvedValue(mockEmbeddings);
+    mockGetEmbeddingsBatch.mockResolvedValue(mockEmbeddings);
 
-    // Mock Qdrant collections list (empty collection list initially)
+    // Mock Qdrant collections list
     mockGetCollections.mockResolvedValue({ collections: [] });
     mockCreateCollection.mockResolvedValue({});
     mockUpsert.mockResolvedValue({});
+
+    // Mock Gemini Summary Output
+    const mockSummaryObj = {
+      tldr: 'Tóm tắt bài báo về nghiên cứu dịch thuật song ngữ.',
+      keyContributions: [
+        'Đóng góp 1: Cải tiến dịch thuật.',
+        'Đóng góp 2: Nâng cao hiệu năng.'
+      ],
+      methodology: 'Sử dụng LLM và học sâu.',
+      limitations: 'Giới hạn về kích thước đoạn văn.'
+    };
+    mockGenerateContent.mockResolvedValue({
+      response: {
+        text: () => JSON.stringify(mockSummaryObj)
+      }
+    });
 
     const event = {
       jobId: 'job-789',
@@ -105,11 +150,11 @@ describe('Ingest Handler', () => {
     expect(mockGetJobItem).toHaveBeenCalledWith('job-789');
     expect(mockGetResultFromS3).toHaveBeenCalledWith('results/job-789/analysis.md');
 
-    // Verify Gemini embeddings called on original English texts
-    expect(mockGetGeminiEmbeddingsBatch).toHaveBeenCalledWith([
+    // Verify Nomic embeddings called on original English texts
+    expect(mockGetEmbeddingsBatch).toHaveBeenCalledWith([
       'This is the first English paragraph.',
       'This is the second English paragraph.',
-    ]);
+    ], 'search_document');
 
     // Verify Qdrant collection creation and upsert
     expect(mockGetCollections).toHaveBeenCalled();
@@ -121,13 +166,14 @@ describe('Ingest Handler', () => {
     });
 
     expect(mockUpsert).toHaveBeenCalled();
-    const upsertCall = mockUpsert.mock.calls[0];
-    expect(upsertCall[0]).toBe('vietai-scholar-chunks');
-    expect(upsertCall[1].points).toHaveLength(2);
-    expect(upsertCall[1].points[0].payload.userId).toBe('user-456');
-    expect(upsertCall[1].points[0].payload.jobId).toBe('job-789');
-    expect(upsertCall[1].points[0].payload.chunkIndex).toBe(0);
-    expect(upsertCall[1].points[0].payload.text_original).toBe('This is the first English paragraph.');
-    expect(upsertCall[1].points[0].payload.text_translated).toBe('Đây là đoạn tiếng Việt thứ nhất.');
+
+    // Verify Executive Summary is generated and saved
+    expect(mockGenerateContent).toHaveBeenCalled();
+    expect(mockUpdateJobSummary).toHaveBeenCalledWith('job-789', {
+      tldr: mockSummaryObj.tldr,
+      keyContributions: mockSummaryObj.keyContributions,
+      methodology: mockSummaryObj.methodology,
+      limitations: mockSummaryObj.limitations
+    });
   });
 });

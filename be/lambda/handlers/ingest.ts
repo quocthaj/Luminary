@@ -1,9 +1,10 @@
 import { getResultFromS3 } from '../utils/s3-helpers';
-import { getJobItem } from '../utils/dynamodb-helpers';
-import { getSecret } from '../utils/aws-clients';
-import { getGeminiEmbeddingsBatch } from '../utils/ai-providers';
+import { getJobItem, updateJobSummary } from '../utils/dynamodb-helpers';
+import { getSecret, GEMINI_SECRET_ARN } from '../utils/aws-clients';
+import { getEmbeddingsBatch } from '../utils/ai-providers';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { v5 as uuidv5 } from 'uuid';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 
 interface IngestInput {
   jobId: string;
@@ -82,7 +83,7 @@ export const handler = async (event: IngestInput): Promise<IngestOutput> => {
 
   // 4. Generate embeddings for English paragraphs
   const originalTexts = chunksToUpsert.map(c => c.original);
-  const embeddings = await getGeminiEmbeddingsBatch(originalTexts);
+  const embeddings = await getEmbeddingsBatch(originalTexts, 'search_document');
 
   // 5. Connect to Qdrant Cloud
   const qdrantSecretArn = process.env.QDRANT_SECRET_ARN || '';
@@ -109,7 +110,22 @@ export const handler = async (event: IngestInput): Promise<IngestOutput> => {
   try {
     const collectionsResult = await qdrantClient.getCollections();
     const collectionExists = collectionsResult.collections.some(c => c.name === COLLECTION_NAME);
-    if (!collectionExists) {
+    let recreate = false;
+
+    if (collectionExists) {
+      // Check collection details for dimension mismatch
+      const info = await qdrantClient.getCollection(COLLECTION_NAME);
+      const vectorSize = (info.config?.params?.vectors as any)?.size;
+      if (vectorSize !== 768) {
+        console.log(`⚠️ [ingest] Dimension mismatch (expected 768, found ${vectorSize}). Deleting collection ${COLLECTION_NAME} to recreate it...`);
+        await qdrantClient.deleteCollection(COLLECTION_NAME);
+        recreate = true;
+      }
+    } else {
+      recreate = true;
+    }
+
+    if (recreate) {
       console.log(`🧱 [ingest] Creating Qdrant collection ${COLLECTION_NAME}...`);
       await qdrantClient.createCollection(COLLECTION_NAME, {
         vectors: {
@@ -140,6 +156,61 @@ export const handler = async (event: IngestInput): Promise<IngestOutput> => {
 
   console.log(`🚀 [ingest] Upserting ${points.length} points to Qdrant...`);
   await qdrantClient.upsert(COLLECTION_NAME, { points });
+
+  // 8. Generate and save Executive Summary
+  try {
+    const geminiSecretArn = GEMINI_SECRET_ARN || process.env.GEMINI_SECRET_ARN || '';
+    if (geminiSecretArn) {
+      const geminiApiKey = await getSecret(geminiSecretArn);
+      if (geminiApiKey) {
+        const genAI = new GoogleGenerativeAI(geminiApiKey);
+        const model = genAI.getGenerativeModel({
+          model: 'gemini-2.0-flash',
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: SchemaType.OBJECT,
+              properties: {
+                tldr: { type: SchemaType.STRING, description: 'Tóm tắt 1 câu ngắn gọn về bài báo' },
+                keyContributions: {
+                  type: SchemaType.ARRAY,
+                  items: { type: SchemaType.STRING },
+                  description: 'Mảng chứa 3-5 đóng góp chính của bài viết'
+                },
+                methodology: { type: SchemaType.STRING, description: 'Tóm tắt phương pháp nghiên cứu' },
+                limitations: { type: SchemaType.STRING, description: 'Tóm tắt các mặt hạn chế của nghiên cứu' }
+              },
+              required: ['tldr', 'keyContributions', 'methodology', 'limitations']
+            }
+          }
+        });
+
+        const docSample = content.length > 150000 ? content.substring(0, 150000) : content;
+        const promptInput = `Bạn hãy trích xuất bản tóm tắt học thuật (Executive Summary) cho tài liệu song ngữ sau. Trả về đúng cấu trúc JSON được yêu cầu bằng Tiếng Việt.
+
+Tài liệu:
+${docSample}
+`;
+
+        console.log(`🤖 [ingest] Generating Executive Summary using Gemini 2.0 Flash...`);
+        const result = await model.generateContent(promptInput);
+        const responseText = result.response.text();
+        console.log(`🤖 [ingest] Gemini summary response: ${responseText}`);
+
+        const summaryObj = JSON.parse(responseText);
+
+        await updateJobSummary(jobId, {
+          tldr: summaryObj.tldr || '',
+          keyContributions: Array.isArray(summaryObj.keyContributions) ? summaryObj.keyContributions : [],
+          methodology: summaryObj.methodology || '',
+          limitations: summaryObj.limitations || ''
+        });
+        console.log(`✅ [ingest] Executive Summary saved for jobId=${jobId}`);
+      }
+    }
+  } catch (err) {
+    console.warn(`⚠️ [ingest] Failed to generate/save Executive Summary:`, err);
+  }
 
   console.log(`✅ [ingest] Ingestion completed for job=${jobId}`);
   return { jobId, status: 'ingested' };

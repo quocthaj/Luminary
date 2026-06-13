@@ -4,7 +4,7 @@
 
 import { UpdateItemCommand, GetItemCommand } from '@aws-sdk/client-dynamodb';
 import { dynamodbClient, JOBS_TABLE } from './aws-clients';
-import type { JobStatusExtra } from '../types';
+import type { JobStatusExtra, ExecutiveSummary } from '../types';
 
 export async function getJobStatus(jobId: string): Promise<{ status: string } | null> {
     const response = await dynamodbClient.send(
@@ -69,6 +69,32 @@ export async function updateJobStatus(
             UpdateExpression: updateExpression,
             ExpressionAttributeNames: names,
             ExpressionAttributeValues: values,
+        })
+    );
+}
+
+export async function updateJobSummary(
+    jobId: string,
+    summary: ExecutiveSummary
+): Promise<void> {
+    await dynamodbClient.send(
+        new UpdateItemCommand({
+            TableName: JOBS_TABLE,
+            Key: { jobId: { S: jobId } },
+            UpdateExpression: 'SET #summary = :summary',
+            ExpressionAttributeNames: { '#summary': 'summary' },
+            ExpressionAttributeValues: {
+                ':summary': {
+                    M: {
+                        tldr: { S: summary.tldr },
+                        keyContributions: {
+                            L: summary.keyContributions.map(c => ({ S: c }))
+                        },
+                        methodology: { S: summary.methodology },
+                        limitations: { S: summary.limitations }
+                    }
+                }
+            }
         })
     );
 }

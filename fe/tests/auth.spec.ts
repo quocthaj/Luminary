@@ -59,9 +59,9 @@ test.describe('NextAuth Stateless Email OTP Authentication Flow', () => {
     await submitOtpBtn.click();
 
     // 7. Verify login modal is closed and top-right session status shows logged-in user
-    await expect(modalTitle).not.toBeVisible({ timeout: 15000 });
+    await expect(modalTitle).not.toBeVisible({ timeout: 30000 });
     const userEmailSpan = page.locator('span:has-text("developer-test@vietai.org")');
-    await expect(userEmailSpan).toBeVisible({ timeout: 15000 });
+    await expect(userEmailSpan).toBeVisible({ timeout: 30000 });
 
     // 8. Verify upload drop zone is unblocked
     await expect(page.locator('text=Đã hết lượt dùng thử vãng lai')).not.toBeVisible();

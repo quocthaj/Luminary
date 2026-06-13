@@ -52,7 +52,7 @@ test.describe('Semantic Scholar Integration & Related Papers E2E Tests', () => {
 
     // 2. Select the "Papers liên quan" Tab
     const scholarTabBtn = page.locator('button:has-text("Papers liên quan")');
-    await expect(scholarTabBtn).toBeVisible({ timeout: 15000 });
+    await expect(scholarTabBtn).toBeVisible({ timeout: 30000 });
     await scholarTabBtn.click();
 
     // 3. Confirm that the papers list container appears

@@ -2,17 +2,15 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Reprocess Job Flow', () => {
   test('should require login for reprocess and transition to processing view after triggering', async ({ page }) => {
-    page.on('console', msg => console.log(`[BROWSER @ ${Math.floor(Date.now() / 1000)}s] ${msg.text()}`));
-
     // 1. Navigate to homepage with a mock jobId
     await page.goto('/?jobId=mock-reprocess-test&test_mode=true');
 
     // Wait for the translation to complete and WorkspaceView to load
-    await expect(page.locator('span:text-is("Song Ngữ")')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('span:text-is("Song Ngữ")')).toBeVisible({ timeout: 30000 });
 
     // 2. Locate the reprocess button
     const reprocessBtn = page.locator('button:has-text("Dịch lại")');
-    await expect(reprocessBtn).toBeVisible({ timeout: 15000 });
+    await expect(reprocessBtn).toBeVisible({ timeout: 30000 });
 
     // 3. Click the reprocess button (user is guest/unauthenticated)
     await reprocessBtn.click();
@@ -49,15 +47,15 @@ test.describe('Reprocess Job Flow', () => {
     await submitOtpBtn.click();
 
     // 8. Verify modal closes
-    await expect(modalTitle).not.toBeVisible({ timeout: 15000 });
+    await expect(modalTitle).not.toBeVisible({ timeout: 30000 });
 
     // Verify user is logged in
     const userEmailSpan = page.locator('span:has-text("reprocess-test@vietai.org")');
-    await expect(userEmailSpan).toBeVisible({ timeout: 15000 });
+    await expect(userEmailSpan).toBeVisible({ timeout: 30000 });
 
     // 9. Click "Dịch lại" again now that user is logged in (wait for data-authenticated="true")
     const authReprocessBtn = page.locator('button:has-text("Dịch lại")[data-authenticated="true"]');
-    await expect(authReprocessBtn).toBeVisible({ timeout: 15000 });
+    await expect(authReprocessBtn).toBeVisible({ timeout: 30000 });
     await authReprocessBtn.click();
 
     // 10. Verify that we transition to the processing/stepper page

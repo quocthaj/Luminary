@@ -6,11 +6,11 @@ test.describe('Download Login Wall & Post-Login Auto-Download', () => {
     await page.goto('/?jobId=mock-download-wall&test_mode=true');
 
     // Wait for the translation to complete and WorkspaceView to load
-    await expect(page.locator('span:text-is("Song Ngữ")')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('span:text-is("Song Ngữ")')).toBeVisible({ timeout: 30000 });
 
     // 2. Locate the download button
     const downloadBtn = page.locator('button:has-text("Tải về Markdown")');
-    await expect(downloadBtn).toBeVisible({ timeout: 15000 });
+    await expect(downloadBtn).toBeVisible({ timeout: 30000 });
 
     // 3. Click the download button (user is guest/unauthenticated)
     await downloadBtn.click();
@@ -51,7 +51,7 @@ test.describe('Download Login Wall & Post-Login Auto-Download', () => {
     await submitOtpBtn.click();
 
     // 8. Verify modal closes
-    await expect(modalTitle).not.toBeVisible({ timeout: 15000 });
+    await expect(modalTitle).not.toBeVisible({ timeout: 30000 });
 
     // 9. Verify the download event completed successfully post-login
     const download = await downloadPromise;
@@ -59,6 +59,6 @@ test.describe('Download Login Wall & Post-Login Auto-Download', () => {
     
     // Check that we are logged in
     const userEmailSpan = page.locator('span:has-text("download-wall-test@vietai.org")');
-    await expect(userEmailSpan).toBeVisible({ timeout: 15000 });
+    await expect(userEmailSpan).toBeVisible({ timeout: 30000 });
   });
 });

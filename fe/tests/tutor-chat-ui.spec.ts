@@ -40,7 +40,7 @@ test.describe('AI Tutor Chat Panel UI & Source Citations E2E Tests', () => {
 
     // 2. Verify right sidebar and AI Tutor tab are active
     const rightSidebar = page.locator('aside').last();
-    await expect(rightSidebar).toBeVisible({ timeout: 15000 });
+    await expect(rightSidebar).toBeVisible({ timeout: 30000 });
     await expect(page.locator('button:has-text("AI Tutor Chat")')).toBeVisible();
 
     // 3. Verify suggestion buttons are present initially

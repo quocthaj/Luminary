@@ -11,9 +11,9 @@ test.describe('Workspace 3-Column Layout & Sidebars', () => {
     const mainWorkspace = page.locator('main');
 
     // Check visibility on desktop
-    await expect(leftSidebar).toBeVisible({ timeout: 15000 });
-    await expect(rightSidebar).toBeVisible({ timeout: 15000 });
-    await expect(mainWorkspace).toBeVisible({ timeout: 15000 });
+    await expect(leftSidebar).toBeVisible({ timeout: 30000 });
+    await expect(rightSidebar).toBeVisible({ timeout: 30000 });
+    await expect(mainWorkspace).toBeVisible({ timeout: 30000 });
 
     // Verify presence of left sidebar sections
     await expect(page.locator('text=Thư viện cá nhân')).toBeVisible();

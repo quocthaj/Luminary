@@ -151,6 +151,12 @@ export class VietAIScholarStack extends cdk.Stack {
     const qdrantSecret = secretsmanager.Secret.fromSecretNameV2(
       this, 'QdrantSecret', 'vietai/qdrant-config'
     );
+    const geminiEmbedSecret = secretsmanager.Secret.fromSecretNameV2(
+      this, 'GeminiEmbedSecret', 'vietai/gemini-embedding-key'
+    );
+    const nomicSecret = secretsmanager.Secret.fromSecretNameV2(
+      this, 'NomicSecret', 'vietai/nomic-api-key'
+    );
 
     // Grant Lambda read access to all secrets
     groqSecret.grantRead(lambdaRole);
@@ -158,6 +164,20 @@ export class VietAIScholarStack extends cdk.Stack {
     deepseekSecret.grantRead(lambdaRole);
     mistralSecret.grantRead(lambdaRole);
     qdrantSecret.grantRead(lambdaRole);
+    geminiEmbedSecret.grantRead(lambdaRole);
+    nomicSecret.grantRead(lambdaRole);
+
+    // Grant fallback access for friendly secret names and suffixes to prevent AccessDeniedException
+    lambdaRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: ['secretsmanager:GetSecretValue'],
+        resources: [
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:vietai/*`,
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:viet-ai-scholar/*`,
+        ],
+        effect: iam.Effect.ALLOW,
+      })
+    );
 
     // CloudWatch Logs
     lambdaRole.addManagedPolicy(
@@ -183,11 +203,13 @@ export class VietAIScholarStack extends cdk.Stack {
           S3_UPLOADS_BUCKET: uploadsBucket.bucketName,
           S3_RESULTS_BUCKET: resultsBucket.bucketName,
           DYNAMODB_TABLE: jobsTable.tableName,
-          GROQ_SECRET_ARN: groqSecret.secretArn,
-          GEMINI_SECRET_ARN: geminiSecret.secretArn,
-          DEEPSEEK_SECRET_ARN: deepseekSecret.secretArn,
-          MISTRAL_SECRET_ARN: mistralSecret.secretArn,
-          QDRANT_SECRET_ARN: qdrantSecret.secretArn,
+          GROQ_SECRET_ARN: groqSecret.secretName,
+          GEMINI_SECRET_ARN: geminiSecret.secretName,
+          DEEPSEEK_SECRET_ARN: deepseekSecret.secretName,
+          MISTRAL_SECRET_ARN: mistralSecret.secretName,
+          GEMINI_EMBEDDING_SECRET_ARN: geminiEmbedSecret.secretName,
+          NOMIC_SECRET_ARN: nomicSecret.secretName,
+          QDRANT_SECRET_ARN: qdrantSecret.secretName,
           AUTH_SECRET_SECRET_NAME: 'vietai/auth-secret',
           // AWS_REGION is automatically available in Lambda runtime
         },
@@ -231,6 +253,7 @@ export class VietAIScholarStack extends cdk.Stack {
     deepseekSecret.grantRead(orchestratorLambda);
     mistralSecret.grantRead(orchestratorLambda);
     qdrantSecret.grantRead(orchestratorLambda);
+    nomicSecret.grantRead(orchestratorLambda);
     orchestratorLambda.addToRolePolicy(new iam.PolicyStatement({
       actions: [
         'textract:DetectDocumentText',
@@ -298,10 +321,10 @@ export class VietAIScholarStack extends cdk.Stack {
       environment: {
         S3_RESULTS_BUCKET: resultsBucket.bucketName,
         DYNAMODB_TABLE: jobsTable.tableName,
-        GROQ_SECRET_ARN: groqSecret.secretArn,
-        GEMINI_SECRET_ARN: geminiSecret.secretArn,
-        DEEPSEEK_SECRET_ARN: deepseekSecret.secretArn,
-        MISTRAL_SECRET_ARN: mistralSecret.secretArn,
+        GROQ_SECRET_ARN: groqSecret.secretName,
+        GEMINI_SECRET_ARN: geminiSecret.secretName,
+        DEEPSEEK_SECRET_ARN: deepseekSecret.secretName,
+        MISTRAL_SECRET_ARN: mistralSecret.secretName,
       },
       description: 'Translate extracted text to Vietnamese',
     });
@@ -317,8 +340,8 @@ export class VietAIScholarStack extends cdk.Stack {
       environment: {
         S3_RESULTS_BUCKET: resultsBucket.bucketName,
         DYNAMODB_TABLE: jobsTable.tableName,
-        GROQ_SECRET_ARN: groqSecret.secretArn,
-        GEMINI_SECRET_ARN: geminiSecret.secretArn,
+        GROQ_SECRET_ARN: groqSecret.secretName,
+        GEMINI_SECRET_ARN: geminiSecret.secretName,
       },
       description: 'Convert LaTeX math expressions in translated text',
     });
@@ -349,8 +372,10 @@ export class VietAIScholarStack extends cdk.Stack {
       environment: {
         S3_RESULTS_BUCKET: resultsBucket.bucketName,
         DYNAMODB_TABLE: jobsTable.tableName,
-        GEMINI_SECRET_ARN: geminiSecret.secretArn,
-        QDRANT_SECRET_ARN: qdrantSecret.secretArn,
+        GEMINI_SECRET_ARN: geminiSecret.secretName,
+        GEMINI_EMBEDDING_SECRET_ARN: geminiEmbedSecret.secretName,
+        NOMIC_SECRET_ARN: nomicSecret.secretName,
+        QDRANT_SECRET_ARN: qdrantSecret.secretName,
       },
       description: 'Ingest bilingual Markdown and upsert vectors to Qdrant Cloud',
     });

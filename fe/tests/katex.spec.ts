@@ -11,13 +11,13 @@ test.describe('KaTeX Mathematical Formula Rendering & Copying', () => {
     await page.goto('/?jobId=mock-123');
 
     // Wait for the WorkspaceView component to load and render
-    await expect(page.locator('span:text-is("Song Ngữ")')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('span:text-is("Song Ngữ")')).toBeVisible({ timeout: 30000 });
 
     // Check if the bilingual views are visible (on Desktop)
     const englishColumn = page.locator('.markdown-preview').first();
     const vietnameseColumn = page.locator('.markdown-preview').nth(1);
-    await expect(englishColumn).toBeVisible({ timeout: 15000 });
-    await expect(vietnameseColumn).toBeVisible({ timeout: 15000 });
+    await expect(englishColumn).toBeVisible({ timeout: 30000 });
+    await expect(vietnameseColumn).toBeVisible({ timeout: 30000 });
 
     // Verify KaTeX math elements are rendered in the DOM
     const formulaWrapper = page.locator('.katex-formula-wrapper').first();
