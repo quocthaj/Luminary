@@ -4,7 +4,7 @@
 
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { getJobItem } from '../utils/dynamodb-helpers';
-import { getSecret, GEMINI_SECRET_ARN } from '../utils/aws-clients';
+import { getSecret, GEMINI_SECRET_ARN, GROQ_SECRET_ARN } from '../utils/aws-clients';
 import { getEmbeddingsBatch } from '../utils/ai-providers';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 
@@ -143,6 +143,44 @@ async function readExecutiveSummary(jobItem: Record<string, any>): Promise<any> 
     methodology: summaryAttr.methodology?.S || '',
     limitations: summaryAttr.limitations?.S || ''
   };
+}
+
+async function generateAnswer(prompt: string): Promise<string> {
+  // Primary: Gemini (non-tool-use fallback)
+  try {
+    const geminiKey = await getSecret(GEMINI_SECRET_ARN);
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (err: any) {
+    if (err?.status === 429 || err?.message?.includes('429')) {
+      console.warn('⚠️ Gemini 429 in fallback, falling back to Groq...');
+    } else {
+      throw err;
+    }
+  }
+
+  // Fallback: Groq
+  const groqKey = await getSecret(GROQ_SECRET_ARN);
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${groqKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.3
+    })
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Groq API failed: ${res.status} - ${errText}`);
+  }
+  const data: any = await res.json();
+  return data.choices[0].message.content;
 }
 
 // ============================================
@@ -302,8 +340,42 @@ Quy tắc làm việc:
     }
 
   } catch (err: any) {
-    console.error('❌ [chat] Error generating content from Gemini:', err);
-    answer = `Không thể tạo câu trả lời do lỗi hệ thống AI: ${err.message || err}`;
+    console.warn('⚠️ [chat] Gemini agentic loop failed or hit 429. Running fallback RAG chain...', err);
+    try {
+      // 1. Retrieve context
+      const relevantChunks = await vectorSearch(jobId, userId, message).catch(vErr => {
+        console.error('⚠️ [chat] Fallback vectorSearch failed:', vErr);
+        return [];
+      });
+      const executiveSummary = await readExecutiveSummary(jobItem).catch(sErr => {
+        console.error('⚠️ [chat] Fallback readExecutiveSummary failed:', sErr);
+        return {};
+      });
+
+      // 2. Build system instruction prompt with context
+      const contextPrompt = `Bạn là trợ lý AI học thuật song ngữ. Nhiệm vụ của bạn là hỗ trợ người dùng đọc và hiểu tài liệu khoa học song ngữ.
+Trình bày câu trả lời rõ ràng bằng Markdown (bôi đậm, vẽ bảng, bullet points).
+Đính kèm liên kết trích dẫn ngược dưới dạng [Đoạn X] (với X là chunkIndex) trỏ đúng về nguồn của thông tin đó. Ví dụ: "...như đã được thảo luận [Đoạn 5]".
+Phản hồi hoàn toàn bằng tiếng Việt thân thiện và chuyên nghiệp.
+
+Dưới đây là ngữ cảnh trích xuất từ tài liệu để hỗ trợ trả lời câu hỏi:
+---
+Tóm tắt tài liệu:
+${JSON.stringify(executiveSummary, null, 2)}
+---
+Các đoạn văn bản liên quan tìm được:
+${relevantChunks.map(c => `[Đoạn ${c.chunkIndex}]:
+Tiếng Anh: ${c.text_original}
+Tiếng Việt: ${c.text_translated}`).join('\n\n')}
+---
+
+Câu hỏi của người dùng: ${message}`;
+
+      answer = await generateAnswer(contextPrompt);
+    } catch (fallbackErr: any) {
+      console.error('❌ [chat] Fallback chain failed:', fallbackErr);
+      answer = `Không thể tạo câu trả lời do lỗi hệ thống AI (cả Gemini và Groq đều gặp lỗi): ${fallbackErr.message || fallbackErr}`;
+    }
   }
 
   console.log(`⏱️ [chat] Gemini reasoning loop completed in ${(performance.now() - geminiStart).toFixed(0)}ms`);
