@@ -542,7 +542,7 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 #### Đã làm:
 - **Thay thế Gemini Embeddings bằng Nomic Embeddings**: Thay đổi hàm `getEmbeddingsBatch` và `getEmbeddings` trong `ai-providers.ts` để gọi endpoint `https://api-atlas.nomic.ai/v1/embedding/text` của Nomic Atlas API sử dụng model `nomic-embed-text-v1.5`. Cấu hình `task_type` là `search_document` khi đánh chỉ mục tài liệu (Ingest Lambda) và `search_query` khi sinh vector truy vấn (Chat Lambda).
 - **Tích hợp AWS Secrets Manager**: Khai báo secret `vietai/nomic-api-key` để lấy API Key động, cấp quyền đọc `nomicSecret.grantRead(lambdaRole)` trong stack CDK và truyền qua biến môi trường `NOMIC_SECRET_ARN`.
-- **Cập nhật Vector Size trên Qdrant**: Cấu hình vector size là `768` tương thích với Nomic Embeddings. Thêm logic tự động kiểm tra kích thước vector hiện tại của collection và recreate collection nếu phát hiện mismatch.
+- **Cập nhật Vector Size và Payload Index trên Qdrant**: Cấu hình vector size là `768` tương thích với Nomic Embeddings. Thêm logic tự động kiểm tra kích thước vector hiện tại của collection và recreate collection nếu phát hiện mismatch. Đồng thời, cấu hình tạo payload index cho các trường `userId` và `jobId` với schema `keyword` ngay sau khi tạo collection để tăng tốc truy vấn filter và đảm bảo RAG tìm kiếm chính xác.
 - **Tích hợp Fallback Chain cho RAG Chat**: Triển khai cơ chế dự phòng tự động `Gemini 2.0 Flash → Groq (llama-3.3-70b) → [error]` cho RAG Chat (`chat.ts`). Nếu luồng Agentic tool-calling của Gemini bị lỗi (như rate limit 429), Lambda tự động kích hoạt chế độ RAG Fallback bằng cách tự chạy vectorSearch + readExecutiveSummary để thu thập ngữ cảnh, ghép prompt và gọi `generateAnswer` sử dụng Groq.
 - **Tối ưu hóa Playwright E2E Suite**: Tăng giá trị default expect timeout lên `30000ms` và cấu hình local retries là `1` giúp giảm thiểu tình trạng timeout do thời gian biên dịch (cold-start Next.js Dev Server compilation) khi chạy song song nhiều worker.
 
@@ -553,9 +553,9 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 #### Files thay đổi:
 - `be/lib/be-stack.ts` – Tích hợp Secrets Manager và cấp quyền Lambda Role.
 - `be/lambda/utils/ai-providers.ts` – Đổi từ Gemini Embeddings sang Nomic Embeddings API.
-- `be/lambda/handlers/ingest.ts` – Sử dụng Nomic Embeddings và thêm logic auto-recreate collection khi dimension mismatch.
+- `be/lambda/handlers/ingest.ts` – Sử dụng Nomic Embeddings, thêm logic auto-recreate collection và tạo payload index (`userId`, `jobId`).
 - `be/lambda/handlers/chat.ts` – Bổ sung helper `generateAnswer`, tích hợp fallback chain và xử lý RAG khi gặp lỗi.
-- `be/test/ingest.test.ts` & `be/test/chat.test.ts` – Cập nhật mock dữ liệu vector dimension 768.
+- `be/test/ingest.test.ts` & `be/test/chat.test.ts` – Cập nhật mock dữ liệu vector dimension 768 và mock cho `createPayloadIndex`.
 - `fe/playwright.config.ts` – Tăng default expect timeout lên 30s và thiết lập retries lên 1.
 - `fe/tests/*` – Cập nhật explicit timeout và cấu hình tương thích.
 
