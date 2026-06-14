@@ -73,7 +73,7 @@ export async function processWithGroq(
     const groq = new Groq({ apiKey });
 
     const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'qwen-2.5-32b',
         messages: [
             { role: 'system', content: systemMessage },
             { role: 'user', content: prompt },

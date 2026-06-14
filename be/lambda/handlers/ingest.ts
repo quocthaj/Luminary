@@ -1,6 +1,6 @@
 import { getResultFromS3 } from '../utils/s3-helpers';
 import { getJobItem, updateJobSummary } from '../utils/dynamodb-helpers';
-import { getSecret, GEMINI_SECRET_ARN } from '../utils/aws-clients';
+import { getSecret, GEMINI_SECRET_ARN, GROQ_SECRET_ARN } from '../utils/aws-clients';
 import { getEmbeddingsBatch } from '../utils/ai-providers';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { v5 as uuidv5 } from 'uuid';
@@ -203,20 +203,64 @@ Tài liệu:
 ${docSample}
 `;
 
-        console.log(`🤖 [ingest] Generating Executive Summary using Gemini 2.0 Flash...`);
-        const result = await model.generateContent(promptInput);
-        const responseText = result.response.text();
-        console.log(`🤖 [ingest] Gemini summary response: ${responseText}`);
+        let summaryObj: any = null;
+        try {
+          console.log(`🤖 [ingest] Generating Executive Summary using Gemini 2.0 Flash...`);
+          const result = await model.generateContent(promptInput);
+          const responseText = result.response.text();
+          console.log(`🤖 [ingest] Gemini summary response: ${responseText}`);
+          summaryObj = JSON.parse(responseText);
+        } catch (geminiErr: any) {
+          console.warn(`⚠️ [ingest] Gemini failed or rate-limited for summary. Falling back to Groq qwen-2.5-32b...`, geminiErr);
+          const groqKey = await getSecret(GROQ_SECRET_ARN);
+          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${groqKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'qwen-2.5-32b',
+              response_format: { type: 'json_object' },
+              messages: [
+                {
+                  role: 'system',
+                  content: `Bạn là trợ lý học thuật. Hãy trích xuất bản tóm tắt Executive Summary của tài liệu khoa học dưới dạng JSON có các trường sau (toàn bộ nội dung bằng Tiếng Việt):
+{
+  "tldr": "Tóm tắt cực ngắn 1-2 câu",
+  "keyContributions": ["Đóng góp chính 1", "Đóng góp chính 2"],
+  "methodology": "Tóm tắt phương pháp nghiên cứu",
+  "limitations": "Tóm tắt hạn chế của nghiên cứu"
+}`
+                },
+                {
+                  role: 'user',
+                  content: docSample
+                }
+              ],
+              temperature: 0.3
+            })
+          });
 
-        const summaryObj = JSON.parse(responseText);
+          if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Groq summary fallback failed: ${res.status} - ${errText}`);
+          }
+          const data: any = await res.json();
+          const responseText = data.choices[0].message.content || '{}';
+          console.log(`🤖 [ingest] Groq fallback summary response: ${responseText}`);
+          summaryObj = JSON.parse(responseText);
+        }
 
-        await updateJobSummary(jobId, {
-          tldr: summaryObj.tldr || '',
-          keyContributions: Array.isArray(summaryObj.keyContributions) ? summaryObj.keyContributions : [],
-          methodology: summaryObj.methodology || '',
-          limitations: summaryObj.limitations || ''
-        });
-        console.log(`✅ [ingest] Executive Summary saved for jobId=${jobId}`);
+        if (summaryObj) {
+          await updateJobSummary(jobId, {
+            tldr: summaryObj.tldr || '',
+            keyContributions: Array.isArray(summaryObj.keyContributions) ? summaryObj.keyContributions : [],
+            methodology: summaryObj.methodology || '',
+            limitations: summaryObj.limitations || ''
+          });
+          console.log(`✅ [ingest] Executive Summary saved for jobId=${jobId}`);
+        }
       }
     }
   } catch (err) {

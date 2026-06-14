@@ -170,7 +170,7 @@ async function generateAnswer(prompt: string): Promise<string> {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'qwen-2.5-32b',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3
     })
