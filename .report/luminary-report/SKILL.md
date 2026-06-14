@@ -543,7 +543,7 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 - **Thay thế Gemini Embeddings bằng Nomic Embeddings**: Thay đổi hàm `getEmbeddingsBatch` và `getEmbeddings` trong `ai-providers.ts` để gọi endpoint `https://api-atlas.nomic.ai/v1/embedding/text` của Nomic Atlas API sử dụng model `nomic-embed-text-v1.5`. Cấu hình `task_type` là `search_document` khi đánh chỉ mục tài liệu (Ingest Lambda) và `search_query` khi sinh vector truy vấn (Chat Lambda).
 - **Tích hợp AWS Secrets Manager**: Khai báo secret `vietai/nomic-api-key` để lấy API Key động, cấp quyền đọc `nomicSecret.grantRead(lambdaRole)` trong stack CDK và truyền qua biến môi trường `NOMIC_SECRET_ARN`.
 - **Cập nhật Vector Size và Payload Index trên Qdrant**: Cấu hình vector size là `768` tương thích với Nomic Embeddings. Thêm logic tự động kiểm tra kích thước vector hiện tại của collection và recreate collection nếu phát hiện mismatch. Đồng thời, cấu hình tạo payload index cho các trường `userId` và `jobId` với schema `keyword` ngay sau khi tạo collection để tăng tốc truy vấn filter và đảm bảo RAG tìm kiếm chính xác.
-- **Tích hợp Fallback Chain cho RAG Chat và Executive Summary (Groq Qwen-2.5-32B)**: Triển khai cơ chế dự phòng tự động cho cả RAG Chat (`chat.ts`) và quá trình sinh Executive Summary (`ingest.ts`). Sử dụng mô hình `qwen-2.5-32b` trên Groq (thay thế cho `llama-3.3-70b-versatile` trước đây) nhằm cải thiện vượt trội chất lượng tiếng Việt và khả năng đọc hiểu văn bản học thuật. Nếu Gemini 2.0 Flash bị lỗi hoặc rate-limit (429):
+- **Tích hợp Fallback Chain cho RAG Chat và Executive Summary (Groq Qwen-2.5-32B) + Giữ Llama-3.3-70B cho Dịch thuật**: Triển khai cơ chế dự phòng tự động cho cả RAG Chat (`chat.ts`) và quá trình sinh Executive Summary (`ingest.ts`). Sử dụng mô hình `qwen-2.5-32b` trên Groq nhằm cải thiện vượt trội chất lượng tiếng Việt và khả năng cấu trúc JSON cho các luồng fallback này. Đồng thời, giữ nguyên mô hình `llama-3.3-70b-versatile` mạnh mẽ cho luồng dịch thuật (`ai-providers.ts`) để tối ưu hóa năng lực dịch ngữ cảnh phức tạp.
   * **RAG Chat Fallback**: lambda tự động chạy `vectorSearch` + `readExecutiveSummary` để lấy ngữ cảnh và gọi Qwen-2.5-32B trên Groq.
   * **Executive Summary Ingest Fallback**: Tự động gọi Qwen-2.5-32B trên Groq ở định dạng đầu ra JSON (`response_format: { type: 'json_object' }`) để đảm bảo không bị gián đoạn tiến trình phân tích tài liệu.
 - **Tối ưu hóa Playwright E2E Suite**: Tăng giá trị default expect timeout lên `30000ms` và cấu hình local retries là `1` giúp giảm thiểu tình trạng timeout do thời gian biên dịch (cold-start Next.js Dev Server compilation) khi chạy song song nhiều worker.
@@ -554,7 +554,7 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 
 #### Files thay đổi:
 - `be/lib/be-stack.ts` – Tích hợp Secrets Manager và cấp quyền Lambda Role.
-- `be/lambda/utils/ai-providers.ts` – Chuyển đổi mô hình Groq mặc định sang `qwen-2.5-32b` cho luồng dịch thuật.
+- `be/lambda/utils/ai-providers.ts` – Giữ nguyên mô hình Groq mặc định `llama-3.3-70b-versatile` cho luồng dịch thuật.
 - `be/lambda/handlers/ingest.ts` – Sử dụng Nomic Embeddings, thêm logic auto-recreate collection + tạo payload index, và bổ sung cơ chế fallback sinh Executive Summary bằng Qwen-2.5-32B qua Groq API.
 - `be/lambda/handlers/chat.ts` – Bổ sung helper `generateAnswer`, tích hợp fallback chain sang Qwen-2.5-32B và xử lý RAG khi gặp lỗi.
 - `be/test/ingest.test.ts` & `be/test/chat.test.ts` – Cập nhật mock dữ liệu vector dimension 768 và mock cho `createPayloadIndex`.
