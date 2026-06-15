@@ -68,8 +68,8 @@ export const handler = async (event: MergeInput): Promise<MergeOutput> => {
   }
 
   // Bước 4: Prepend anchors và assemble bilingual Markdown
-  const englishContent = originalParts.map((part, idx) => `{#chunk-${idx}}${part}`).join('\n\n');
-  const vietnameseContent = processedTranslatedParts.map((part, idx) => `{#chunk-${idx}}${part}`).join('\n\n');
+  const englishContent = originalParts.map((part, idx) => `{#chunk-${idx}}${part.trim()}`).join('\n\n');
+  const vietnameseContent = processedTranslatedParts.map((part, idx) => `{#chunk-${idx}}${part.trim()}`).join('\n\n');
   const finalMarkdown = `## English\n\n${englishContent}\n\n---\n\n## Tiếng Việt\n\n${vietnameseContent}${bibliographySection}`;
 
   // Bước 5: Save to S3

@@ -63,6 +63,36 @@ describe('Chat Handler - RAG QA Assistant', () => {
     mockGenerateContent.mockReset();
 
     process.env.QDRANT_SECRET_ARN = 'arn:aws:secretsmanager:ap-southeast-1:123456789012:secret:vietai/qdrant-config';
+    process.env.GROQ_SECRET_ARN = 'arn:aws:secretsmanager:ap-southeast-1:123456789012:secret:vietai/groq-key';
+
+    jest.spyOn(global, 'fetch').mockImplementation((url: any) => {
+      if (typeof url === 'string' && url.includes('groq.com')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({
+            choices: [
+              {
+                message: {
+                  content: 'Đây là câu trả lời dự phòng từ Groq Llama.'
+                }
+              }
+            ]
+          }),
+          text: () => Promise.resolve('ok')
+        } as any);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve('ok')
+      } as any);
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('should successfully search Qdrant and generate response with Gemini using tools', async () => {
