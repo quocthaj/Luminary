@@ -15,7 +15,7 @@
 | 3.3 | RAG Chat API | ✅ Done | [story](../../_bmad-output/implementation-artifacts/3-3-api-rag-chat-an-toan-secure-rag-chat-api-namespace-filter.md) |
 | 3.4 | AI Tutor Chat Panel UI | ✅ Done | [story](../../_bmad-output/implementation-artifacts/3-4-giao-dien-ai-tutor-chat-ai-tutor-chat-panel-ui-source-citations.md) |
 | 3.5 | Semantic Scholar Integration | ✅ Done | [story](../../_bmad-output/implementation-artifacts/3-5-tich-hop-api-semantic-scholar-semantic-scholar-integration-related-papers-panel.md) |
-| **3.6** | **Agentic RAG & Summary Routing** | **🔄 In Progress** | [story](../../_bmad-output/implementation-artifacts/3-6-he-thong-chat-agentic-rag-tu-dong-dinh-tuyen-va-truy-van-active-agentic-rag-chat-router.md) |
+| 3.6 | Agentic RAG & Summary Routing | ✅ Done | [story](../../_bmad-output/implementation-artifacts/3-6-he-thong-chat-agentic-rag-tu-dong-dinh-tuyen-va-truy-van-active-agentic-rag-chat-router.md) |
 
 ---
 

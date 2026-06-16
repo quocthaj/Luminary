@@ -566,3 +566,80 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 - TypeScript errors: 0
 - Playwright E2E test suite: Pass (14/14 tests passed)
 - Jest Backend test suite: Pass (24/24 tests passed)
+
+---
+
+### ✅ Story 4.1: Kiểm tra AI (Quiz) với cấu hình số lượng câu hỏi động & Sửa lỗi UX
+**Status:** Done  
+**Time:** 8 hours  
+**Date:** 2026-06-16
+
+#### Đã làm:
+1. **Màn hình cấu hình số lượng câu hỏi**:
+   - Thêm trạng thái chọn số lượng câu hỏi (`questionCount`) ở giao diện khởi tạo của Quiz.
+   - Thiết kế giao diện trực quan cho phép người dùng chọn **3 câu** (Nhanh chóng), **5 câu** (Tiêu chuẩn), hoặc **10 câu** (Thách thức).
+   - Truyền tham số `count` động từ Frontend qua Next.js Proxy (`fe/app/api/tools/[jobId]/quiz/route.ts`) xuống Lambda Backend (`POST /job/{jobId}/quiz?count=X`).
+2. **Khắc phục lỗi tạo Quiz lần đầu thất bại (Timeout)**:
+   - Tăng thời gian chờ `timeout` của Next.js API Proxy từ `25000ms` lên `55000ms` để phòng ngừa cold start của Gemini và bảo đảm retry flow của Backend được hoàn thành đầy đủ.
+3. **Chuyển tiếp trực tiếp sang giao diện chơi**:
+   - Khắc phục sự cố giao diện bị kẹt ở trạng thái "Đang tạo...". Khi nhận được kết quả thành công, modal tự động chuyển trực tiếp sang `'playing'` phase.
+4. **Loại bỏ nút trùng lặp và đồng bộ Sidebar**:
+   - Xóa bỏ nút Quiz trùng lặp ở Header và liên kết nút "Kiểm tra AI (Quiz)" ở Sidebar trái để mở trực tiếp modal cấu hình.
+5. **Cập nhật Logic Backend**:
+   - Chuyển đổi toàn bộ model Gemini trong luồng Quiz sang **`gemini-2.5-flash`** (theo yêu cầu).
+   - Cập nhật hàm `validateQuiz(data, expectedCount)` để kiểm tra và xác thực số lượng câu hỏi động tương ứng với số câu được yêu cầu (hỗ trợ dung sai chấp nhận 3 hoặc 4 câu đối với yêu cầu mặc định 5 câu).
+   - Cập nhật cơ chế cache S3: Kiểm tra khớp chính xác `questionCount` của dữ liệu đã lưu với số lượng câu hỏi được yêu cầu mới để kích hoạt cache-hit.
+
+#### Kết quả kiểm thử:
+- **Backend Jest Unit Tests**: Bổ sung kiểm thử tham số `count` động trong `be/test/quiz.test.ts`. Kết quả **27/27 tests PASS** (100%).
+- **Frontend Playwright E2E**: Cập nhật toàn bộ test suite `fe/tests/quiz.spec.ts` tương thích với màn hình setup mới và kiểm chứng tham số count gửi qua API. Kết quả **19/19 tests PASS** (100%).
+- **Build Status**: Chạy `npm run build` biên dịch thành công 100% không phát sinh lỗi TypeScript.
+
+#### Files thay đổi:
+- `be/lambda/handlers/quiz.ts` – Hỗ trợ count động trong validation, prompt và cache S3; cập nhật model `gemini-2.5-flash`.
+- `be/lambda/index.ts` – Nhận tham số count từ API Gateway query string và truyền tới handler.
+- `be/test/quiz.test.ts` – Thêm unit tests kiểm tra tham số count cho `validateQuiz` và `handleQuizJob`.
+- `fe/app/api/tools/[jobId]/quiz/route.ts` – Forward tham số count và tăng timeout lên 55s.
+- `fe/lib/api.ts` – Cập nhật tham số count cho hàm `generateQuiz`.
+- `fe/components/WorkspaceView.tsx` – Liên kết nút Sidebar và xóa bỏ nút Header.
+- `fe/components/QuizModal.tsx` – Thêm giao diện setup chọn số lượng câu, sửa lỗi chuyển trạng thái và thêm `data-testid`.
+- `fe/tests/quiz.spec.ts` – Cập nhật E2E tests hỗ trợ setup phase, wildcard route matchers và kiểm tra count.
+
+#### Build & Test status:
+- npm run build (Backend & Frontend): Pass
+- TypeScript errors: 0
+- Playwright E2E test suite: Pass (19/19 tests passed)
+- Jest Backend test suite: Pass (27/27 tests passed)
+
+
+---
+
+### ✅ Story 4.1.2: Phân mảnh Cache S3 Quiz theo số lượng câu hỏi (`quiz-X.json`) & Cấu hình count [5, 10, 20]
+**Status:** Done  
+**Time:** 6 hours  
+**Date:** 2026-06-16
+
+#### Đã làm:
+1. **Phân vùng cache S3 theo số lượng câu hỏi**:
+   - Thay đổi logic lưu trữ cache của Quiz trên S3. Thay vì lưu chung vào file `quiz.json`, hệ thống lưu vào các file riêng biệt dạng `quiz-${count}.json` (ví dụ: `quiz-5.json`, `quiz-10.json`, `quiz-20.json`) dựa theo số câu hỏi người dùng yêu cầu.
+   - Khi người dùng yêu cầu số câu cụ thể, hệ thống sẽ kiểm tra và truy xuất chính xác file cache tương ứng trên S3, loại bỏ hoàn toàn việc dùng chung/random từ một file cache đơn lẻ.
+2. **Cấu hình tùy chọn số câu mới**:
+   - Thay đổi các nút cấu hình trên giao diện QuizModal từ `[3, 5, 10]` thành **`[5, 10, 20]`** câu, đặt mặc định (`default`) là **10 câu**.
+   - Cập nhật backend mặc định (`expectedCount`) từ 5 thành 10 câu.
+3. **Ngưỡng chất lượng động (isCritical)**:
+   - Thay đổi ngưỡng tối thiểu để kích hoạt cảnh báo/tạo lại (`isCritical = true`) từ số lượng cứng thành theo tỷ lệ **60%** của số câu yêu cầu: `Math.ceil(expectedCount * 0.6)` (ví dụ: tối thiểu 3 câu đối với yêu cầu 5 câu, tối thiểu 6 câu đối với yêu cầu 10 câu, và tối thiểu 12 câu đối với yêu cầu 20 câu).
+   - Nếu số lượng câu hỏi hợp lệ sinh ra thấp hơn ngưỡng 60% này, backend sẽ từ chối lưu đè cache lỗi (tránh poison cache) và kích hoạt cơ chế retry tối đa 2 lần.
+4. **Cập nhật Unit Tests & E2E Tests**:
+   - Cập nhật 27 test cases Jest Backend trong `be/test/quiz.test.ts` để đồng bộ với dải giá trị mặc định là 10 câu, ngưỡng 60% động, và kiểm tra chính xác tên file cache (`quiz-10.json`, `quiz-5.json`) được lưu/đọc từ S3.
+   - Cập nhật test case E2E Playwright trong `fe/tests/quiz.spec.ts` từ `quiz-setup-opt-3` thành `quiz-setup-opt-5` để tương thích dải giá trị mới `[5, 10, 20]`.
+
+#### Kết quả kiểm thử:
+- **Backend Jest Unit Tests**: 100% PASS (51/51 tests passed bao gồm be/test/quiz.test.ts, chat.test.ts, authorizer.test.ts, ingest.test.ts, v.v.).
+- **Frontend Playwright E2E**: 100% PASS (33/33 tests passed bao gồm quiz.spec.ts, rag-chat.spec.ts, auth.spec.ts, v.v.).
+- **Build Status**: Chạy `npm run build` frontend biên dịch thành công 100% không phát sinh lỗi TypeScript.
+
+#### Files thay đổi:
+- `be/lambda/handlers/quiz.ts` – Chuyển đổi file lưu cache S3 thành `quiz-${requestedCount}.json`, đổi default count về 10, cập nhật ngưỡng chất lượng động `Math.ceil(expectedCount * 0.6)`.
+- `be/test/quiz.test.ts` – Cập nhật assertions kiểm tra default count = 10, ngưỡng chất lượng động, và tên file cache dạng `quiz-X.json` trên S3.
+- `fe/components/QuizModal.tsx` – Thay đổi dải cấu hình nút chọn sang `[5, 10, 20]` (default 10) và cập nhật ngưỡng cảnh báo `isPartial` động.
+- `fe/tests/quiz.spec.ts` – Điều chỉnh test setup sang chọn 5 câu thay vì 3 câu.

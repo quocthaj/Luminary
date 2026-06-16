@@ -5,6 +5,7 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { useSession, signOut } from 'next-auth/react';
 import { LoginModal } from './LoginModal';
+import { QuizModal } from './QuizModal';
 
 type Lang = 'en' | 'vi';
 type RightTab = 'tutor' | 'scholar';
@@ -211,6 +212,9 @@ export function WorkspaceView({
 
   // Alert/Modal state for coming-soon features
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+
+  // Quiz Modal state
+  const [showQuizModal, setShowQuizModal] = useState(false);
 
   // Sync current jobId to URL query params
   useEffect(() => {
@@ -624,25 +628,48 @@ export function WorkspaceView({
               Bộ công cụ học tập
             </h3>
             <div className="flex flex-col gap-2">
-              {[
-                { name: 'Kiểm tra AI (Quiz)', desc: 'Tự động tạo câu hỏi trắc nghiệm' },
-                { name: 'Thẻ ghi nhớ (Flashcard)', desc: 'Ôn tập thuật ngữ khoa học' },
-                { name: 'Sơ đồ tư duy (Mindmap)', desc: 'Vẽ mindmap cấu trúc bài viết' },
-              ].map((tool, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setAlertMessage(`Tính năng "${tool.name}" sẽ được tích hợp ở Epic 4. Hãy đón chờ!`)}
-                  className="text-left p-2.5 rounded-xl border border-[var(--border-subtle)] bg-transparent hover:bg-[var(--bg-elevated)] transition-all flex flex-col gap-0.5 cursor-pointer relative group"
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <span className="text-xs font-semibold text-[var(--text-primary)]">{tool.name}</span>
-                    <span className="text-[8px] bg-[var(--border-normal)] text-[var(--text-secondary)] px-1 rounded uppercase tracking-widest scale-90">
-                      Sắp có
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-[var(--text-secondary)] opacity-75">{tool.desc}</span>
-                </button>
-              ))}
+              {/* Kiểm tra AI (Quiz) */}
+              <button
+                onClick={() => setShowQuizModal(true)}
+                disabled={loading}
+                id="open-quiz-btn"
+                data-testid="open-quiz-btn"
+                title="Tạo bài kiểm tra trắc nghiệm từ bài báo này"
+                className="text-left p-2.5 rounded-xl border border-[var(--border-subtle)] bg-transparent hover:bg-[var(--bg-elevated)] transition-all flex flex-col gap-0.5 cursor-pointer relative group disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-xs font-semibold text-[var(--text-primary)]">Kiểm tra AI (Quiz)</span>
+                </div>
+                <span className="text-[10px] text-[var(--text-secondary)] opacity-75">Tự động tạo câu hỏi trắc nghiệm</span>
+              </button>
+
+              {/* Thẻ ghi nhớ (Flashcard) */}
+              <button
+                onClick={() => setAlertMessage('Tính năng "Thẻ ghi nhớ (Flashcard)" sẽ được tích hợp ở Epic 4. Hãy đón chờ!')}
+                className="text-left p-2.5 rounded-xl border border-[var(--border-subtle)] bg-transparent hover:bg-[var(--bg-elevated)] transition-all flex flex-col gap-0.5 cursor-pointer relative group"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-xs font-semibold text-[var(--text-primary)]">Thẻ ghi nhớ (Flashcard)</span>
+                  <span className="text-[8px] bg-[var(--border-normal)] text-[var(--text-secondary)] px-1 rounded uppercase tracking-widest scale-90">
+                    Sắp có
+                  </span>
+                </div>
+                <span className="text-[10px] text-[var(--text-secondary)] opacity-75">Ôn tập thuật ngữ khoa học</span>
+              </button>
+
+              {/* Sơ đồ tư duy (Mindmap) */}
+              <button
+                onClick={() => setAlertMessage('Tính năng "Sơ đồ tư duy (Mindmap)" sẽ được tích hợp ở Epic 4. Hãy đón chờ!')}
+                className="text-left p-2.5 rounded-xl border border-[var(--border-subtle)] bg-transparent hover:bg-[var(--bg-elevated)] transition-all flex flex-col gap-0.5 cursor-pointer relative group"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-xs font-semibold text-[var(--text-primary)]">Sơ đồ tư duy (Mindmap)</span>
+                  <span className="text-[8px] bg-[var(--border-normal)] text-[var(--text-secondary)] px-1 rounded uppercase tracking-widest scale-90">
+                    Sắp có
+                  </span>
+                </div>
+                <span className="text-[10px] text-[var(--text-secondary)] opacity-75">Vẽ mindmap cấu trúc bài viết</span>
+              </button>
             </div>
           </div>
         </div>
@@ -762,6 +789,7 @@ export function WorkspaceView({
                     </>
                   )}
                 </button>
+
               </>
             ) : null}
           </div>
@@ -1243,6 +1271,13 @@ export function WorkspaceView({
           setPendingDownload(false);
         }}
         onSuccess={handleLoginSuccess}
+      />
+
+      {/* ── Quiz Modal ── */}
+      <QuizModal
+        isOpen={showQuizModal}
+        jobId={jobId}
+        onClose={() => setShowQuizModal(false)}
       />
 
       {/* ── Alert popup for mock elements ── */}

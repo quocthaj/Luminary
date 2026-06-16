@@ -153,3 +153,34 @@ export async function getRelatedPapers(jobId: string): Promise<RelatedPaper[]> {
   const data = await res.json();
   return data.papers || [];
 }
+
+export interface QuizQuestion {
+  questionText: string;
+  options: string[];
+  correctOptionIndex: number;
+  explanation: string;
+}
+
+export interface QuizData {
+  questions: QuizQuestion[];
+  questionCount: number;
+}
+
+export async function generateQuiz(jobId: string, count?: number): Promise<QuizData> {
+  const url = `/api/tools/${jobId}/quiz${count ? `?count=${count}` : ''}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const status = res.status;
+    if (status === 401) throw new ApiError('Bạn cần đăng nhập để tạo quiz.', 401);
+    if (status === 403) throw new ApiError('Bạn không có quyền truy cập tài liệu này.', 403);
+    if (status === 409) throw new ApiError('Bản dịch tài liệu chưa hoàn thành. Vui lòng đợi quá trình dịch xong.', 409);
+    if (status === 504) throw new ApiError('Quá trình tạo quiz mất nhiều thời gian hơn dự kiến. Vui lòng thử lại.', 504);
+    throw new ApiError(err.error || `Quiz generation failed: ${status}`, status);
+  }
+  return res.json();
+}
+

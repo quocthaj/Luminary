@@ -558,6 +558,19 @@ export class VietAIScholarStack extends cdk.Stack {
     );
 
     // ============================================
+    // API Endpoint 2.7: POST /job/{jobId}/quiz
+    // Returns: { questions } — AI quiz generator
+    // ============================================
+    const quizResource = jobIdResource.addResource('quiz');
+    quizResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+
+    // ============================================
     // API Endpoint 3: GET /result/{jobId}
     // Returns: { downloadUrl } — presigned S3 URL for analysis.md
     // ============================================

@@ -9,7 +9,7 @@
 | Epic 1 | Core Translation & LaTeX | ✅ Done |
 | Epic 2 | Auth & Personal Library | ✅ Done |
 | Epic 3 | Workspace & RAG Chat | ✅ Done |
-| Epic 4 | Learning Tools (Quiz/Flashcard/Mindmap) | 📋 Backlog |
+| Epic 4 | Learning Tools (Quiz/Flashcard/Mindmap) | 🔄 In Progress |
 | Epic 5 | Multi-PDF Synthesis & Explore | 📋 Backlog |
 
 ### Epic 3 — Chi tiết
@@ -22,6 +22,14 @@
 | 3.4 | AI Tutor Chat Panel UI | ✅ Done |
 | 3.5 | Semantic Scholar Integration | ✅ Done |
 | 3.6 | Agentic RAG & Summary Routing | ✅ Done |
+
+### Epic 4 — Chi tiết
+
+| Story | Tên | Trạng thái |
+|-------|-----|-----------|
+| **4.1** | **AI Quiz Generator & Play Modal** | **📋 Next** |
+| 4.2 | AI Flashcard Generator & Swiper UI | 📋 Backlog |
+| 4.3 | Mermaid Mindmap Generator | 📋 Backlog |
 
 ---
 

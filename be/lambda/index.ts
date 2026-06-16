@@ -25,6 +25,7 @@ import { extractTextFromS3 } from './utils/text-extraction';
 import { supervisorHandler } from './supervisor';
 import { verifyToken } from './utils/auth-helpers';
 import { handleChatJob } from './handlers/chat';
+import { handleQuizJob } from './handlers/quiz';
 
 const STATE_MACHINE_ARN = process.env.STATE_MACHINE_ARN || '';
 const sfnClient = new SFNClient({ region: process.env.AWS_REGION || 'ap-southeast-1' });
@@ -95,6 +96,33 @@ export const handler = async (event: any) => {
                     return respond(403, { error: 'Forbidden' });
                 }
                 console.error('❌ Chat handler error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
+        if (httpMethod === 'POST' && path?.startsWith('/job/') && path?.endsWith('/quiz')) {
+            const userId = event.requestContext?.authorizer?.userId;
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const parts = path.split('/');
+            const jobId = parts[2];
+            const countParam = event.queryStringParameters?.count;
+            const count = countParam ? parseInt(countParam, 10) : undefined;
+            try {
+                const result = await handleQuizJob({ jobId, userId, count });
+                return respond(200, result);
+            } catch (err: any) {
+                if (err.message === 'JOB_NOT_FOUND') {
+                    return respond(404, { error: 'Job not found' });
+                }
+                if (err.message === 'FORBIDDEN') {
+                    return respond(403, { error: 'Forbidden' });
+                }
+                if (err.message === 'ANALYSIS_NOT_FOUND') {
+                    return respond(409, { error: 'Bản dịch song ngữ chưa hoàn thành để tạo trắc nghiệm.' });
+                }
+                console.error('❌ Quiz handler error:', err);
                 return respond(500, { error: err.message || 'Internal server error' });
             }
         }

@@ -150,7 +150,7 @@ async function generateAnswer(prompt: string): Promise<string> {
   try {
     const geminiKey = await getSecret(GEMINI_SECRET_ARN);
     const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const result = await model.generateContent(prompt);
     return result.response.text();
   } catch (err: any) {
@@ -258,7 +258,7 @@ export const handleChatJob = async (event: ChatInput): Promise<ChatOutput> => {
   try {
     const genAI = await getGeminiClient();
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       systemInstruction: `Bạn là trợ lý AI học thuật song ngữ. Nhiệm vụ của bạn là hỗ trợ người dùng đọc và hiểu tài liệu khoa học song ngữ.
 Bạn có quyền truy cập vào các công cụ tìm kiếm ngữ cảnh cục bộ (vectorSearch), lấy thêm đoạn văn lân cận để tránh đứt gãy ngữ nghĩa (fetchAdjacentParagraphs), hoặc đọc bản tóm tắt toàn diện của bài báo (readExecutiveSummary).
 
