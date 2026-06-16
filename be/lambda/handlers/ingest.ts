@@ -205,7 +205,8 @@ ${docSample}`
           ],
           max_tokens: 1000,
           temperature: 0.3
-        })
+        }),
+        signal: AbortSignal.timeout(15000)
       });
 
       if (!res.ok) {

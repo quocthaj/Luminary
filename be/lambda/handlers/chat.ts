@@ -173,7 +173,8 @@ async function generateAnswer(prompt: string): Promise<string> {
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3
-    })
+    }),
+    signal: AbortSignal.timeout(15000)
   });
   if (!res.ok) {
     const errText = await res.text();

@@ -1,6 +1,6 @@
 # RAG Architecture — VietAI Scholar
 
-## Pattern đang dùng: Naive RAG
+## Pattern đang dùng: Agentic RAG (Story 3.6) — upgrade từ Naive RAG
 
 ```
 Query → Embed query (Gemini) → Vector search Qdrant (top 4)

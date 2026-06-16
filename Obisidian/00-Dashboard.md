@@ -1,6 +1,6 @@
 # VietAI Scholar — Dashboard
 
-> Cập nhật lần cuối: 2026-06-11
+> Cập nhật lần cuối: 2026-06-16
 
 ## Trạng thái hiện tại
 
@@ -8,7 +8,7 @@
 |------|-----|-----------|
 | Epic 1 | Core Translation & LaTeX | ✅ Done |
 | Epic 2 | Auth & Personal Library | ✅ Done |
-| Epic 3 | Workspace & RAG Chat | 🔄 In Progress |
+| Epic 3 | Workspace & RAG Chat | ✅ Done |
 | Epic 4 | Learning Tools (Quiz/Flashcard/Mindmap) | 📋 Backlog |
 | Epic 5 | Multi-PDF Synthesis & Explore | 📋 Backlog |
 
@@ -21,7 +21,7 @@
 | 3.3 | RAG Chat API | ✅ Done |
 | 3.4 | AI Tutor Chat Panel UI | ✅ Done |
 | 3.5 | Semantic Scholar Integration | ✅ Done |
-| **3.6** | **Agentic RAG & Summary Routing** | **📋 Next** |
+| 3.6 | Agentic RAG & Summary Routing | ✅ Done |
 
 ---
 
@@ -40,6 +40,7 @@
 - [[30-Decisions/ADR-002-Multi-AI-Providers]] — Fallback chain AI
 - [[30-Decisions/ADR-003-Qdrant-RAG]] — Tại sao chọn Qdrant
 - [[30-Decisions/ADR-004-NextAuth]] — Tại sao chọn NextAuth
+- [[30-Decisions/ADR-005-Agentic-RAG-Memory]] — Sliding window + Executive Summary (2026-06-11)
 
 ### Research
 - [[40-Research/RAG-Architecture]] — RAG patterns trong project
@@ -51,6 +52,7 @@
 ---
 
 ## Session hôm nay
+- [[50-Sessions/2026-06-16]]
 - [[50-Sessions/2026-06-11]]
 
 ---

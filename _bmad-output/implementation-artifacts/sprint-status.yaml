@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-07T11:05:00Z
-last_updated: 2026-06-12T11:21:00+07:00
+last_updated: 2026-06-16T10:57:21+07:00
 project: viet-ai-scholar
 project_key: NOKEY
 tracking_system: file-system
