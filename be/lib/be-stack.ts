@@ -255,6 +255,11 @@ export class VietAIScholarStack extends cdk.Stack {
     qdrantSecret.grantRead(orchestratorLambda);
     nomicSecret.grantRead(orchestratorLambda);
     orchestratorLambda.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['lambda:InvokeFunction'],
+      resources: [`arn:aws:lambda:${this.region}:${this.account}:function:vietai-orchestrator`],
+      effect: iam.Effect.ALLOW,
+    }));
+    orchestratorLambda.addToRolePolicy(new iam.PolicyStatement({
       actions: [
         'textract:DetectDocumentText',
         'textract:AnalyzeDocument',
@@ -564,6 +569,53 @@ export class VietAIScholarStack extends cdk.Stack {
     const quizResource = jobIdResource.addResource('quiz');
     quizResource.addMethod(
       'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+    quizResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+ 
+    // ============================================
+    // API Endpoint 2.8: POST /job/{jobId}/flashcard
+    // Returns: { status } — AI flashcard generator
+    // ============================================
+    const flashcardResource = jobIdResource.addResource('flashcard');
+    flashcardResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+    flashcardResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+
+    // ============================================
+    // API Endpoint 2.9: POST & GET /job/{jobId}/mindmap
+    // Returns: { status } — AI mindmap generator
+    // ============================================
+    const mindmapResource = jobIdResource.addResource('mindmap');
+    mindmapResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+    mindmapResource.addMethod(
+      'GET',
       new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
       {
         authorizer,

@@ -643,3 +643,121 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 - `be/test/quiz.test.ts` – Cập nhật assertions kiểm tra default count = 10, ngưỡng chất lượng động, và tên file cache dạng `quiz-X.json` trên S3.
 - `fe/components/QuizModal.tsx` – Thay đổi dải cấu hình nút chọn sang `[5, 10, 20]` (default 10) và cập nhật ngưỡng cảnh báo `isPartial` động.
 - `fe/tests/quiz.spec.ts` – Điều chỉnh test setup sang chọn 5 câu thay vì 3 câu.
+
+---
+
+### ✅ Story 4.1.3: Di chuyển sang Kiến trúc Asynchronous Quiz Polling & Triển khai AWS
+**Status:** Done  
+**Time:** 10 hours  
+**Date:** 2026-06-17
+
+#### Đã làm:
+1. **Tái cấu trúc sang mô hình Bất đồng bộ (Async Polling)**:
+   - Thay đổi API `POST /job/{jobId}/quiz` để lấy lock atomic trong DynamoDB, tự kích hoạt Lambda ngầm (self-invoke `orchestratorLambda`) và phản hồi lập tức mã `202 Accepted` (trạng thái `GENERATING`) chỉ trong dưới 100ms.
+   - Thêm API `GET /job/{jobId}/quiz?count=X` để client poll định kỳ mỗi 2 giây, trả về trạng thái hiện tại (`GENERATING`, `COMPLETED`, `FAILED`) và trả kèm dữ liệu câu hỏi từ S3 ngay khi quá trình sinh thành công.
+2. **Khắc phục lỗi circular dependency trong CDK**:
+   - Thay thế cơ chế cấp quyền tự kích hoạt `grantInvoke` gây ra tham chiếu vòng bằng một `PolicyStatement` độc lập sử dụng ARN định dạng chuỗi tự ghép (với Region và Account ID động), đảm bảo stack CDK deploy ổn định.
+3. **Triển khai cơ chế khóa nguyên tử (Atomic Locking)**:
+   - Sử dụng `ConditionExpression` của DynamoDB kèm thời gian hết hạn TTL 5 phút (`expiredTime`) nhằm đảm bảo tại một thời điểm chỉ có duy nhất một background worker thực hiện sinh câu hỏi cho một `jobId`, tránh xung đột concurrency.
+4. **Tích hợp giao diện Frontend Polling State Machine**:
+   - Cập nhật `QuizModal.tsx` tự động chuyển trạng thái giao diện và thực hiện gọi vòng lặp kiểm tra trạng thái (`checkQuizStatus`) tối đa 90 giây khi nhận được tín hiệu `202`. Tự động dừng polling và hiển thị nút **Thử lại** nếu backend trả về trạng thái `FAILED`.
+
+#### Kết quả kiểm thử & Triển khai thực tế trên AWS:
+- **Deploy AWS Production**: Triển khai CDK Stack thành công (`cdk deploy` thành công với Exit code 0).
+- **Kiểm chứng Vượt ngưỡng API Gateway Timeout (>29s)**:
+  - Tiến hành sinh thử nghiệm **10 câu** (ca cache-miss thực tế) trên Job ID mới sinh `5b51aa89-424e-416c-9b72-94c9dbed6fd3`.
+  - **POST Request**: RequestId `03e1ea0f-f0f1-421e-b0e8-ceeb6daa9dcc` phản hồi `202 Accepted` trong **~49ms**.
+  - **Background Async Worker**: RequestId `95bc983d-5e72-4a05-babe-c0283f4ae09e` kích hoạt chạy ngầm thành công, chạy trong **35.08 giây** (vượt ngưỡng 29s của API Gateway) để gọi Gemini sinh 10 câu hỏi và lưu lên S3 thành công mà **không hề gây lỗi 504**.
+  - **Client Polling**: Client gửi GET polling định kỳ và nhận dữ liệu câu hỏi thành công ở lần poll thứ 16 (ngay sau khi worker kết thúc) chỉ trong **34ms**, hiển thị mượt mà giao diện chơi game Quiz 10 câu.
+- **Backend Jest Unit Tests**: 100% PASS (51/51 tests).
+- **Frontend Playwright E2E**: 100% PASS (33/33 tests).
+- **TypeScript & Build Status**: Pass 100%.
+
+
+---
+
+### ✅ Story 4.2: Tự động sinh và học Thẻ ghi nhớ (AI Flashcard Generator & Swiper UI)
+**Status:** Done  
+**Time:** 12 hours  
+**Date:** 2026-06-18
+
+#### Đã làm:
+1. **Kiến trúc Asynchronous Flashcard Polling (Backend)**:
+   - Phát triển API `POST /job/{jobId}/flashcard` hỗ trợ lấy khóa nguyên tử (Atomic Lock) trong DynamoDB với cơ chế `ConditionExpression` tránh concurrency (TTL 5 phút), tự kích hoạt worker Lambda chạy ngầm (`orchestratorLambda` với context `tool: 'flashcard'`) và phản hồi mã `202 Accepted` (trạng thái `GENERATING`) cho API Gateway trong <100ms.
+   - Phát triển API `GET /job/{jobId}/flashcard` cho phép client thăm dò (polling) định kỳ, trả về đúng trạng thái hiện tại (`IDLE`, `GENERATING`, `FAILED`, `COMPLETED`) kèm dữ liệu flashcards từ cache S3 (`flashcards-{count}.json`).
+   - Xây dựng logic router xử lý tương thích ngược hoàn hảo trong `be/lambda/index.ts` để định tuyến chính xác các payload worker chạy ngầm dựa trên thuộc tính `event.tool` (`quiz` vs `flashcard`).
+2. **Xử lý Logic tạo Flashcard với Gemini 2.5 Flash & Tự sửa lỗi (Self-Correction)**:
+   - Xây dựng handler `be/lambda/handlers/flashcard.ts` để kiểm tra quyền sở hữu job, xác nhận trạng thái biên dịch (`translationCompleted` trước khi sinh).
+   - Tích hợp Gemini 2.5 Flash cấu hình Output Structure nghiêm ngặt (`pronunciation` là bắt buộc nhưng cho phép `""` để tương thích công thức/viết tắt).
+   - Cơ chế tự sửa sai (retry loop tối đa 2 lần kèm feedback prompt chi tiết) và cơ chế Soft-Fail (chấp nhận kết quả tối thiểu 60% tổng số thẻ yêu cầu nếu lần cuối vẫn lỗi).
+3. **Tích hợp Giao diện Modal Flashcard tương tác 3D (Frontend)**:
+   - Xây dựng `fe/components/FlashcardModal.tsx` sử dụng CSS lật 3D hiệu năng cao (`transform-style: preserve-3d`, `backface-visibility: hidden`). Ẩn dòng hiển thị phiên âm IPA nếu giá trị nhận được là chuỗi rỗng `""`.
+   - Hỗ trợ đầy đủ bộ xử lý sự kiện vuốt touch (`onTouchStart`, `onTouchEnd`) trên di động và sự kiện bàn phím (ArrowRight / ArrowLeft / Space để điều hướng và lật thẻ).
+   - Tích hợp KaTeX để hiển thị chính xác các công thức toán học/khoa học ở cả hai mặt thẻ.
+   - Thêm Proxy API Next.js tại `fe/app/api/tools/[jobId]/flashcard/route.ts` xử lý timeout 55s và mock data cho các chạy thử nghiệm Playwright (Job ID bắt đầu với `mock-`).
+   - Kết nối nút "Thẻ ghi nhớ (Flashcard)" trong sidebar của `WorkspaceView.tsx` để kích hoạt mở FlashcardModal.
+
+#### Kết quả kiểm thử:
+- **Backend Jest Unit Tests**: 100% PASS (23/23 tests mới trong `be/test/flashcard.test.ts` đạt kết quả tuyệt đối, tổng số test backend đạt 74/74 tests).
+- **Frontend Playwright E2E**: 100% PASS (6/6 tests E2E trong `fe/tests/flashcard.spec.ts` kiểm thử đầy đủ các luồng: mở modal, chọn số câu, hiển thị loading/polling, hiển thị mặt trước/sau, lật thẻ, ẩn IPA, điều hướng phím/touch, đóng modal).
+- **Build Status**: Chạy `npm run build` frontend biên dịch thành công 100% không phát sinh lỗi TypeScript.
+
+#### Files thay đổi:
+- `be/lib/be-stack.ts` – Đăng ký Route Gateway cho `/job/{jobId}/flashcard`.
+- `be/lambda/index.ts` – Tích hợp HTTP router và background worker router cho flashcard.
+- `be/lambda/handlers/quiz.ts` – Thêm tham số `tool: 'quiz'` tường minh vào payload self-invoke của Quiz.
+- `be/lambda/handlers/flashcard.ts` – Triển khai logic xử lý backend, locking DynamoDB, Gemini integration và caching S3 cho flashcard.
+- `be/test/flashcard.test.ts` – Viết 23 tests bao phủ toàn bộ logic xử lý backend.
+- `fe/lib/api.ts` – Cập nhật FlashcardItem/FlashcardResponse interfaces, hàm `generateFlashcards` và `checkFlashcardStatus`.
+- `fe/components/FlashcardModal.tsx` – Giao diện Modal học thẻ 3D lật, KaTeX, touch swipe, keyboard nav.
+- `fe/components/WorkspaceView.tsx` – Tích hợp trigger nút Sidebar và render FlashcardModal.
+- `fe/app/api/tools/[jobId]/flashcard/route.ts` – Proxy API NextJS hỗ trợ mock data.
+- `fe/tests/flashcard.spec.ts` – Viết 6 tests E2E Playwright kiểm thử tương tác frontend.
+
+---
+
+### ✅ Story 4.3: Tự động vẽ Sơ đồ Tư duy bằng Mermaid.js (Mermaid Mindmap Generator & Interactive SVG Viewer)
+**Status:** Done  
+**Time:** 10 hours  
+**Date:** 2026-06-18
+
+#### Đã làm:
+1. **Kiến trúc Asynchronous Mindmap Polling (Backend)**:
+   - Phát triển API `POST /job/{jobId}/mindmap` hỗ trợ khóa nguyên tử (Atomic Lock) trong DynamoDB (`mindmapStatus` và `mindmapUpdatedAt` với TTL 5 phút), tự kích hoạt worker Lambda chạy ngầm (`orchestratorLambda` với context `tool: 'mindmap'`) và phản hồi mã `202 Accepted` (trạng thái `GENERATING`) trong <100ms.
+   - Phát triển API `GET /job/{jobId}/mindmap` cho phép client polling trạng thái định kỳ.
+   - Cập nhật router `be/lambda/index.ts` để định tuyến chính xác các payload ngầm cho mindmap.
+2. **Logic Sinh Sơ Đồ Tư Duy với Gemini 2.5 Flash & Tự Sửa Lỗi (Self-Correction)**:
+   - Tạo handler `be/lambda/handlers/mindmap.ts` gọi Gemini Flash sinh mã Mermaid.js thô (không bọc code block markdown) thông qua Structured Output.
+   - Cập nhật **system prompt (Hướng A)** để yêu cầu Gemini chỉ sử dụng cấu trúc văn bản thuần (plain text), tuyệt đối không sinh dấu ngoặc hình dạng như `(( ))`, `( )`, `[ ]`, `{ }`, `{{ }}` hay bọc nháy kép quanh tên nút, cho phép sử dụng khoảng trắng thoải mái mà không cần ngoặc kép, giúp định dạng luôn tối giản và tương thích 100% với mindmap parser.
+   - Tự động kiểm tra chất lượng cú pháp Mermaid bằng parse logic cơ bản. Nếu sai cú pháp, thực hiện cơ chế feedback-driven retry để Gemini tự sửa lỗi, nếu vẫn lỗi sẽ lưu fallback.
+3. **Giao diện Modal Sơ Đồ Tư Duy Tương Tác (Frontend)**:
+   - Phát triển `fe/components/MindmapModal.tsx` sử dụng dynamic import `@mermaid-js/mermaid` để tránh lỗi Server-side Rendering (SSR).
+   - Hỗ trợ thao tác Zoom & Pan (phóng to/thu nhỏ bằng con lăn chuột/nút bấm, di chuyển bằng kéo rê chuột) và tải ảnh SVG chất lượng cao.
+   - Triển khai cơ chế Fallback Text Tree (sơ đồ cây dạng thụt dòng văn bản) nếu trình duyệt không hỗ trợ hoặc lỗi cú pháp Mermaid.
+   - Thêm Proxy API Next.js tại `fe/app/api/tools/[jobId]/mindmap/route.ts` hỗ trợ mock data cho chạy thử nghiệm Playwright.
+   - **Fix lỗi Double-Escape JSON & Chuẩn Hóa Cú Pháp (Hướng B)**: Bổ sung hàm `cleanMermaidCode` để xử lý và loại bỏ các ký tự escape dạng double JSON-encoded (ví dụ: giải mã chuỗi json string bọc ngoài, thay thế `\\n` thành `\n`). Đồng thời triển khai bộ lọc regex để chuyển đổi tất cả các hình dạng ngoặc tròn kép `(( ))` và dấu nháy kép bọc ngoài `^(\s*)"(.+)"$` về dạng text thuần chuẩn, và dọn dẹp các ký tự đặc biệt phá vỡ cú pháp mindmap của Mermaid.
+4. **Tích hợp Workspace Polling & Thông báo Toast**:
+   - Cập nhật `fe/components/WorkspaceView.tsx` để thực hiện polling ngầm dưới background khi bấm nút Sơ đồ duy.
+   - Hiển thị badge trạng thái động (Đang tạo / Đã xong) trên Sidebar.
+   - Hiển thị Toast mờ kính (glassmorphism) không chặn (non-blocking) với nút mở nhanh modal "Xem sơ đồ tư duy ngay".
+
+#### Kết quả kiểm thử:
+- **Backend Jest Unit Tests**: 100% PASS (be/test/mindmap.test.ts đạt 100% độ bao phủ).
+- **Frontend Playwright E2E**: 100% PASS (4/4 tests trong `fe/tests/mindmap.spec.ts` kiểm thử đầy đủ các luồng: hiển thị nút sidebar, background polling ngầm & cập nhật toast, phóng to/thu nhỏ/đặt lại zoom, và fallback nested tree khi render lỗi).
+  - *Ghi chú*: Khắc phục lỗi strict mode của locator trên Playwright khi tìm text `invalid-syntax-mermaid-code` bằng cách tối ưu hóa selector cụ thể hơn `[data-testid="mindmap-modal"] .font-medium:has-text(...)` để tránh trùng khớp với Next.js error overlays.
+- **Build Status**: Chạy `npm run build` frontend biên dịch thành công 100% không phát sinh lỗi TypeScript.
+
+#### Files thay đổi:
+- `be/lib/be-stack.ts` – Đăng ký Route Gateway cho `/job/{jobId}/mindmap`.
+- `be/lambda/index.ts` – Tích hợp HTTP router và background worker router cho mindmap.
+- `be/lambda/handlers/mindmap.ts` – Triển khai logic xử lý backend, locking DynamoDB, Gemini integration và caching S3 cho mindmap.
+- `be/test/mindmap.test.ts` – Bộ test backend Jest.
+- `fe/lib/api.ts` – Cập nhật API helper `generateMindmap` và `checkMindmapStatus`.
+- `fe/components/MindmapModal.tsx` – Giao diện Modal SVG zoom/pan và fallback tree view.
+- `fe/components/WorkspaceView.tsx` – Tích hợp Sidebar badge, background polling loop, và Toast notification.
+- `fe/app/api/tools/[jobId]/mindmap/route.ts` – Proxy API NextJS hỗ trợ mock data.
+- `fe/tests/mindmap.spec.ts` – Playwright E2E tests cho tính năng Mindmap.
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` – Cập nhật trạng thái Story và Epic 4 sang done.
+
+
+

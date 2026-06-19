@@ -1,13 +1,10 @@
-// ============================================
-// TESTS: AI Quiz Generator Handler (Story 4.1)
-// be/test/quiz.test.ts
-// ============================================
-
 const mockGetJobItem = jest.fn();
 const mockGetSecret = jest.fn();
 const mockGetResultFromS3 = jest.fn();
 const mockSaveResultToS3 = jest.fn();
 const mockGenerateContent = jest.fn();
+const mockDynamoDBSend = jest.fn();
+const mockLambdaSend = jest.fn();
 
 const mockGetGenerativeModel = jest.fn().mockImplementation(() => ({
   generateContent: (args: any) => mockGenerateContent(args),
@@ -20,6 +17,22 @@ jest.mock('../lambda/utils/dynamodb-helpers', () => ({
 jest.mock('../lambda/utils/aws-clients', () => ({
   getSecret: (arn: string) => mockGetSecret(arn),
   GEMINI_SECRET_ARN: 'arn:aws:secretsmanager:ap-southeast-1:123456789012:secret:vietai/gemini-key',
+  dynamodbClient: {
+    send: (cmd: any) => mockDynamoDBSend(cmd),
+  },
+  JOBS_TABLE: 'mock-jobs-table',
+}));
+
+jest.mock('@aws-sdk/client-lambda', () => ({
+  LambdaClient: jest.fn().mockImplementation(() => ({
+    send: (cmd: any) => mockLambdaSend(cmd),
+  })),
+  InvokeCommand: jest.fn().mockImplementation((payload) => payload),
+}));
+
+jest.mock('@aws-sdk/client-dynamodb', () => ({
+  UpdateItemCommand: jest.fn().mockImplementation((payload) => payload),
+  GetItemCommand: jest.fn().mockImplementation((payload) => payload),
 }));
 
 jest.mock('../lambda/utils/s3-helpers', () => ({
@@ -39,7 +52,7 @@ jest.mock('@google/generative-ai', () => ({
   },
 }));
 
-import { handleQuizJob, validateQuiz } from '../lambda/handlers/quiz';
+import { handleQuizJob, validateQuiz, handleQuizPost, handleQuizGet, handleAsyncQuizJob } from '../lambda/handlers/quiz';
 
 // ============================================
 // TEST FIXTURES
@@ -466,5 +479,178 @@ describe('handleQuizJob()', () => {
     expect(mockGenerateContent).toHaveBeenCalledTimes(1);
     expect(mockSaveResultToS3).toHaveBeenCalledTimes(1);
     expect(mockSaveResultToS3.mock.calls[0][3]).toBe('quiz-5.json');
+  });
+});
+
+// ============================================
+// TESTS: POLLING API CONTROLLERS
+// ============================================
+
+describe('Polling API Controllers', () => {
+  beforeEach(() => {
+    mockGetJobItem.mockReset();
+    mockGetResultFromS3.mockReset();
+    mockSaveResultToS3.mockReset();
+    mockDynamoDBSend.mockReset();
+    mockLambdaSend.mockReset();
+    mockGenerateContent.mockReset();
+  });
+
+  describe('handleQuizPost()', () => {
+    it('throws INVALID_COUNT when unsupported count is requested', async () => {
+      mockGetJobItem.mockResolvedValue(VALID_JOB_ITEM);
+      await expect(handleQuizPost({ jobId: 'job-abc', userId: 'user-123', count: 15 }))
+        .rejects.toThrow('INVALID_COUNT');
+    });
+
+    it('returns COMPLETED immediately on S3 cache hit', async () => {
+      mockGetJobItem.mockResolvedValue(VALID_JOB_ITEM);
+      const cachedQuiz = makeValidQuizPayload(5);
+      mockGetResultFromS3.mockResolvedValueOnce(JSON.stringify({
+        ...cachedQuiz,
+        questionCount: 5,
+      }));
+
+      const result = await handleQuizPost({ jobId: 'job-abc', userId: 'user-123', count: 5 });
+
+      expect(result.status).toBe('COMPLETED');
+      expect(result.questions).toHaveLength(5);
+      // It should also update the status to COMPLETED in DynamoDB
+      expect(mockDynamoDBSend).toHaveBeenCalledTimes(1);
+      // Should NOT invoke lambda
+      expect(mockLambdaSend).not.toHaveBeenCalled();
+    });
+
+    it('returns GENERATING and invokes lambda when cache miss and lock acquired', async () => {
+      mockGetJobItem.mockResolvedValue(VALID_JOB_ITEM);
+      // S3 Cache miss (NoSuchKey)
+      const missError = Object.assign(new Error('Not Found'), { name: 'NoSuchKey' });
+      mockGetResultFromS3.mockRejectedValueOnce(missError);
+
+      // DynamoDB lock acquisition succeeds (UpdateItemCommand returns void/success)
+      mockDynamoDBSend.mockResolvedValueOnce({});
+
+      // Lambda invocation succeeds
+      mockLambdaSend.mockResolvedValueOnce({});
+
+      const result = await handleQuizPost({ jobId: 'job-abc', userId: 'user-123', count: 10 });
+
+      expect(result.status).toBe('GENERATING');
+      expect(mockDynamoDBSend).toHaveBeenCalledTimes(1); // lock acquisition
+      expect(mockLambdaSend).toHaveBeenCalledTimes(1); // async invoke
+    });
+
+    it('returns GENERATING without invoking lambda when lock acquisition fails (concurrency check)', async () => {
+      mockGetJobItem.mockResolvedValue(VALID_JOB_ITEM);
+      // Cache miss
+      const missError = Object.assign(new Error('Not Found'), { name: 'NoSuchKey' });
+      mockGetResultFromS3.mockRejectedValueOnce(missError);
+
+      // DynamoDB lock fails with ConditionalCheckFailedException
+      const condError = Object.assign(new Error('Conditional check failed'), { name: 'ConditionalCheckFailedException' });
+      mockDynamoDBSend.mockRejectedValueOnce(condError);
+
+      const result = await handleQuizPost({ jobId: 'job-abc', userId: 'user-123', count: 10 });
+
+      expect(result.status).toBe('GENERATING');
+      expect(mockLambdaSend).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleQuizGet()', () => {
+    it('returns IDLE when status attribute is missing in DynamoDB', async () => {
+      mockGetJobItem.mockResolvedValue({
+        ...VALID_JOB_ITEM,
+        // quizStatus_10 is missing
+      });
+
+      const result = await handleQuizGet({ jobId: 'job-abc', userId: 'user-123', count: 10 });
+      expect(result.status).toBe('IDLE');
+    });
+
+    it('returns GENERATING / FAILED when status matches in DynamoDB', async () => {
+      mockGetJobItem.mockResolvedValue({
+        ...VALID_JOB_ITEM,
+        quizStatus_10: { S: 'GENERATING' }
+      });
+
+      const result = await handleQuizGet({ jobId: 'job-abc', userId: 'user-123', count: 10 });
+      expect(result.status).toBe('GENERATING');
+    });
+
+    it('returns COMPLETED with questions when status is COMPLETED and cache exists', async () => {
+      mockGetJobItem.mockResolvedValue({
+        ...VALID_JOB_ITEM,
+        quizStatus_10: { S: 'COMPLETED' }
+      });
+      const cachedQuiz = {
+        ...makeValidQuizPayload(10),
+        questionCount: 10,
+      };
+      mockGetResultFromS3.mockResolvedValueOnce(JSON.stringify(cachedQuiz));
+
+      const result = await handleQuizGet({ jobId: 'job-abc', userId: 'user-123', count: 10 });
+      expect(result.status).toBe('COMPLETED');
+      expect(result.questions).toHaveLength(10);
+    });
+
+    it('falls back to IDLE when status is COMPLETED but cache is missing in S3', async () => {
+      mockGetJobItem.mockResolvedValue({
+        ...VALID_JOB_ITEM,
+        quizStatus_10: { S: 'COMPLETED' }
+      });
+      // S3 missing cache
+      const missError = Object.assign(new Error('Not Found'), { name: 'NoSuchKey' });
+      mockGetResultFromS3.mockRejectedValueOnce(missError);
+
+      const result = await handleQuizGet({ jobId: 'job-abc', userId: 'user-123', count: 10 });
+      expect(result.status).toBe('IDLE');
+      // Should have reset the status back to IDLE in DynamoDB
+      expect(mockDynamoDBSend).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('handleAsyncQuizJob()', () => {
+    it('generates quiz and updates status to COMPLETED on success', async () => {
+      // Mock jobItem ownership & translation checks
+      mockGetJobItem.mockResolvedValue(VALID_JOB_ITEM);
+      // Cache miss
+      const missError = Object.assign(new Error('Not Found'), { name: 'NoSuchKey' });
+      mockGetResultFromS3.mockRejectedValueOnce(missError);
+      mockGetResultFromS3.mockResolvedValueOnce('Analysis content...');
+
+      // Gemini mock success
+      mockGenerateContent.mockResolvedValue({
+        response: { text: () => JSON.stringify(makeValidQuizPayload(10)) },
+      });
+
+      // DynamoDB status update
+      mockDynamoDBSend.mockResolvedValue({});
+
+      await handleAsyncQuizJob({ jobId: 'job-abc', userId: 'user-123', count: 10, invocationDepth: 1 });
+
+      expect(mockSaveResultToS3).toHaveBeenCalledTimes(1);
+      expect(mockDynamoDBSend).toHaveBeenCalledTimes(1); // update status to COMPLETED
+    });
+
+    it('circuit-breaks immediately if invocationDepth > 1', async () => {
+      await handleAsyncQuizJob({ jobId: 'job-abc', userId: 'user-123', count: 10, invocationDepth: 2 });
+      expect(mockGetJobItem).not.toHaveBeenCalled();
+    });
+
+    it('updates status to FAILED on generation errors', async () => {
+      mockGetJobItem.mockResolvedValue(VALID_JOB_ITEM);
+      const missError = Object.assign(new Error('Not Found'), { name: 'NoSuchKey' });
+      mockGetResultFromS3.mockRejectedValueOnce(missError);
+      mockGetResultFromS3.mockResolvedValueOnce('Analysis content...');
+
+      // Gemini throws error
+      mockGenerateContent.mockRejectedValue(new Error('Gemini API Error'));
+
+      await handleAsyncQuizJob({ jobId: 'job-abc', userId: 'user-123', count: 10, invocationDepth: 1 });
+
+      expect(mockSaveResultToS3).not.toHaveBeenCalled();
+      expect(mockDynamoDBSend).toHaveBeenCalledTimes(1); // status updated to FAILED
+    });
   });
 });

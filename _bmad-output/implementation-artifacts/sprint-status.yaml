@@ -1,5 +1,5 @@
 # generated: 2026-06-07T11:05:00Z
-# last_updated: 2026-06-11T23:00:00+07:00
+# last_updated: 2026-06-17T21:12:51+07:00
 # project: viet-ai-scholar
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-07T11:05:00Z
-last_updated: 2026-06-16T11:02:17+07:00
+last_updated: 2026-06-17T21:12:51+07:00
 project: viet-ai-scholar
 project_key: NOKEY
 tracking_system: file-system
@@ -66,10 +66,10 @@ development_status:
   3-6-he-thong-chat-agentic-rag-tu-dong-dinh-tuyen-va-truy-van-active-agentic-rag-chat-router: done
   epic-3-retrospective: optional
 
-  epic-4: in-progress
+  epic-4: done
   4-1-tu-dong-sinh-va-lam-bai-trac-nghiem-ai-quiz-generator-play-modal: done
-  4-2-tu-dong-sinh-va-hoc-the-ghi-nho-ai-flashcard-generator-swiper-ui: backlog
-  4-3-tu-dong-ve-so-do-tu-duy-bang-mermaid-js-mermaid-mindmap-generator-interactive-svg-viewer: backlog
+  4-2-tu-dong-sinh-va-hoc-the-ghi-nho-ai-flashcard-generator-swiper-ui: done
+  4-3-tu-dong-ve-so-do-tu-duy-bang-mermaid-js-mermaid-mindmap-generator-interactive-svg-viewer: done
   epic-4-retrospective: optional
 
   epic-5: backlog

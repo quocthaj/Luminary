@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { generateQuiz, QuizData, QuizQuestion } from '../lib/api';
+import { generateQuiz, checkQuizStatus, QuizData, QuizQuestion } from '../lib/api';
 import katex from 'katex';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -75,9 +75,26 @@ export function QuizModal({ isOpen, jobId, onClose }: QuizModalProps) {
   const [questionCount, setQuestionCount] = useState<number>(10);
   const loadingText = useProgressiveLoading(phase === 'loading' && isOpen);
 
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, []);
+
   // Load quiz when modal opens
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      return;
+    }
 
     // Reset state
     setPhase('setup');
@@ -92,15 +109,80 @@ export function QuizModal({ isOpen, jobId, onClose }: QuizModalProps) {
     setPhase('loading');
     setErrorMsg(null);
 
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
     generateQuiz(jobId, count)
       .then((data) => {
-        setQuiz(data);
-        setSelected(new Array(data.questionCount).fill(null));
-        setPhase('playing');
+        // Backward compatibility for mock/legacy responses without status field
+        const effectiveStatus = data.status || (data.questions ? 'COMPLETED' : undefined);
+
+        if (effectiveStatus === 'COMPLETED' && data.questions) {
+          const quizData: QuizData = {
+            questions: data.questions,
+            questionCount: data.questions.length,
+          };
+          setQuiz(quizData);
+          setSelected(new Array(quizData.questionCount).fill(null));
+          setPhase('playing');
+        } else if (effectiveStatus === 'GENERATING') {
+          let ticks = 0;
+          const maxTicks = 45; // 90 seconds (45 * 2s)
+
+          pollIntervalRef.current = setInterval(() => {
+            ticks++;
+            if (ticks > maxTicks) {
+              if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+              }
+              setErrorMsg('Quá trình tạo quiz mất nhiều thời gian hơn dự kiến. Vui lòng thử lại.');
+              setPhase('playing');
+              return;
+            }
+
+            checkQuizStatus(jobId, count)
+              .then((statusData) => {
+                if (statusData.status === 'COMPLETED' && statusData.questions) {
+                  if (pollIntervalRef.current) {
+                    clearInterval(pollIntervalRef.current);
+                    pollIntervalRef.current = null;
+                  }
+                  const quizData: QuizData = {
+                    questions: statusData.questions,
+                    questionCount: statusData.questions.length,
+                  };
+                  setQuiz(quizData);
+                  setSelected(new Array(quizData.questionCount).fill(null));
+                  setPhase('playing');
+                } else if (statusData.status === 'FAILED') {
+                  if (pollIntervalRef.current) {
+                    clearInterval(pollIntervalRef.current);
+                    pollIntervalRef.current = null;
+                  }
+                  setErrorMsg(statusData.error || 'Không thể tạo quiz. Vui lòng thử lại sau.');
+                  setPhase('playing');
+                }
+              })
+              .catch((err) => {
+                if (pollIntervalRef.current) {
+                  clearInterval(pollIntervalRef.current);
+                  pollIntervalRef.current = null;
+                }
+                setErrorMsg(err?.message || 'Không thể kiểm tra trạng thái tạo quiz.');
+                setPhase('playing');
+              });
+          }, 2000);
+        } else {
+          setErrorMsg('Phản hồi không hợp lệ từ máy chủ.');
+          setPhase('playing');
+        }
       })
       .catch((err) => {
         setErrorMsg(err?.message || 'Không thể tạo quiz. Vui lòng thử lại sau.');
-        setPhase('playing'); // stay open to show error
+        setPhase('playing');
       });
   }, [jobId]);
 

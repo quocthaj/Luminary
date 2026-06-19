@@ -166,7 +166,13 @@ export interface QuizData {
   questionCount: number;
 }
 
-export async function generateQuiz(jobId: string, count?: number): Promise<QuizData> {
+export interface QuizResponse {
+  status: 'IDLE' | 'GENERATING' | 'FAILED' | 'COMPLETED';
+  questions?: QuizQuestion[];
+  error?: string;
+}
+
+export async function generateQuiz(jobId: string, count?: number): Promise<QuizResponse> {
   const url = `/api/tools/${jobId}/quiz${count ? `?count=${count}` : ''}`;
   const res = await fetch(url, {
     method: 'POST',
@@ -183,4 +189,112 @@ export async function generateQuiz(jobId: string, count?: number): Promise<QuizD
   }
   return res.json();
 }
+
+export async function checkQuizStatus(jobId: string, count?: number): Promise<QuizResponse> {
+  const url = `/api/tools/${jobId}/quiz${count ? `?count=${count}` : ''}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const status = res.status;
+    if (status === 401) throw new ApiError('Bạn cần đăng nhập để tạo quiz.', 401);
+    if (status === 403) throw new ApiError('Bạn không có quyền truy cập tài liệu này.', 403);
+    if (status === 409) throw new ApiError('Bản dịch tài liệu chưa hoàn thành. Vui lòng đợi quá trình dịch xong.', 409);
+    throw new ApiError(err.error || `Quiz status check failed: ${status}`, status);
+  }
+  return res.json();
+}
+
+export interface FlashcardItem {
+  term: string;
+  pronunciation: string;
+  translation: string;
+  definition: string;
+}
+
+export interface FlashcardResponse {
+  status: 'IDLE' | 'GENERATING' | 'FAILED' | 'COMPLETED';
+  flashcards?: FlashcardItem[];
+  cardCount?: number;
+  error?: string;
+}
+
+export async function generateFlashcards(jobId: string, count?: number): Promise<FlashcardResponse> {
+  const url = `/api/tools/${jobId}/flashcard${count ? `?count=${count}` : ''}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const status = res.status;
+    if (status === 401) throw new ApiError('Bạn cần đăng nhập để tạo thẻ ghi nhớ.', 401);
+    if (status === 403) throw new ApiError('Bạn không có quyền truy cập tài liệu này.', 403);
+    if (status === 409) throw new ApiError('Bản dịch tài liệu chưa hoàn thành. Vui lòng đợi quá trình dịch xong.', 409);
+    if (status === 504) throw new ApiError('Quá trình tạo thẻ ghi nhớ mất nhiều thời gian hơn dự kiến. Vui lòng thử lại.', 504);
+    throw new ApiError(err.error || `Flashcard generation failed: ${status}`, status);
+  }
+  return res.json();
+}
+
+export async function checkFlashcardStatus(jobId: string, count?: number): Promise<FlashcardResponse> {
+  const url = `/api/tools/${jobId}/flashcard${count ? `?count=${count}` : ''}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const status = res.status;
+    if (status === 401) throw new ApiError('Bạn cần đăng nhập để tạo thẻ ghi nhớ.', 401);
+    if (status === 403) throw new ApiError('Bạn không có quyền truy cập tài liệu này.', 403);
+    if (status === 409) throw new ApiError('Bản dịch tài liệu chưa hoàn thành. Vui lòng đợi quá trình dịch xong.', 409);
+    throw new ApiError(err.error || `Flashcard status check failed: ${status}`, status);
+  }
+  return res.json();
+}
+
+export interface MindmapResponse {
+  status: 'IDLE' | 'GENERATING' | 'FAILED' | 'COMPLETED';
+  mermaidCode?: string;
+  error?: string;
+}
+
+export async function generateMindmap(jobId: string): Promise<MindmapResponse> {
+  const url = `/api/tools/${jobId}/mindmap`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const status = res.status;
+    if (status === 401) throw new ApiError('Bạn cần đăng nhập để tạo sơ đồ tư duy.', 401);
+    if (status === 403) throw new ApiError('Bạn không có quyền truy cập tài liệu này.', 403);
+    if (status === 409) throw new ApiError('Bản dịch tài liệu chưa hoàn thành. Vui lòng đợi quá trình dịch xong.', 409);
+    if (status === 504) throw new ApiError('Quá trình tạo sơ đồ tư duy mất nhiều thời gian hơn dự kiến. Vui lòng thử lại.', 504);
+    throw new ApiError(err.error || `Mindmap generation failed: ${status}`, status);
+  }
+  return res.json();
+}
+
+export async function checkMindmapStatus(jobId: string): Promise<MindmapResponse> {
+  const url = `/api/tools/${jobId}/mindmap`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const status = res.status;
+    if (status === 401) throw new ApiError('Bạn cần đăng nhập để tạo sơ đồ tư duy.', 401);
+    if (status === 403) throw new ApiError('Bạn không có quyền truy cập tài liệu này.', 403);
+    if (status === 409) throw new ApiError('Bản dịch tài liệu chưa hoàn thành. Vui lòng đợi quá trình dịch xong.', 409);
+    throw new ApiError(err.error || `Mindmap status check failed: ${status}`, status);
+  }
+  return res.json();
+}
+
 

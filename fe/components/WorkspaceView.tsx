@@ -1,11 +1,14 @@
 'use client';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { getResultUrl, fetchPreviewContent, resetMockProgress, getJobs, JobStatus, sendRAGChatMessage, RelatedPaper, getRelatedPapers } from '../lib/api';
+import { getResultUrl, fetchPreviewContent, resetMockProgress, getJobs, JobStatus, sendRAGChatMessage, RelatedPaper, getRelatedPapers, generateMindmap, checkMindmapStatus } from '../lib/api';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { useSession, signOut } from 'next-auth/react';
 import { LoginModal } from './LoginModal';
 import { QuizModal } from './QuizModal';
+import { FlashcardModal } from './FlashcardModal';
+import { MindmapModal } from './MindmapModal';
+
 
 type Lang = 'en' | 'vi';
 type RightTab = 'tutor' | 'scholar';
@@ -215,6 +218,119 @@ export function WorkspaceView({
 
   // Quiz Modal state
   const [showQuizModal, setShowQuizModal] = useState(false);
+
+  // Flashcard Modal state
+  const [showFlashcardModal, setShowFlashcardModal] = useState(false);
+
+  // Mindmap states
+  const [showMindmapModal, setShowMindmapModal] = useState(false);
+  const [mindmapStatus, setMindmapStatus] = useState<'IDLE' | 'GENERATING' | 'FAILED' | 'COMPLETED'>('IDLE');
+  const [mindmapToast, setMindmapToast] = useState<{ type: 'generating' | 'success' | 'failed' | null; message: string }>({ type: null, message: '' });
+  const mindmapPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startMindmapPolling = useCallback(() => {
+    if (mindmapPollRef.current) {
+      clearInterval(mindmapPollRef.current);
+    }
+    let ticks = 0;
+    const maxTicks = 30; // 90 seconds (30 * 3s)
+
+    mindmapPollRef.current = setInterval(() => {
+      ticks++;
+      if (ticks > maxTicks) {
+        if (mindmapPollRef.current) {
+          clearInterval(mindmapPollRef.current);
+          mindmapPollRef.current = null;
+        }
+        setMindmapStatus('FAILED');
+        setMindmapToast({ type: 'failed', message: 'Tạo sơ đồ tư duy quá thời gian. Vui lòng thử lại.' });
+        return;
+      }
+
+      checkMindmapStatus(jobId)
+        .then((data) => {
+          if (data.status === 'COMPLETED') {
+            if (mindmapPollRef.current) {
+              clearInterval(mindmapPollRef.current);
+              mindmapPollRef.current = null;
+            }
+            setMindmapStatus('COMPLETED');
+            setMindmapToast({ type: 'success', message: 'Sơ đồ tư duy đã được vẽ hoàn tất bởi AI!' });
+          } else if (data.status === 'FAILED') {
+            if (mindmapPollRef.current) {
+              clearInterval(mindmapPollRef.current);
+              mindmapPollRef.current = null;
+            }
+            setMindmapStatus('FAILED');
+            setMindmapToast({ type: 'failed', message: 'Tiến trình vẽ sơ đồ tư duy thất bại.' });
+          }
+        })
+        .catch((err) => {
+          console.error('Polling check failed:', err);
+        });
+    }, 3000);
+  }, [jobId]);
+
+  // Check mindmap status on load or jobId change
+  useEffect(() => {
+    if (mindmapPollRef.current) {
+      clearInterval(mindmapPollRef.current);
+      mindmapPollRef.current = null;
+    }
+    setMindmapStatus('IDLE');
+    setMindmapToast({ type: null, message: '' });
+
+    if (!jobId) return;
+
+    checkMindmapStatus(jobId)
+      .then((data) => {
+        if (data.status === 'COMPLETED') {
+          setMindmapStatus('COMPLETED');
+        } else if (data.status === 'GENERATING') {
+          setMindmapStatus('GENERATING');
+          startMindmapPolling();
+        }
+      })
+      .catch((err) => {
+        console.warn('Initial check of mindmap status failed:', err);
+      });
+
+    return () => {
+      if (mindmapPollRef.current) {
+        clearInterval(mindmapPollRef.current);
+      }
+    };
+  }, [jobId, startMindmapPolling]);
+
+  const handleMindmapClick = useCallback(() => {
+    if (mindmapStatus === 'COMPLETED') {
+      setShowMindmapModal(true);
+      return;
+    }
+
+    if (mindmapStatus === 'GENERATING') {
+      setMindmapToast({ type: 'generating', message: 'Tiến trình vẽ sơ đồ tư duy đang được xử lý ở chế độ chạy ngầm...' });
+      return;
+    }
+
+    setMindmapStatus('GENERATING');
+    setMindmapToast({ type: 'generating', message: 'Đang khởi chạy tiến trình vẽ sơ đồ tư duy ở background...' });
+
+    generateMindmap(jobId)
+      .then((data) => {
+        if (data.status === 'COMPLETED') {
+          setMindmapStatus('COMPLETED');
+          setMindmapToast({ type: 'success', message: 'Sơ đồ tư duy đã tạo xong!' });
+        } else {
+          startMindmapPolling();
+        }
+      })
+      .catch((err: any) => {
+        setMindmapStatus('FAILED');
+        setMindmapToast({ type: 'failed', message: err.message || 'Khởi tạo tiến trình vẽ sơ đồ tư duy thất bại.' });
+      });
+  }, [jobId, mindmapStatus, startMindmapPolling]);
+
 
   // Sync current jobId to URL query params
   useEffect(() => {
@@ -645,30 +761,53 @@ export function WorkspaceView({
 
               {/* Thẻ ghi nhớ (Flashcard) */}
               <button
-                onClick={() => setAlertMessage('Tính năng "Thẻ ghi nhớ (Flashcard)" sẽ được tích hợp ở Epic 4. Hãy đón chờ!')}
-                className="text-left p-2.5 rounded-xl border border-[var(--border-subtle)] bg-transparent hover:bg-[var(--bg-elevated)] transition-all flex flex-col gap-0.5 cursor-pointer relative group"
+                onClick={() => setShowFlashcardModal(true)}
+                disabled={loading}
+                id="open-flashcard-btn"
+                data-testid="open-flashcard-btn"
+                title="Tạo thẻ ghi nhớ thuật ngữ từ bài báo này"
+                className="text-left p-2.5 rounded-xl border border-[var(--border-subtle)] bg-transparent hover:bg-[var(--bg-elevated)] transition-all flex flex-col gap-0.5 cursor-pointer relative group disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
                 <div className="flex items-center justify-between w-full">
                   <span className="text-xs font-semibold text-[var(--text-primary)]">Thẻ ghi nhớ (Flashcard)</span>
-                  <span className="text-[8px] bg-[var(--border-normal)] text-[var(--text-secondary)] px-1 rounded uppercase tracking-widest scale-90">
-                    Sắp có
-                  </span>
                 </div>
                 <span className="text-[10px] text-[var(--text-secondary)] opacity-75">Ôn tập thuật ngữ khoa học</span>
               </button>
 
               {/* Sơ đồ tư duy (Mindmap) */}
               <button
-                onClick={() => setAlertMessage('Tính năng "Sơ đồ tư duy (Mindmap)" sẽ được tích hợp ở Epic 4. Hãy đón chờ!')}
-                className="text-left p-2.5 rounded-xl border border-[var(--border-subtle)] bg-transparent hover:bg-[var(--bg-elevated)] transition-all flex flex-col gap-0.5 cursor-pointer relative group"
+                onClick={handleMindmapClick}
+                disabled={loading}
+                id="open-mindmap-btn"
+                data-testid="open-mindmap-btn"
+                title="Tạo sơ đồ tư duy trực quan từ bài báo này"
+                className={`text-left p-2.5 rounded-xl border transition-all flex flex-col gap-0.5 cursor-pointer relative group disabled:opacity-40 disabled:cursor-not-allowed ${
+                  mindmapStatus === 'COMPLETED'
+                    ? 'border-green-500/30 bg-green-500/5 hover:bg-green-500/10'
+                    : 'border-[var(--border-subtle)] bg-transparent hover:bg-[var(--bg-elevated)]'
+                }`}
               >
                 <div className="flex items-center justify-between w-full">
-                  <span className="text-xs font-semibold text-[var(--text-primary)]">Sơ đồ tư duy (Mindmap)</span>
-                  <span className="text-[8px] bg-[var(--border-normal)] text-[var(--text-secondary)] px-1 rounded uppercase tracking-widest scale-90">
-                    Sắp có
+                  <span className="text-xs font-semibold text-[var(--text-primary)]">
+                    {mindmapStatus === 'COMPLETED' ? 'Xem sơ đồ tư duy (Mindmap)' : 'Sơ đồ tư duy (Mindmap)'}
                   </span>
+                  {mindmapStatus === 'COMPLETED' && (
+                    <span className="text-[8px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider scale-90">
+                      Đã xong
+                    </span>
+                  )}
+                  {mindmapStatus === 'GENERATING' && (
+                    <span className="text-[8px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider scale-90 animate-pulse flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-ping" />
+                      Đang tạo
+                    </span>
+                  )}
                 </div>
-                <span className="text-[10px] text-[var(--text-secondary)] opacity-75">Vẽ mindmap cấu trúc bài viết</span>
+                <span className="text-[10px] text-[var(--text-secondary)] opacity-75">
+                  {mindmapStatus === 'COMPLETED'
+                    ? 'Nhấn để mở sơ đồ tư duy trực quan'
+                    : 'AI vẽ mindmap cấu trúc bài viết'}
+                </span>
               </button>
             </div>
           </div>
@@ -1279,6 +1418,83 @@ export function WorkspaceView({
         jobId={jobId}
         onClose={() => setShowQuizModal(false)}
       />
+
+      {/* ── Flashcard Modal ── */}
+      <FlashcardModal
+        isOpen={showFlashcardModal}
+        jobId={jobId}
+        onClose={() => setShowFlashcardModal(false)}
+      />
+
+      {/* ── Mindmap Modal ── */}
+      <MindmapModal
+        isOpen={showMindmapModal}
+        jobId={jobId}
+        onClose={() => setShowMindmapModal(false)}
+      />
+
+      {/* ── Background Mindmap Toast Notification ── */}
+      {mindmapToast.type && (
+        <div
+          id="mindmap-toast"
+          data-testid="mindmap-toast"
+          className="fixed bottom-5 right-5 z-50 max-w-sm w-full bg-[#0e131f]/95 border border-[var(--border-normal,rgba(255,255,255,0.1))] rounded-2xl p-4 shadow-2xl backdrop-blur-md animate-fade-in flex flex-col gap-3"
+        >
+          <div className="flex items-start gap-3">
+            {mindmapToast.type === 'generating' && (
+              <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 flex-shrink-0 animate-pulse">
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89" />
+                </svg>
+              </div>
+            )}
+            {mindmapToast.type === 'success' && (
+              <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400 flex-shrink-0">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            )}
+            {mindmapToast.type === 'failed' && (
+              <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400 flex-shrink-0">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+            )}
+            <div className="flex-1">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                {mindmapToast.type === 'generating' && 'Đang vẽ sơ đồ tư duy'}
+                {mindmapToast.type === 'success' && 'Hoàn thành sơ đồ'}
+                {mindmapToast.type === 'failed' && 'Lỗi tiến trình'}
+              </h4>
+              <p className="text-[11px] text-gray-300 leading-relaxed mt-0.5">{mindmapToast.message}</p>
+            </div>
+            <button
+              onClick={() => setMindmapToast({ type: null, message: '' })}
+              className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/5 cursor-pointer"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          {mindmapToast.type === 'success' && (
+            <button
+              onClick={() => {
+                setShowMindmapModal(true);
+                setMindmapToast({ type: null, message: '' });
+              }}
+              id="toast-open-mindmap-btn"
+              data-testid="toast-open-mindmap-btn"
+              className="w-full bg-green-500 text-[#080b12] text-xs font-bold py-2 rounded-xl hover:opacity-90 active:scale-95 transition-all cursor-pointer text-center"
+            >
+              Mở sơ đồ tư duy ngay
+            </button>
+          )}
+        </div>
+      )}
+
 
       {/* ── Alert popup for mock elements ── */}
       {alertMessage && (

@@ -154,8 +154,22 @@ async function generateAnswer(prompt: string): Promise<string> {
     const result = await model.generateContent(prompt);
     return result.response.text();
   } catch (err: any) {
-    if (err?.status === 429 || err?.message?.includes('429')) {
-      console.warn('⚠️ Gemini 429 in fallback, falling back to Groq...');
+    const status = err?.status || err?.statusCode;
+    const message = err?.message || '';
+    
+    const isTransientError = 
+      status === 429 || 
+      status === 500 || 
+      status === 502 || 
+      status === 503 || 
+      status === 504 ||
+      message.includes('429') ||
+      message.includes('503') ||
+      message.includes('fetch failed') ||
+      err?.name === 'AbortError';
+
+    if (isTransientError) {
+      console.warn(`⚠️ Gemini failed (status: ${status}, msg: ${message}). Falling back to Groq...`);
     } else {
       throw err;
     }

@@ -1,12 +1,9 @@
-// ============================================
-// HANDLER: AI Quiz Generator
-// Story 4.1 — Tự động sinh và làm bài Trắc nghiệm
-// ============================================
-
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { getJobItem } from '../utils/dynamodb-helpers';
-import { getSecret, GEMINI_SECRET_ARN } from '../utils/aws-clients';
+import { getSecret, GEMINI_SECRET_ARN, dynamodbClient, JOBS_TABLE } from '../utils/aws-clients';
 import { getResultFromS3, saveResultToS3 } from '../utils/s3-helpers';
+import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
+import { UpdateItemCommand } from '@aws-sdk/client-dynamodb';
 
 // ============================================
 // TYPES & INTERFACES
@@ -389,4 +386,201 @@ export async function handleQuizJob(input: QuizInput): Promise<QuizData> {
 
   console.error(`❌ [quiz] Quiz generation failed after 2 attempts. Only ${validQuestions.length} valid questions. jobId=${jobId}`);
   throw new Error('QUIZ_GENERATION_FAILED');
+}
+
+// ============================================
+// POLLING API CONTROLLERS
+// ============================================
+
+const lambdaClient = new LambdaClient({ region: process.env.AWS_REGION || 'ap-southeast-1' });
+
+export async function handleQuizPost(input: { jobId: string; userId: string; count?: number }): Promise<any> {
+  const { jobId, userId, count } = input;
+  const requestedCount = count && [5, 10, 20].includes(count) ? count : 10;
+
+  // 1. Ownership & translation status checks
+  const jobItem = await getJobItem(jobId);
+  if (!jobItem) {
+    throw new Error('JOB_NOT_FOUND');
+  }
+  const jobOwnerId = jobItem.userId?.S;
+  if (jobOwnerId !== userId) {
+    throw new Error('FORBIDDEN');
+  }
+  const jobStatus = jobItem.status?.S;
+  const s3OutputKey = jobItem.s3OutputKey?.S;
+  if (jobStatus !== 'completed' || !s3OutputKey) {
+    throw new Error('ANALYSIS_NOT_FOUND');
+  }
+
+  // Validate count parameter is strictly supported
+  if (count !== undefined && ![5, 10, 20].includes(count)) {
+    throw new Error('INVALID_COUNT');
+  }
+
+  // 2. Cache check
+  const quizKey = `results/${jobId}/quiz-${requestedCount}.json`;
+  const cached = await readCachedQuiz(quizKey, requestedCount);
+  if (cached) {
+    console.log(`✅ [quiz-post] Cache hit for jobId=${jobId}, count=${requestedCount}. Setting completed in DB.`);
+    await updateQuizStatus(jobId, requestedCount, 'COMPLETED');
+    return {
+      status: 'COMPLETED',
+      questions: cached.questions
+    };
+  }
+
+  // 3. Acquire lock
+  const locked = await acquireLock(jobId, requestedCount);
+  if (locked) {
+    console.log(`🔒 [quiz-post] Lock acquired. Invoking async generator for jobId=${jobId}, count=${requestedCount}...`);
+    try {
+      await lambdaClient.send(
+        new InvokeCommand({
+          FunctionName: process.env.AWS_LAMBDA_FUNCTION_NAME || 'vietai-orchestrator',
+          InvocationType: 'Event',
+          Payload: Buffer.from(
+            JSON.stringify({
+              asyncRun: true,
+              tool: 'quiz',
+              jobId,
+              userId,
+              count: requestedCount,
+              invocationDepth: 1
+            })
+          )
+        })
+      );
+    } catch (invokeErr: any) {
+      console.error(`❌ [quiz-post] Failed to invoke lambda:`, invokeErr);
+      // Release lock on invocation failure so user doesn't wait 5 mins
+      await updateQuizStatus(jobId, requestedCount, 'FAILED');
+      throw invokeErr;
+    }
+  }
+
+  return { status: 'GENERATING' };
+}
+
+export async function handleQuizGet(input: { jobId: string; userId: string; count?: number }): Promise<any> {
+  const { jobId, userId, count } = input;
+  const requestedCount = count && [5, 10, 20].includes(count) ? count : 10;
+
+  // Validate count parameter is strictly supported
+  if (count !== undefined && ![5, 10, 20].includes(count)) {
+    throw new Error('INVALID_COUNT');
+  }
+
+  // 1. Ownership checks
+  const jobItem = await getJobItem(jobId);
+  if (!jobItem) {
+    throw new Error('JOB_NOT_FOUND');
+  }
+  const jobOwnerId = jobItem.userId?.S;
+  if (jobOwnerId !== userId) {
+    throw new Error('FORBIDDEN');
+  }
+
+  // 2. Read status from DynamoDB
+  const status = jobItem[`quizStatus_${requestedCount}`]?.S || 'IDLE';
+
+  if (status === 'COMPLETED') {
+    // Read cached quiz from S3
+    const quizKey = `results/${jobId}/quiz-${requestedCount}.json`;
+    const cached = await readCachedQuiz(quizKey, requestedCount);
+    if (cached) {
+      return {
+        status: 'COMPLETED',
+        questions: cached.questions
+      };
+    } else {
+      console.warn(`⚠️ [quiz-get] Status is COMPLETED but cache file is missing on S3. Falling back to IDLE.`);
+      await updateQuizStatus(jobId, requestedCount, 'IDLE');
+      return { status: 'IDLE' };
+    }
+  }
+
+  return { status };
+}
+
+export async function handleAsyncQuizJob(event: { jobId: string; userId: string; count: number; invocationDepth: number }): Promise<void> {
+  const { jobId, userId, count, invocationDepth } = event;
+  console.log(`🤖 [quiz-async] Background worker started for jobId=${jobId}, count=${count}, depth=${invocationDepth}`);
+
+  if (invocationDepth && invocationDepth > 1) {
+    console.error(`❌ [quiz-async] Circuit breaker: Recursive call detected! depth=${invocationDepth}. Aborting.`);
+    return;
+  }
+
+  try {
+    // Call the core generator handler (it loads analysis, calls Gemini, validates, fallbacks, and writes to S3)
+    await handleQuizJob({ jobId, userId, count });
+    
+    // Set status to COMPLETED
+    await updateQuizStatus(jobId, count, 'COMPLETED');
+    console.log(`✅ [quiz-async] Generation successful for jobId=${jobId}, count=${count}. Status COMPLETED.`);
+  } catch (err: any) {
+    console.error(`❌ [quiz-async] Error during generation for jobId=${jobId}, count=${count}:`, err?.message || err);
+    // Always update status to FAILED on error
+    await updateQuizStatus(jobId, count, 'FAILED');
+  }
+}
+
+async function acquireLock(jobId: string, count: number): Promise<boolean> {
+  const lockTimeoutMs = 5 * 60 * 1000; // 5 minutes lock
+  const now = Date.now();
+  const expiredTime = now - lockTimeoutMs;
+
+  try {
+    await dynamodbClient.send(
+      new UpdateItemCommand({
+        TableName: JOBS_TABLE,
+        Key: { jobId: { S: jobId } },
+        ExpressionAttributeNames: {
+          '#quizStatus': `quizStatus_${count}`,
+          '#quizUpdatedAt': `quizUpdatedAt_${count}`
+        },
+        UpdateExpression: 'SET #quizStatus = :generating, #quizUpdatedAt = :now',
+        ConditionExpression: `attribute_not_exists(#quizStatus) OR #quizStatus = :idle OR #quizStatus = :failed OR #quizUpdatedAt < :expiredTime`,
+        ExpressionAttributeValues: {
+          ':generating': { S: 'GENERATING' },
+          ':now': { N: now.toString() },
+          ':idle': { S: 'IDLE' },
+          ':failed': { S: 'FAILED' },
+          ':expiredTime': { N: expiredTime.toString() }
+        }
+      })
+    );
+    return true;
+  } catch (err: any) {
+    if (err.name === 'ConditionalCheckFailedException') {
+      console.log(`🔒 [quiz-post] Lock acquisition failed for jobId=${jobId}, count=${count}. Another request is generating.`);
+      return false;
+    }
+    console.error(`❌ [quiz-post] DynamoDB Lock acquisition failed for jobId=${jobId}:`, err);
+    throw err;
+  }
+}
+
+async function updateQuizStatus(jobId: string, count: number, status: 'IDLE' | 'GENERATING' | 'FAILED' | 'COMPLETED'): Promise<void> {
+  const now = Date.now();
+  try {
+    await dynamodbClient.send(
+      new UpdateItemCommand({
+        TableName: JOBS_TABLE,
+        Key: { jobId: { S: jobId } },
+        ExpressionAttributeNames: {
+          '#quizStatus': `quizStatus_${count}`,
+          '#quizUpdatedAt': `quizUpdatedAt_${count}`
+        },
+        UpdateExpression: 'SET #quizStatus = :status, #quizUpdatedAt = :now',
+        ExpressionAttributeValues: {
+          ':status': { S: status },
+          ':now': { N: now.toString() }
+        }
+      })
+    );
+  } catch (err: any) {
+    console.error(`❌ [quiz-post] Failed to update quizStatus_${count} to ${status} for jobId=${jobId}:`, err);
+  }
 }

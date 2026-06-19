@@ -25,7 +25,9 @@ import { extractTextFromS3 } from './utils/text-extraction';
 import { supervisorHandler } from './supervisor';
 import { verifyToken } from './utils/auth-helpers';
 import { handleChatJob } from './handlers/chat';
-import { handleQuizJob } from './handlers/quiz';
+import { handleQuizPost, handleQuizGet } from './handlers/quiz';
+import { handleFlashcardPost, handleFlashcardGet } from './handlers/flashcard';
+import { handleMindmapPost, handleMindmapGet } from './handlers/mindmap';
 
 const STATE_MACHINE_ARN = process.env.STATE_MACHINE_ARN || '';
 const sfnClient = new SFNClient({ region: process.env.AWS_REGION || 'ap-southeast-1' });
@@ -37,6 +39,22 @@ export const handler = async (event: any) => {
     console.log('📨 Event received:', JSON.stringify(event, null, 2));
 
     try {
+        // Async Quiz/Flashcard background worker self-invocation
+        if (event.asyncRun) {
+            const tool = event.tool;
+            if (tool === 'flashcard') {
+                const { handleAsyncFlashcardJob } = require('./handlers/flashcard');
+                return await handleAsyncFlashcardJob(event);
+            } else if (tool === 'mindmap') {
+                const { handleAsyncMindmapJob } = require('./handlers/mindmap');
+                return await handleAsyncMindmapJob(event);
+            } else {
+                // Default to quiz for backward compatibility (where tool is undefined or 'quiz')
+                const { handleAsyncQuizJob } = require('./handlers/quiz');
+                return await handleAsyncQuizJob(event);
+            }
+        }
+
         // S3 trigger
         if (event.Records && event.Records[0]?.s3) {
             return await handleS3Upload(event);
@@ -100,7 +118,7 @@ export const handler = async (event: any) => {
             }
         }
 
-        if (httpMethod === 'POST' && path?.startsWith('/job/') && path?.endsWith('/quiz')) {
+        if (path?.startsWith('/job/') && path?.endsWith('/quiz')) {
             const userId = event.requestContext?.authorizer?.userId;
             if (!userId) {
                 return respond(401, { error: 'Unauthorized' });
@@ -109,9 +127,18 @@ export const handler = async (event: any) => {
             const jobId = parts[2];
             const countParam = event.queryStringParameters?.count;
             const count = countParam ? parseInt(countParam, 10) : undefined;
+
             try {
-                const result = await handleQuizJob({ jobId, userId, count });
-                return respond(200, result);
+                if (httpMethod === 'POST') {
+                    const result = await handleQuizPost({ jobId, userId, count });
+                    const statusCode = result.status === 'COMPLETED' ? 200 : 202;
+                    return respond(statusCode, result);
+                } else if (httpMethod === 'GET') {
+                    const result = await handleQuizGet({ jobId, userId, count });
+                    return respond(200, result);
+                } else {
+                    return respond(405, { error: 'Method not allowed' });
+                }
             } catch (err: any) {
                 if (err.message === 'JOB_NOT_FOUND') {
                     return respond(404, { error: 'Job not found' });
@@ -122,7 +149,83 @@ export const handler = async (event: any) => {
                 if (err.message === 'ANALYSIS_NOT_FOUND') {
                     return respond(409, { error: 'Bản dịch song ngữ chưa hoàn thành để tạo trắc nghiệm.' });
                 }
-                console.error('❌ Quiz handler error:', err);
+                if (err.message === 'INVALID_COUNT') {
+                    return respond(400, { error: 'Tham số count không hợp lệ. Chỉ hỗ trợ 5, 10, hoặc 20 câu hỏi.' });
+                }
+                console.error('❌ Quiz routing error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
+        if (path?.startsWith('/job/') && path?.endsWith('/flashcard')) {
+            const userId = event.requestContext?.authorizer?.userId;
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const parts = path.split('/');
+            const jobId = parts[2];
+            const countParam = event.queryStringParameters?.count;
+            const count = countParam ? parseInt(countParam, 10) : undefined;
+
+            try {
+                if (httpMethod === 'POST') {
+                    const result = await handleFlashcardPost({ jobId, userId, count });
+                    const statusCode = result.status === 'COMPLETED' ? 200 : 202;
+                    return respond(statusCode, result);
+                } else if (httpMethod === 'GET') {
+                    const result = await handleFlashcardGet({ jobId, userId, count });
+                    return respond(200, result);
+                } else {
+                    return respond(405, { error: 'Method not allowed' });
+                }
+            } catch (err: any) {
+                if (err.message === 'JOB_NOT_FOUND') {
+                    return respond(404, { error: 'Job not found' });
+                }
+                if (err.message === 'FORBIDDEN') {
+                    return respond(403, { error: 'Forbidden' });
+                }
+                if (err.message === 'ANALYSIS_NOT_FOUND') {
+                    return respond(409, { error: 'Bản dịch song ngữ chưa hoàn thành để tạo thẻ ghi nhớ.' });
+                }
+                if (err.message === 'INVALID_COUNT') {
+                    return respond(400, { error: 'Tham số count không hợp lệ. Chỉ hỗ trợ 5, 10, hoặc 20 thẻ ghi nhớ.' });
+                }
+                console.error('❌ Flashcard routing error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
+        if (path?.startsWith('/job/') && path?.endsWith('/mindmap')) {
+            const userId = event.requestContext?.authorizer?.userId;
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const parts = path.split('/');
+            const jobId = parts[2];
+
+            try {
+                if (httpMethod === 'POST') {
+                    const result = await handleMindmapPost({ jobId, userId });
+                    const statusCode = result.status === 'COMPLETED' ? 200 : 202;
+                    return respond(statusCode, result);
+                } else if (httpMethod === 'GET') {
+                    const result = await handleMindmapGet({ jobId, userId });
+                    return respond(200, result);
+                } else {
+                    return respond(405, { error: 'Method not allowed' });
+                }
+            } catch (err: any) {
+                if (err.message === 'JOB_NOT_FOUND') {
+                    return respond(404, { error: 'Job not found' });
+                }
+                if (err.message === 'FORBIDDEN') {
+                    return respond(403, { error: 'Forbidden' });
+                }
+                if (err.message === 'ANALYSIS_NOT_FOUND') {
+                    return respond(409, { error: 'Bản dịch song ngữ chưa hoàn thành để vẽ sơ đồ tư duy.' });
+                }
+                console.error('❌ Mindmap routing error:', err);
                 return respond(500, { error: err.message || 'Internal server error' });
             }
         }
