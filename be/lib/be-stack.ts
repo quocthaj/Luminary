@@ -647,6 +647,53 @@ export class VietAIScholarStack extends cdk.Stack {
     );
 
     // ============================================
+    // API Endpoint 5: POST /synthesis
+    // Returns: { report } — Cross-Paper Synthesis Report
+    // ============================================
+    const synthesisResource = api.root.addResource('synthesis');
+    synthesisResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+
+    // ============================================
+    // API Endpoint 5.1: POST /synthesis/chat
+    // Returns: { answer } — Cross-Paper RAG Chat
+    // ============================================
+    const synthesisChatResource = synthesisResource.addResource('chat');
+    synthesisChatResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+
+    // ============================================
+    // API Endpoint 5.2: POST & GET /explore
+    // Returns: { status } — Explore Mode Topic-Based Generation
+    // ============================================
+    const exploreResource = api.root.addResource('explore');
+    exploreResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+    const exploreJobIdResource = exploreResource.addResource('{jobId}');
+    exploreJobIdResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+
+    // ============================================
     // OUTPUTS
     // ============================================
     new cdk.CfnOutput(this, 'UploadsBucketOutput', {

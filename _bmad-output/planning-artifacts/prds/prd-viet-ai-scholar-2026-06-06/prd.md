@@ -117,6 +117,11 @@ Bằng cách kết hợp sức mạnh của hệ thống dịch thuật đa tác
     - Nếu xảy ra lỗi mạng trong quá trình upload (mất kết nối đột ngột), hệ thống hiển thị thông báo lỗi: *"Kết nối mạng bị gián đoạn. Vui lòng thử lại"* kèm nút "Thử lại" để upload lại file hiện tại mà không cần reload trang.
     - Thời gian timeout tối đa cho yêu cầu upload presigned URL là 5 phút. Nếu vượt quá, client hủy upload và báo lỗi timeout.
 
+### 4.5 Advanced Learning Tools & Sharing (Công cụ học tập & Chia sẻ)
+**Description:** Hỗ trợ tính năng cộng tác, chia sẻ tài nguyên ôn tập học thuật.
+
+**Functional Requirements:**
+- **FR-19 (Quiz Sharing):** Cho phép người dùng tạo liên kết chia sẻ công khai cho một bài trắc nghiệm (Quiz). Người nhận liên kết có thể làm bài trắc nghiệm trực tiếp mà không cần đăng nhập hay truy cập vào tài liệu gốc.
 
 ---
 

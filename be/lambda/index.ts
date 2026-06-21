@@ -48,6 +48,12 @@ export const handler = async (event: any) => {
             } else if (tool === 'mindmap') {
                 const { handleAsyncMindmapJob } = require('./handlers/mindmap');
                 return await handleAsyncMindmapJob(event);
+            } else if (tool === 'synthesis') {
+                const { handleAsyncSynthesisJob } = require('./handlers/synthesis');
+                return await handleAsyncSynthesisJob(event);
+            } else if (tool === 'explore') {
+                const { handleAsyncExploreJob } = require('./handlers/explore');
+                return await handleAsyncExploreJob(event);
             } else {
                 // Default to quiz for backward compatibility (where tool is undefined or 'quiz')
                 const { handleAsyncQuizJob } = require('./handlers/quiz');
@@ -240,6 +246,86 @@ export const handler = async (event: any) => {
             const authHeader = event.headers?.Authorization || event.headers?.authorization;
             const userId = await verifyToken(authHeader);
             return await handleGetResultUrl({ jobId, userId });
+        }
+
+        if (httpMethod === 'POST' && path === '/synthesis') {
+            const userId = event.requestContext?.authorizer?.userId;
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const { handleSynthesisPost } = require('./handlers/synthesis');
+            try {
+                const result = await handleSynthesisPost({ userId, jobIds: requestBody.jobIds });
+                return respond(200, result);
+            } catch (err: any) {
+                if (err.message === 'FORBIDDEN') {
+                    return respond(403, { error: 'Forbidden' });
+                }
+                if (err.message === 'INVALID_INPUT') {
+                    return respond(400, { error: 'Vui lòng cung cấp danh sách từ 2 đến 10 tài liệu hợp lệ.' });
+                }
+                console.error('❌ Synthesis routing error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
+        if (httpMethod === 'POST' && path === '/synthesis/chat') {
+            const userId = event.requestContext?.authorizer?.userId;
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const { handleSynthesisChat } = require('./handlers/synthesis');
+            try {
+                const result = await handleSynthesisChat({ userId, jobIds: requestBody.jobIds, message: requestBody.message });
+                return respond(200, result);
+            } catch (err: any) {
+                if (err.message === 'FORBIDDEN') {
+                    return respond(403, { error: 'Forbidden' });
+                }
+                if (err.message === 'INVALID_INPUT') {
+                    return respond(400, { error: 'Vui lòng cung cấp danh sách tài liệu và câu hỏi hợp lệ.' });
+                }
+                console.error('❌ Synthesis chat routing error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
+        if (httpMethod === 'POST' && path === '/explore') {
+            const userId = event.requestContext?.authorizer?.userId;
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const { handleExplorePost } = require('./handlers/explore');
+            try {
+                const result = await handleExplorePost({ userId, topic: requestBody.topic });
+                return respond(202, result);
+            } catch (err: any) {
+                console.error('❌ Explore POST error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
+        if (httpMethod === 'GET' && path?.startsWith('/explore/')) {
+            const userId = event.requestContext?.authorizer?.userId;
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const parts = path.split('/');
+            const jobId = parts[2];
+            const { handleExploreGet } = require('./handlers/explore');
+            try {
+                const result = await handleExploreGet({ jobId, userId });
+                return respond(200, result);
+            } catch (err: any) {
+                if (err.message === 'JOB_NOT_FOUND') {
+                    return respond(404, { error: 'Job not found' });
+                }
+                if (err.message === 'FORBIDDEN') {
+                    return respond(403, { error: 'Forbidden' });
+                }
+                console.error('❌ Explore GET error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
         }
 
         return respond(404, { error: 'Not found' });

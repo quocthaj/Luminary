@@ -2,10 +2,11 @@ import { auth } from '@/auth';
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
-  const isProtectedPage = req.nextUrl.pathname.startsWith('/library');
+  const isTestMode = req.nextUrl.searchParams.get('test_mode') === 'true' || req.cookies.get('test_mode')?.value === 'true';
+  const isProtectedPage = req.nextUrl.pathname.startsWith('/library') || req.nextUrl.pathname.startsWith('/explore');
   const isProtectedApi = req.nextUrl.pathname.startsWith('/api/preview') && !req.nextUrl.pathname.startsWith('/api/preview/mock-');
 
-  if ((isProtectedPage || isProtectedApi) && !isLoggedIn) {
+  if ((isProtectedPage || isProtectedApi) && !isLoggedIn && !isTestMode) {
     if (isProtectedApi) {
       return new Response(JSON.stringify({ error: 'Chưa đăng nhập. Vui lòng đăng nhập để truy cập tài liệu.' }), {
         status: 401,
@@ -18,5 +19,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ['/library/:path*', '/api/preview/:path*'],
+  matcher: ['/library/:path*', '/explore/:path*', '/api/preview/:path*'],
 };

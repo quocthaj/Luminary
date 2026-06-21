@@ -1,5 +1,5 @@
 # generated: 2026-06-07T11:05:00Z
-# last_updated: 2026-06-17T21:12:51+07:00
+# last_updated: 2026-06-20T14:40:00+07:00
 # project: viet-ai-scholar
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-07T11:05:00Z
-last_updated: 2026-06-17T21:12:51+07:00
+last_updated: 2026-06-21T13:40:00+07:00
 project: viet-ai-scholar
 project_key: NOKEY
 tracking_system: file-system
@@ -72,7 +72,10 @@ development_status:
   4-3-tu-dong-ve-so-do-tu-duy-bang-mermaid-js-mermaid-mindmap-generator-interactive-svg-viewer: done
   epic-4-retrospective: optional
 
-  epic-5: backlog
-  5-1-doi-chieu-tong-hop-cheo-nhieu-pdf-cross-paper-multi-pdf-synthesis-chat: backlog
-  5-2-che-do-kham-pha-ai-agent-tu-sinh-noi-dung-hoc-thuat-theo-chu-de-explore-mode-topic-based-generation: backlog
+  epic-5: in-progress
+  5-1-doi-chieu-tong-hop-cheo-nhieu-tai-lieu-cross-paper-multi-pdf-synthesis-chat: done
+  5-2-che-do-kham-pha-ai-agent-tu-sinh-noi-dung-hoc-thuat-theo-chu-de-explore-mode-topic-based-generation: done
+  5-3-scholar-search-agent-tim-kiem-bai-bao-lien-quan-scholar-search-agent-related-papers-web-search: backlog
+  5-4-doi-thoai-audio-2-nguoi-tts-podcast-tong-hop-2-person-audio-overview-tts-podcast: backlog
+  5-5-chia-se-va-lam-bai-trac-nghiem-lien-ket-cong-khai-quiz-sharing-public-quiz-player: backlog
   epic-5-retrospective: optional

@@ -11,3 +11,6 @@ This file tracks technical debt and deferred items from code reviews.
 
 ## Deferred from: code review of 3-3-api-rag-chat-an-toan-secure-rag-chat-api-namespace-filter.md (2026-06-11)
 - Hardcoded AWS Secrets Manager ARN in CDK stack [be/lib/be-stack.ts:217] — deferred, pre-existing (ARN is hardcoded, restricting deployment to account 042360978148)
+
+## Deferred from: user report of 5-2-explore-mode (2026-06-21)
+- Lỗi 404 trang Thư viện cá nhân (/library hoặc /libary) — Trì hoãn để fix sau theo yêu cầu của user.

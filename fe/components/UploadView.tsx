@@ -209,6 +209,13 @@ export function UploadView({ onJobCreated }: { onJobCreated: (jobId: string) => 
         {status === 'authenticated' ? (
           <div className="flex items-center gap-3 bg-[var(--bg-surface)] border border-[var(--border-normal)] px-4 py-2 rounded-full shadow-sm">
             <a
+              href="/explore"
+              className="text-xs text-[var(--accent)] hover:underline font-bold mr-1 transition-all"
+            >
+              Khám phá
+            </a>
+            <div aria-hidden className="w-[1px] h-4 bg-[var(--border-normal)] mr-0.5" />
+            <a
               href="/library"
               className="text-xs text-[var(--accent)] hover:underline font-bold mr-1 transition-all"
             >

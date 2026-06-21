@@ -467,3 +467,35 @@ Sau khi `MergeAgent` hoàn thành việc kết xuất file dịch song ngữ Mar
 - Cài đặt thư viện: `npm install next-auth@beta katex` ở thư mục `fe`.
 - Tạo file cấu hình `fe/auth.ts` và script đồng bộ `fe/scripts/sync-types.js`.
 
+
+## Quiz Sharing Architecture (Epic 5 Extension)
+
+### 1. Database Schema Additions
+- **DynamoDB `vietai-jobs` modifications:**
+  - Attribute `quizShares` (Map) to store sharing status and token mappings:
+    ```typescript
+    quizShares?: {
+      [quizId: string]: {
+        shared: boolean;
+        shareId: string;
+        createdAt: number;
+      }
+    }
+    ```
+- **Global Secondary Index (GSI) configuration:**
+  - Index Name: `shareIdIndex`
+  - Partition Key: `quizShareId` (String) - populated with `shareId` on active shares.
+  - Sort Key: None.
+  - Projection: `INCLUDE` (`jobId`, `userId`, `status`).
+
+### 2. Public API Route Configuration
+- **API route:** `/share/quiz/{shareId}` (GET)
+- **Authorization:** Unauthenticated (bypass JWT Lambda Authorizer).
+- **Backend Flow:**
+  1. The API Gateway forwards the request to `share-quiz` handler.
+  2. The Lambda queries `vietai-jobs` using the GSI `shareIdIndex` with `shareId`.
+  3. If no record is found or the GSI partition key doesn't match, return `404 Not Found`.
+  4. Verify the nested `quizShares` map for that specific `shareId` has `shared: true`. If not, return `403 Forbidden`.
+  5. Fetch `quiz-{count}.json` (derived from the quiz ID format like `quiz-10` or `quiz-20`) from S3 using the associated `jobId` and stream the content back to the client.
+
+

@@ -10,10 +10,17 @@ export default function LibraryPage() {
   const router = useRouter();
 
   const [jobs, setJobs] = useState<JobStatus[]>([]);
+  const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [timeFilter, setTimeFilter] = useState<'all' | 'today' | '7days' | '30days'>('all');
   const [downloadingJobId, setDownloadingJobId] = useState<string | null>(null);
+
+  const handleToggleSelect = (jobId: string) => {
+    setSelectedJobIds((prev) =>
+      prev.includes(jobId) ? prev.filter((id) => id !== jobId) : [...prev, jobId]
+    );
+  };
 
   // 1. Session check & redirect
   useEffect(() => {
@@ -255,122 +262,168 @@ export default function LibraryPage() {
               className="inline-block mt-4 text-xs font-bold px-4 py-2 rounded-lg"
               style={{ background: 'var(--accent)', color: '#080b12' }}
             >
-              Dịch tài liệu đầu tiên
+              Bắt đầu dịch ngay
             </a>
           </div>
         ) : (
           /* Documents list */
           <div className="flex flex-col gap-4">
             {filteredJobs.map((job) => {
-              const isProcessing = ['pending', 'extracting', 'processing', 'agents_completed', 'queued'].includes(job.status);
-              const isCompleted = job.status === 'completed';
-              const isFailed = job.status === 'failed';
+              const isExplore = job.jobId?.startsWith('exp-');
+              const isProcessing = ['pending', 'extracting', 'processing', 'agents_completed', 'queued', 'GENERATING'].includes(job.status);
+              const isCompleted = job.status === 'completed' || job.status === 'COMPLETED';
+              const isFailed = job.status === 'failed' || job.status === 'FAILED';
+              const isSelected = selectedJobIds.includes(job.jobId);
 
               return (
                 <div
                   key={job.jobId}
-                  className="p-5 rounded-2xl border border-[var(--border-normal)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] transition-all duration-200 flex flex-col gap-3 group"
+                  onClick={() => isCompleted && !isExplore && handleToggleSelect(job.jobId)}
+                  className={`p-5 rounded-2xl border transition-all duration-200 flex items-start gap-4 group ${
+                    isCompleted && !isExplore ? 'cursor-pointer' : ''
+                  } ${
+                    isSelected
+                      ? 'border-[var(--accent)] bg-[var(--accent-dim)]'
+                      : 'border-[var(--border-normal)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)]'
+                  }`}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-[var(--text-primary)] truncate" title={job.fileName}>
-                        {job.fileName || 'Tài liệu không tên.pdf'}
-                      </p>
-                      <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                        Đăng lúc: {formatTime(job.createdAt)}
-                      </p>
-                    </div>
-
-                    {/* Status badges */}
-                    <div className="self-start">
-                      {isProcessing && (
-                        <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-amber-500/20 bg-amber-500/5 text-amber-500">
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              width: 6,
-                              height: 6,
-                              borderRadius: '50%',
-                              background: 'var(--warning)',
-                              animation: 'pulse-dot 1.2s infinite ease-in-out',
-                            }}
-                          />
-                          Đang dịch...
-                        </span>
-                      )}
-                      {isCompleted && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-green-500/20 bg-green-500/5 text-green-400">
-                          ✓ Hoàn thành
-                        </span>
-                      )}
-                      {isFailed && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-red-500/20 bg-red-500/5 text-red-400">
-                          ✕ Lỗi dịch
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Action buttons */}
-                  <div className="flex items-center gap-3 mt-1 pt-2 border-t border-[var(--border-subtle)]">
-                    {isCompleted && (
-                      <>
-                        <a
-                          href={`/?jobId=${job.jobId}`}
-                          className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent-dim)] transition-colors"
-                        >
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                          Xem kết quả
-                        </a>
-                        <button
-                          onClick={() => handleDownload(job.jobId, job.fileName)}
-                          disabled={downloadingJobId === job.jobId}
-                          className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--border-normal)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer"
-                        >
-                          {downloadingJobId === job.jobId ? (
-                            <>
-                              <span
-                                style={{
-                                  display: 'inline-block',
-                                  width: 10,
-                                  height: 10,
-                                  borderRadius: '50%',
-                                  border: '1.5px solid var(--border-normal)',
-                                  borderTopColor: 'var(--text-primary)',
-                                  animation: 'spin-cw 0.75s linear infinite',
-                                }}
-                              />
-                              Đang tải...
-                            </>
-                          ) : (
-                            <>
-                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                              </svg>
-                              Tải Markdown
-                            </>
-                          )}
-                        </button>
-                      </>
-                    )}
-
-                    {isProcessing && (
-                      <a
-                        href={`/?jobId=${job.jobId}`}
-                        className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--border-normal)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors"
+                  {/* Custom Checkbox */}
+                  {isCompleted && !isExplore && (
+                    <div className="flex-shrink-0 mt-1 select-none">
+                      <div
+                        className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                          isSelected
+                            ? 'bg-[var(--accent)] border-[var(--accent)] text-[#080b12]'
+                            : 'border-[var(--border-normal)] group-hover:border-[var(--text-secondary)]'
+                        }`}
                       >
-                        Theo dõi tiến trình
-                      </a>
-                    )}
+                        {isSelected && (
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-                    {isFailed && (
-                      <span className="text-xs text-[var(--text-secondary)] italic">
-                        {job.error ? `Lỗi: ${job.error}` : 'Xử lý tài liệu thất bại.'}
-                      </span>
-                    )}
+                  <div className="flex-1 min-w-0 flex flex-col gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          {isExplore ? (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-[var(--accent-dim)] text-[var(--accent)] border border-[var(--accent)]/30">
+                              Khám phá
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border-normal)]">
+                              Tài liệu dịch
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-semibold text-sm text-[var(--text-primary)] truncate" title={job.fileName}>
+                          {job.fileName || (isExplore ? 'Khám phá chủ đề' : 'Tài liệu không tên.pdf')}
+                        </p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                          Đăng lúc: {formatTime(job.createdAt)}
+                        </p>
+                      </div>
+
+                      {/* Status badges */}
+                      <div className="self-start">
+                        {isProcessing && (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-amber-500/20 bg-amber-500/5 text-amber-500">
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                width: 6,
+                                height: 6,
+                                borderRadius: '50%',
+                                background: 'var(--warning)',
+                                animation: 'pulse-dot 1.2s infinite ease-in-out',
+                              }}
+                            />
+                            {isExplore ? 'Đang tổng hợp...' : 'Đang dịch...'}
+                          </span>
+                        )}
+                        {isCompleted && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-green-500/20 bg-green-500/5 text-green-400">
+                            ✓ Hoàn thành
+                          </span>
+                        )}
+                        {isFailed && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-red-500/20 bg-red-500/5 text-red-400">
+                            ✕ Lỗi
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-3 mt-1 pt-2 border-t border-[var(--border-subtle)]">
+                      {isCompleted && (
+                        <>
+                          <a
+                            href={isExplore ? `/explore?jobId=${job.jobId}` : `/?jobId=${job.jobId}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent-dim)] transition-colors"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            Xem kết quả
+                          </a>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownload(job.jobId, job.fileName);
+                            }}
+                            disabled={downloadingJobId === job.jobId}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--border-normal)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer"
+                          >
+                            {downloadingJobId === job.jobId ? (
+                              <>
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    width: 10,
+                                    height: 10,
+                                    borderRadius: '50%',
+                                    border: '1.5px solid var(--border-normal)',
+                                    borderTopColor: 'var(--text-primary)',
+                                    animation: 'spin-cw 0.75s linear infinite',
+                                  }}
+                                />
+                                Đang tải...
+                              </>
+                            ) : (
+                              <>
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                Tải Markdown
+                              </>
+                            )}
+                          </button>
+                        </>
+                      )}
+
+                      {isProcessing && (
+                        <a
+                          href={isExplore ? `/explore?jobId=${job.jobId}` : `/?jobId=${job.jobId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--border-normal)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors"
+                        >
+                          Theo dõi tiến trình
+                        </a>
+                      )}
+
+                      {isFailed && (
+                        <span className="text-xs text-[var(--text-secondary)] italic">
+                          {job.error ? `Lỗi: ${job.error}` : (isExplore ? 'Tổng hợp tài liệu thất bại.' : 'Xử lý tài liệu thất bại.')}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -378,6 +431,39 @@ export default function LibraryPage() {
           </div>
         )}
       </div>
+
+      {/* Floating Quick Actions Bar */}
+      {selectedJobIds.length >= 2 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[var(--bg-surface)] border border-[var(--accent)] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 max-w-md w-[90%] justify-between backdrop-blur-md">
+          <div className="flex flex-col">
+            <span className="text-xs font-semibold text-[var(--text-primary)]">
+              Đã chọn {selectedJobIds.length} tài liệu
+            </span>
+            <span className="text-[10px] text-[var(--text-secondary)]">
+              Sẵn sàng tổng hợp chéo thông tin
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedJobIds([])}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-[var(--border-normal)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer"
+            >
+              Hủy
+            </button>
+            <button
+              onClick={() => {
+                router.push(`/synthesis?ids=${selectedJobIds.join(',')}`);
+              }}
+              className="text-xs font-bold px-4 py-1.5 rounded-lg bg-[var(--accent)] text-[#080b12] hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1.5"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              Tổng hợp chéo
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

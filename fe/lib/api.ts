@@ -80,7 +80,10 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
     if (mockProgressIndex < mockStates.length - 1) {
       mockProgressIndex++;
     }
-    return { jobId, status };
+    let fileName = `Tài liệu ${jobId}`;
+    if (jobId === 'mock-job-1') fileName = 'Nghiên cứu về Transformer.pdf';
+    else if (jobId === 'mock-job-2') fileName = 'Ứng dụng của CNN trong Y tế.pdf';
+    return { jobId, status, fileName };
   }
   const headers = await getApiHeaders();
   const res = await fetch(`${API_BASE}/job/${jobId}`, { headers });
@@ -296,5 +299,99 @@ export async function checkMindmapStatus(jobId: string): Promise<MindmapResponse
   }
   return res.json();
 }
+
+export interface SynthesisReportResponse {
+  report: string;
+}
+
+export interface SynthesisChatResponse {
+  answer: string;
+}
+
+export async function generateSynthesisReport(jobIds: string[]): Promise<SynthesisReportResponse> {
+  const maxRetries = 60; // 60 retries * 2s = 120 seconds max timeout (2 minutes)
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const res = await fetch('/api/synthesis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobIds }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(err.error || `Synthesis failed: ${res.status}`, res.status);
+    }
+    const data = await res.json();
+    
+    // Support both immediate report format (mock data) and polling format
+    if (data.report && !data.status) {
+      return { report: data.report };
+    }
+    
+    if (data.status === 'COMPLETED') {
+      return { report: data.report || '' };
+    }
+    
+    if (data.status === 'FAILED') {
+      throw new ApiError(data.error || 'Quá trình tổng hợp báo cáo đối chiếu thất bại (Background synthesis failed).', 500);
+    }
+    
+    // Otherwise it is GENERATING, wait 2 seconds and poll again
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  
+  throw new ApiError('Quá trình tổng hợp báo cáo đối chiếu đang mất quá nhiều thời gian để xử lý. Vui lòng tải lại trang để kiểm tra kết quả.', 504);
+}
+
+export async function sendSynthesisChatMessage(jobIds: string[], message: string): Promise<SynthesisChatResponse> {
+  const res = await fetch('/api/synthesis/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jobIds, message }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(err.error || `Synthesis chat failed: ${res.status}`, res.status);
+  }
+  return res.json();
+}
+
+export interface ExploreResponse {
+  status: 'GENERATING' | 'FAILED' | 'COMPLETED';
+  jobId?: string;
+  originalName?: string;
+  s3OutputKey?: string;
+  error?: string;
+}
+
+export async function createExploreJob(topic: string): Promise<ExploreResponse> {
+  const res = await fetch('/api/explore', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ topic }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const status = res.status;
+    if (status === 401) throw new ApiError('Bạn cần đăng nhập để sử dụng Chế độ Khám phá.', 401);
+    throw new ApiError(err.error || `Yêu cầu chế độ khám phá thất bại: ${status}`, status);
+  }
+  return res.json();
+}
+
+export async function getExploreJobStatus(jobId: string): Promise<ExploreResponse> {
+  const res = await fetch(`/api/explore/${jobId}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const status = res.status;
+    if (status === 401) throw new ApiError('Bạn cần đăng nhập để kiểm tra trạng thái Chế độ Khám phá.', 401);
+    throw new ApiError(err.error || `Kiểm tra trạng thái thất bại: ${status}`, status);
+  }
+  return res.json();
+}
+
+
 
 
