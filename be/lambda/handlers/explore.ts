@@ -226,9 +226,10 @@ Yêu cầu định dạng bài viết:
         content = geminiResult;
         console.log(`✅ [explore-async] Gemini fallback passed validation.`);
       } else {
-        console.warn(`⚠️ [explore-async] Gemini fallback also failed validation, but saving it to S3 anyway for diagnosis.`);
-        content = geminiResult;
-        throw new Error("Gemini fallback output also failed validation.");
+        throw new Error(
+          "EXPLORE_VALIDATION_FAILED: Both Groq and Gemini outputs " +
+          "failed content validation (truncated or missing LaTeX/Mermaid)."
+        );
       }
     } catch (geminiErr: any) {
       console.error(`❌ [explore-async] Both Groq and Gemini failed validation. Setting job FAILED.`);
@@ -248,7 +249,7 @@ Yêu cầu định dạng bài viết:
         ContentType: 'text/markdown; charset=utf-8',
         Metadata: {
           jobId,
-          topic,
+          topic: encodeURIComponent(topic),
           processedAt: new Date().toISOString()
         }
       })

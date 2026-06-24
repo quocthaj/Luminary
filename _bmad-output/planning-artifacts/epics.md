@@ -371,7 +371,9 @@ So that tôi tìm ra điểm tương đồng và khác biệt giữa các công 
 **Acceptance Criteria:**
 - **Given** Người dùng đang ở trang Thư viện cá nhân (`/library`),
 - **When** Người dùng tích chọn từ 2 đến 10 bài báo và bấm nút "Tổng hợp liên bài viết" (Synthesize Papers),
-- **Then** Hệ thống gửi yêu cầu lên Backend. Backend truy xuất các bản tóm tắt thông tin (Executive Summaries) của các bài báo đã chọn, sử dụng Gemini 1.5 Pro để sinh ra một báo cáo tổng hợp (Synthesis Report) so sánh phương pháp nghiên cứu, kết quả và hạn chế của từng bài dưới dạng bảng đối chiếu song ngữ.
+- **Then** Giao diện chính của Synthesis Mode mở ra với khung hiển thị trung tâm mở rộng (`max-w-6xl` hoặc tương đương) để hiển thị bảng so sánh đối chiếu song ngữ dễ nhìn, không bị gò bó.
+- **And** Hai bên panel (Tập tài liệu bên trái và AI Tutor Chat bên phải) hoạt động dưới dạng panel thu phóng linh hoạt, có các nút Toggle Header độc lập ("Tài liệu", "Chat AI") và nút "Tập trung" (Focus Mode) để ẩn/hiện đồng thời cả 2 panel mượt mà (`w-0` khi ẩn).
+- **And** Hệ thống gửi yêu cầu lên Backend. Backend truy xuất các bản tóm tắt thông tin (Executive Summaries) của các bài báo đã chọn, sử dụng Gemini 1.5 Pro để sinh ra một báo cáo tổng hợp (Synthesis Report) so sánh phương pháp nghiên cứu, kết quả và hạn chế của từng bài dưới dạng bảng đối chiếu song ngữ.
 - **And** Workspace mở ra một giao diện chat đặc biệt, cho phép truy vấn RAG đồng thời trên phạm vi của tất cả các `jobId` đã chọn (sử dụng filter `jobId` dạng list `in` trên Qdrant Cloud), hiển thị rõ câu trả lời kèm theo trích dẫn nguồn lấy từ bài viết nào (ví dụ: `[Tên bài báo - Đoạn X]`).
 
 ### Story 5.2: Chế độ Khám phá - AI Agent Tự sinh nội dung học thuật theo chủ đề (Explore Mode Topic-Based Generation)
@@ -383,7 +385,9 @@ So that tôi có thể bắt đầu nghiên cứu một chủ đề mới mà kh
 - **Given** Người dùng chuyển sang tab "Khám phá" (Explore Mode) từ thanh điều hướng,
 - **When** Người dùng chọn một chủ đề (Ví dụ: "Học sâu trong Y khoa", "Hình học phi Euclid"...) hoặc nhập từ khóa chủ đề tự do,
 - **Then** AI Agent chuyên trách sẽ tự động tìm kiếm thông tin khoa học uy tín, biên soạn thành một bài viết cấu trúc phân cấp rõ ràng (gồm lý thuyết, công thức toán LaTeX, ví dụ thực tế và các sơ đồ minh họa bằng Mermaid).
-- **And** Hiển thị bài viết đẹp mắt trên giao diện đọc tương tác, tự động lưu bài viết này vào mục "Bài viết khám phá" trong Thư viện cá nhân của người dùng để đọc lại sau này (tạo record trong DynamoDB và lưu file Markdown vào S3).
+- **And** Hệ thống prompt của AI bắt buộc yêu cầu sinh ra **sơ đồ trực quan chi tiết (tối thiểu 8 - 12 nodes)** mô tả quy trình kỹ thuật, sử dụng các hình khối đa dạng (hình hộp, hình thoi, hình trụ...) và áp dụng các thuộc tính style (ví dụ: tô màu nổi bật cho các node chính như `style Node fill:#1e293b,stroke:#38bdf8`) để tăng tính thẩm mỹ.
+- **And** Trình render Mermaid ở frontend phải tự động sửa lỗi cú pháp nhãn chứa ký tự đặc biệt, giải mã an toàn các ký tự mã hóa URL và hiển thị sơ đồ đẹp mắt trên giao diện đọc tương tác.
+- **And** Tự động lưu bài viết này vào mục "Bài viết khám phá" trong Thư viện cá nhân của người dùng để đọc lại sau này (tạo record trong DynamoDB và lưu file Markdown vào S3).
 
 ### Story 5.3: Scholar Search Agent - Tìm kiếm nâng cao bài viết liên quan (Scholar Search Agent & Related Papers Web Search)
 As a nhà nghiên cứu khoa học muốn mở rộng tài liệu tham khảo,

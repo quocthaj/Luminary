@@ -33,7 +33,7 @@ async function setupMockSession(page: any) {
     },
   ]);
 
-  await page.route('**/api/auth/session', async (route) => {
+  await page.route('**/api/auth/session', async (route: any) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

@@ -75,21 +75,25 @@ test.describe('Multi-Document Synthesis Workspace - E2E (Story 5.1)', () => {
     // Wait for the page title and elements to render
     await expect(page.locator('h1')).toContainText('Đối chiếu & Tổng hợp liên bài viết');
 
-    // 1. Verify Left Sidebar displays document titles and details
+    // 1. Click button to show Left Sidebar first (since it defaults to collapsed in Focus Mode)
+    const toggleLeftBtn = page.locator('button[title="Hiện danh sách tài liệu"]');
+    await expect(toggleLeftBtn).toBeVisible();
+    await toggleLeftBtn.click();
+
+    // Verify Left Sidebar displays document titles and details
     const leftSidebar = page.locator('aside').first();
     await expect(leftSidebar).toContainText('DANH SÁCH TÀI LIỆU (2)');
     await expect(leftSidebar).toContainText('Nghiên cứu về Transformer.pdf');
     await expect(leftSidebar).toContainText('Ứng dụng của CNN trong Y tế.pdf');
 
-    // Test collapse left sidebar
+    // Test collapse left sidebar using the sidebar inner collapse button
     const collapseLeftBtn = leftSidebar.locator('button[title="Thu gọn"]');
     await collapseLeftBtn.click();
-    await expect(leftSidebar).toHaveClass(/w-12/);
+    await expect(leftSidebar).toHaveClass(/w-0/);
 
-    // Expand left sidebar back
-    const expandLeftBtn = leftSidebar.locator('button[title="Mở rộng danh sách tài liệu"]');
-    await expandLeftBtn.click();
-    await expect(leftSidebar).not.toHaveClass(/w-12/);
+    // Expand left sidebar back via header
+    await toggleLeftBtn.click();
+    await expect(leftSidebar).toHaveClass(/w-80/);
 
     // 2. Verify Center Workspace renders Markdown content & KaTeX Math formulas
     const mainWorkspace = page.locator('main');
@@ -105,7 +109,12 @@ test.describe('Multi-Document Synthesis Workspace - E2E (Story 5.1)', () => {
     const copyBtn = katexBlock.locator('.copy-latex-btn');
     await expect(copyBtn).toBeVisible();
 
-    // 3. Verify Right Sidebar (AI Synthesis Tutor Chat)
+    // 3. Click button to show Right Sidebar (since it defaults to collapsed in Focus Mode)
+    const toggleRightBtn = page.locator('button[title="Hiện khung chat"]');
+    await expect(toggleRightBtn).toBeVisible();
+    await toggleRightBtn.click();
+
+    // Verify Right Sidebar (AI Synthesis Tutor Chat)
     const rightSidebar = page.locator('aside').last();
     await expect(rightSidebar).toContainText('AI SYNTHESIS TUTOR CHAT');
     

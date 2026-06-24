@@ -87,6 +87,7 @@ function renderMarkdown(md: string): string {
     .replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>')
     .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-[var(--accent)] hover:underline">$1</a>')
     .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
     .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
     .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
@@ -184,6 +185,7 @@ export function WorkspaceView({
 
   // Semantic Scholar states
   const [relatedPapers, setRelatedPapers] = useState<RelatedPaper[]>([]);
+  const [hasFetchedPapers, setHasFetchedPapers] = useState(false);
   const [isLoadingPapers, setIsLoadingPapers] = useState(false);
   const [papersError, setPapersError] = useState<string | null>(null);
   const [expandedPaperId, setExpandedPaperId] = useState<string | null>(null);
@@ -407,12 +409,24 @@ export function WorkspaceView({
 
   // Reset or initialize messages when userName changes
   useEffect(() => {
-    setMessages([
-      {
-        role: 'assistant',
-        content: `Chào ${userName}! Tôi là AI Tutor. Tôi có thể giúp bạn giải đáp, tóm tắt và phân tích chuyên sâu về bài báo này. Hãy thử đặt câu hỏi bên dưới nhé!`,
-      },
-    ]);
+    setMessages(prev => {
+      if (prev.length <= 1) {
+        return [
+          {
+            role: 'assistant',
+            content: `Chào ${userName}! Tôi là AI Tutor. Tôi có thể giúp bạn giải đáp, tóm tắt và phân tích chuyên sâu về bài báo này. Hãy thử đặt câu hỏi bên dưới nhé!`,
+          },
+        ];
+      }
+      const updated = [...prev];
+      if (updated[0]?.role === 'assistant' && updated[0].content.startsWith('Chào ')) {
+        updated[0] = {
+          role: 'assistant',
+          content: `Chào ${userName}! Tôi là AI Tutor. Tôi có thể giúp bạn giải đáp, tóm tắt và phân tích chuyên sâu về bài báo này. Hãy thử đặt câu hỏi bên dưới nhé!`,
+        };
+      }
+      return updated;
+    });
   }, [userName]);
 
   // Auto-scroll chat container to bottom
@@ -428,6 +442,7 @@ export function WorkspaceView({
     try {
       const papers = await getRelatedPapers(targetJobId);
       setRelatedPapers(papers);
+      setHasFetchedPapers(true);
     } catch (err: any) {
       console.error('Error fetching related papers:', err);
       setPapersError(err.message || 'Không thể tải bài báo liên quan.');
@@ -438,14 +453,15 @@ export function WorkspaceView({
 
   // Fetch automatically when the scholar tab is selected and papers are not yet loaded
   useEffect(() => {
-    if (rightTab === 'scholar' && relatedPapers.length === 0 && !isLoadingPapers && !papersError && jobId) {
+    if (rightTab === 'scholar' && !hasFetchedPapers && !isLoadingPapers && !papersError && jobId) {
       fetchRelatedPapers(jobId);
     }
-  }, [rightTab, relatedPapers.length, isLoadingPapers, papersError, jobId, fetchRelatedPapers]);
+  }, [rightTab, hasFetchedPapers, isLoadingPapers, papersError, jobId, fetchRelatedPapers]);
 
   // Reset papers when jobId changes
   useEffect(() => {
     setRelatedPapers([]);
+    setHasFetchedPapers(false);
     setPapersError(null);
     setExpandedPaperId(null);
   }, [jobId]);
@@ -909,6 +925,22 @@ export function WorkspaceView({
                 </button>
 
                 <button
+                  onClick={() => {
+                    setIsRightCollapsed(false);
+                    setRightTab('tutor');
+                    handleSendMessage("Tìm các bài viết liên quan đến tài liệu này");
+                  }}
+                  disabled={loading || isSending}
+                  className="flex items-center gap-1.5 rounded-lg border border-[var(--border-normal)] bg-[var(--bg-elevated)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-subtle)] px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer"
+                  data-testid="header-find-related-btn"
+                >
+                  <svg className="h-3.5 w-3.5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Tìm liên quan
+                </button>
+
+                <button
                   onClick={handleReprocessClick}
                   disabled={reprocessing}
                   data-authenticated={status === 'authenticated'}
@@ -1260,6 +1292,22 @@ export function WorkspaceView({
 
               {/* Chat input box */}
               <div className="border-t border-[var(--border-subtle)] pt-4 flex-shrink-0">
+                <div className="flex gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSendMessage("Tìm các bài viết liên quan đến tài liệu này");
+                    }}
+                    disabled={loading || isSending}
+                    className="flex items-center gap-1.5 rounded-lg border border-[var(--border-normal)] bg-[var(--bg-elevated)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-subtle)] px-2.5 py-1 text-[10px] font-bold transition-all cursor-pointer"
+                    data-testid="chat-find-related-btn"
+                  >
+                    <svg className="h-3 w-3 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Tìm liên quan
+                  </button>
+                </div>
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -1319,7 +1367,7 @@ export function WorkspaceView({
                     Thử lại
                   </button>
                 </div>
-              ) : relatedPapers.length === 0 ? (
+              ) : !hasFetchedPapers ? (
                 /* Empty/Initial State */
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
                   <p className="text-xs text-[var(--text-secondary)] mb-4">Chưa tải thông tin bài báo liên quan.</p>
@@ -1329,6 +1377,17 @@ export function WorkspaceView({
                     data-testid="find-related-btn"
                   >
                     Tìm bài báo liên quan
+                  </button>
+                </div>
+              ) : relatedPapers.length === 0 ? (
+                /* No Results Found State */
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+                  <p className="text-xs text-[var(--text-secondary)] mb-4">Không tìm thấy bài báo liên quan.</p>
+                  <button
+                    onClick={() => fetchRelatedPapers(jobId)}
+                    className="px-4 py-2 rounded-lg bg-[var(--accent)] text-[#080b12] text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer border-none"
+                  >
+                    Thử tìm lại
                   </button>
                 </div>
               ) : (

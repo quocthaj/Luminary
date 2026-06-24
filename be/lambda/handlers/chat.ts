@@ -145,6 +145,86 @@ async function readExecutiveSummary(jobItem: Record<string, any>): Promise<any> 
   };
 }
 
+async function searchExternalPapers(query: string, limit: number = 5): Promise<any[]> {
+  try {
+    const url = new URL('https://api.semanticscholar.org/graph/v1/paper/search');
+    url.searchParams.set('query', query);
+    url.searchParams.set('limit', String(limit));
+    url.searchParams.set('fields', 'title,authors,year,abstract,url,openAccessPdf');
+
+    console.log(`🔍 [chat] searchExternalPapers querying Semantic Scholar: ${query}`);
+    const headers: Record<string, string> = {};
+    if (process.env.SEMANTIC_SCHOLAR_API_KEY) {
+      headers['x-api-key'] = process.env.SEMANTIC_SCHOLAR_API_KEY;
+    }
+    const res = await fetch(url.toString(), {
+      headers,
+      signal: AbortSignal.timeout(6000), // Timeout 6 seconds
+    });
+    if (!res.ok) {
+      throw new Error(`Semantic Scholar returned status ${res.status}`);
+    }
+    const data: any = await res.json();
+    return (data.data || []).map((paper: any) => ({
+      paperId: paper.paperId,
+      title: paper.title || 'Untitled',
+      authors: (paper.authors || []).map((a: any) => a.name),
+      year: paper.year || null,
+      abstract: paper.abstract || null,
+      url: paper.url || null,
+      pdfUrl: paper.openAccessPdf?.url || null
+    }));
+  } catch (err: any) {
+    console.warn(`⚠️ [chat] Semantic Scholar search failed, trying fallback to OpenAlex:`, err.message || String(err));
+    try {
+      console.log(`🔍 [chat] searchExternalPapers querying OpenAlex: ${query}`);
+      const url = new URL('https://api.openalex.org/works');
+      url.searchParams.set('search', query);
+      url.searchParams.set('per_page', String(limit));
+      url.searchParams.set('mailto', 'hello@vietai.org');
+
+      const res = await fetch(url.toString(), {
+        signal: AbortSignal.timeout(6000), // Timeout 6 seconds
+      });
+      if (!res.ok) {
+        throw new Error(`OpenAlex returned status ${res.status}`);
+      }
+      const data: any = await res.json();
+      return (data.results || []).map((work: any) => {
+        let abstract = null;
+        if (work.abstract_inverted_index) {
+          const words: string[] = [];
+          for (const [word, positions] of Object.entries(work.abstract_inverted_index)) {
+            if (Array.isArray(positions)) {
+              positions.forEach((pos: any) => {
+                words[pos] = word;
+              });
+            }
+          }
+          abstract = words.join(' ').trim();
+        }
+
+        const authors = (work.authorships || []).map((a: any) => a.author?.display_name).filter(Boolean);
+        const url = work.doi || work.primary_location?.landing_page_url || work.id || null;
+        const pdfUrl = work.primary_location?.pdf_url || work.open_access?.oa_url || null;
+
+        return {
+          paperId: work.id ? work.id.split('/').pop() : 'W-unknown',
+          title: work.title || 'Untitled',
+          authors,
+          year: work.publication_year || null,
+          abstract: abstract ? (abstract.length > 300 ? abstract.slice(0, 300) + '...' : abstract) : null,
+          url,
+          pdfUrl
+        };
+      });
+    } catch (fallbackErr: any) {
+      console.error('❌ [chat] Both Semantic Scholar and OpenAlex failed:', fallbackErr);
+      return [{ error: `Lỗi kết nối học thuật: ${fallbackErr.message || String(fallbackErr)}` }];
+    }
+  }
+}
+
 async function generateAnswer(prompt: string): Promise<string> {
   // Primary: Gemini (non-tool-use fallback)
   try {
@@ -260,6 +340,18 @@ export const handleChatJob = async (event: ChatInput): Promise<ChatOutput> => {
             type: SchemaType.OBJECT,
             properties: {}
           }
+        },
+        {
+          name: 'searchExternalPapers',
+          description: 'Tìm kiếm các nghiên cứu hoặc bài báo khoa học liên quan từ Semantic Scholar dựa trên từ khóa hoặc chủ đề nghiên cứu.',
+          parameters: {
+            type: SchemaType.OBJECT,
+            properties: {
+              query: { type: SchemaType.STRING, description: 'Từ khóa tìm kiếm (bằng tiếng Anh)' },
+              limit: { type: SchemaType.INTEGER, description: 'Số lượng bài báo tối đa cần lấy (mặc định là 5)' }
+            },
+            required: ['query']
+          }
         }
       ]
     }
@@ -274,14 +366,19 @@ export const handleChatJob = async (event: ChatInput): Promise<ChatOutput> => {
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
       systemInstruction: `Bạn là trợ lý AI học thuật song ngữ. Nhiệm vụ của bạn là hỗ trợ người dùng đọc và hiểu tài liệu khoa học song ngữ.
-Bạn có quyền truy cập vào các công cụ tìm kiếm ngữ cảnh cục bộ (vectorSearch), lấy thêm đoạn văn lân cận để tránh đứt gãy ngữ nghĩa (fetchAdjacentParagraphs), hoặc đọc bản tóm tắt toàn diện của bài báo (readExecutiveSummary).
+Bạn có quyền truy cập vào các công cụ tìm kiếm ngữ cảnh cục bộ (vectorSearch), lấy thêm đoạn văn lân cận để tránh đứt gãy ngữ nghĩa (fetchAdjacentParagraphs), đọc bản tóm tắt toàn diện của bài báo (readExecutiveSummary), hoặc tìm kiếm bài báo liên quan từ nguồn bên ngoài (searchExternalPapers).
 
 Quy tắc làm việc:
 1. Đánh giá câu hỏi để quyết định xem cần gọi công cụ nào. Ví dụ:
    - Các câu hỏi chi tiết hoặc tìm thông tin cụ thể nên dùng 'vectorSearch'.
    - Nếu ngữ cảnh tìm được từ 'vectorSearch' bị ngắt quãng ở đầu hoặc cuối câu, hãy dùng 'fetchAdjacentParagraphs' để lấy thêm đoạn liền kề.
    - Các câu hỏi bao quát toàn tài liệu (như tóm tắt, đóng góp chính, hạn chế, phương pháp) nên sử dụng 'readExecutiveSummary'.
-2. Trình bày câu trả lời rõ ràng bằng Markdown (bôi đậm, vẽ bảng, bullet points).
+   - Khi người dùng muốn tìm các bài báo liên quan, mở rộng tài liệu tham khảo, hoặc tra cứu thêm thông tin ngoài tài liệu hiện tại, hãy sử dụng 'searchExternalPapers'. Bạn có thể tự động bóc tách từ khóa/chủ đề từ câu hỏi hoặc từ tài liệu hiện tại để đưa vào tham số 'query'.
+2. Trình bày kết quả bài báo ngoài rõ ràng dưới dạng danh sách Markdown. Với mỗi bài báo ngoài, phải hiển thị:
+   - **[Tiêu đề bài viết](url của bài viết)** (Luôn đính kèm link Semantic Scholar URL)
+   - Tác giả, năm xuất bản
+   - Tóm tắt ngắn (1-2 câu dịch sang tiếng Việt)
+   - [Đọc PDF gốc](pdfUrl) (nếu pdfUrl tồn tại)
 3. Đính kèm liên kết trích dẫn ngược dưới dạng [Đoạn X] (với X là chunkIndex) trỏ đúng về nguồn của thông tin đó. Ví dụ: "...như đã được thảo luận [Đoạn 5]".
 4. Phản hồi hoàn toàn bằng tiếng Việt thân thiện và chuyên nghiệp.`,
       tools
@@ -334,6 +431,11 @@ Quy tắc làm việc:
             );
           } else if (call.name === 'readExecutiveSummary') {
             callResult = await readExecutiveSummary(jobItem);
+          } else if (call.name === 'searchExternalPapers') {
+            callResult = await searchExternalPapers(
+              args.query as string,
+              args.limit ? Number(args.limit) : 5
+            );
           } else {
             callResult = { error: `Unknown tool: ${call.name}` };
           }

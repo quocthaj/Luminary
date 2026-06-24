@@ -107,36 +107,59 @@ function cleanMermaidCode(code: string): string {
     } catch (_) {}
   }
 
-  // Hướng B: Giải phóng các dấu ngoặc tròn kép và dấu nháy kép bọc ngoài
-  clean = clean.replace(/\(\("(.+?)"\)\)/g, '$1');
-  clean = clean.replace(/\(\((.+?)\)\)/g, '$1');
-  clean = clean.replace(/^(\s*)"(.+)"$/gm, '$1$2');
+  // Detect diagram type
+  const firstLine = clean.trim().split('\n')[0].trim().toLowerCase();
+  const isMindmap = firstLine.startsWith('mindmap');
 
-  // Xử lý từng dòng để dọn dẹp các ký tự đặc biệt có thể phá vỡ cú pháp mindmap của Mermaid
-  const lines = clean.split('\n');
-  const sanitizedLines = lines.map((line) => {
-    const indentMatch = line.match(/^(\s*)/);
-    const indent = indentMatch ? indentMatch[1] : '';
-    const trimmed = line.trim();
+  if (isMindmap) {
+    clean = clean.replace(/\(\("(.+?)"\)\)/g, '$1');
+    clean = clean.replace(/\(\((.+?)\)\)/g, '$1');
+    clean = clean.replace(/^(\s*)"(.+)"$/gm, '$1$2');
 
-    if (trimmed === '' || trimmed.toLowerCase() === 'mindmap') {
-      return line;
-    }
+    const lines = clean.split('\n');
+    const sanitizedLines = lines.map((line) => {
+      const indentMatch = line.match(/^(\s*)/);
+      const indent = indentMatch ? indentMatch[1] : '';
+      const trimmed = line.trim();
 
-    // Loại bỏ dấu ngoặc đơn, ngoặc vuông, ngoặc nhọn nguy hiểm và nháy kép thừa
-    const cleanText = trimmed
-      .replace(/[()\[\]{}]/g, '')
-      .replace(/"/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+      if (trimmed === '' || trimmed.toLowerCase() === 'mindmap') {
+        return line;
+      }
 
-    if (cleanText === '') {
-      return '';
-    }
-    return `${indent}${cleanText}`;
-  });
+      const cleanText = trimmed
+        .replace(/[()\[\]{}]/g, '')
+        .replace(/"/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
 
-  return sanitizedLines.filter((l) => l !== '').join('\n');
+      if (cleanText === '') {
+        return '';
+      }
+      return `${indent}${cleanText}`;
+    });
+
+    return sanitizedLines.filter((l) => l !== '').join('\n');
+  } else {
+    const lines = clean.split('\n');
+    const sanitizedLines = lines.map((line) => {
+      const indentMatch = line.match(/^(\s*)/);
+      const indent = indentMatch ? indentMatch[1] : '';
+      let trimmed = line.trim();
+
+      if (trimmed === '') return '';
+
+      // Fix invalid arrow endings like -->|Text|> or -->|>
+      trimmed = trimmed.replace(/(-->\|[^|]+)\|>\s*/g, '$1| ');
+      trimmed = trimmed.replace(/-->\|>\s*/g, '--> ');
+
+      // Remove HTML tags inside labels
+      trimmed = trimmed.replace(/<[^>]*>/g, '');
+
+      return `${indent}${trimmed}`;
+    });
+
+    return sanitizedLines.filter((l) => l !== '').join('\n');
+  }
 }
 
 interface MindmapModalProps {

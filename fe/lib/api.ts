@@ -122,7 +122,13 @@ export async function sendRAGChatMessage(jobId: string, message: string): Promis
   if (jobId.startsWith('mock-')) {
     return new Promise((resolve) => {
       setTimeout(() => {
-        resolve({ answer: `Đây là câu trả lời thử nghiệm từ tài liệu mock cho câu hỏi "${message}" [Đoạn 1].` });
+        if (message.includes('Tìm các bài viết liên quan')) {
+          resolve({
+            answer: 'Dưới đây là một số bài báo liên quan tìm thấy:\n\n1. **[Attention Is All You Need](https://semanticscholar.org/paper/111)** (Vaswani et al., 2017)\nTóm tắt: Nghiên cứu giới thiệu kiến trúc Transformer.\n[Đọc PDF gốc](https://arxiv.org/pdf/1706.03762.pdf)'
+          });
+        } else {
+          resolve({ answer: `Đây là câu trả lời thử nghiệm từ tài liệu mock cho câu hỏi "${message}" [Đoạn 1].` });
+        }
       }, 1000);
     });
   }

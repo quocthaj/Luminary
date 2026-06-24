@@ -84,6 +84,7 @@ async function verifyHmac(message: string, signatureWithExpiry: string, secret: 
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID || process.env.AUTH_GOOGLE_ID,

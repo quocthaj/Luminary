@@ -38,9 +38,21 @@ function SynthesisContent() {
   const [loadingReport, setLoadingReport] = useState<boolean>(true);
   const [reportError, setReportError] = useState<string>('');
 
-  // Side panels collapse states
-  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(false);
-  const [rightCollapsed, setRightCollapsed] = useState<boolean>(false);
+  // Side panels collapse states — default both collapsed for maximum report area
+  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(true);
+  const [rightCollapsed, setRightCollapsed] = useState<boolean>(true);
+
+  // Focus mode: collapse both panels for full-width reading
+  const focusMode = leftCollapsed && rightCollapsed;
+  const toggleFocusMode = () => {
+    if (focusMode) {
+      setLeftCollapsed(false);
+      setRightCollapsed(false);
+    } else {
+      setLeftCollapsed(true);
+      setRightCollapsed(true);
+    }
+  };
 
   // Chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -380,32 +392,68 @@ function SynthesisContent() {
             Đối chiếu & Tổng hợp liên bài viết
           </h1>
         </div>
+        <div className="flex items-center gap-2">
+          {/* Toggle Left Panel */}
+          <button
+            onClick={() => setLeftCollapsed(!leftCollapsed)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
+              leftCollapsed
+                ? 'border-[var(--border-normal)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
+                : 'border-[var(--accent-glow)] text-[var(--accent)] bg-[var(--accent-dim)]'
+            }`}
+            title={leftCollapsed ? 'Hiện danh sách tài liệu' : 'Ẩn danh sách tài liệu'}
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" />
+            </svg>
+            Tài liệu
+          </button>
+          {/* Focus Mode Toggle */}
+          <button
+            onClick={toggleFocusMode}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
+              focusMode
+                ? 'border-[var(--accent-glow)] text-[var(--accent)] bg-[var(--accent-dim)]'
+                : 'border-[var(--border-normal)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
+            }`}
+            title={focusMode ? 'Hiện tất cả panel' : 'Chế độ tập trung đọc'}
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {focusMode ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+              )}
+            </svg>
+            {focusMode ? 'Mở panel' : 'Tập trung'}
+          </button>
+          {/* Toggle Right Panel */}
+          <button
+            onClick={() => setRightCollapsed(!rightCollapsed)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
+              rightCollapsed
+                ? 'border-[var(--border-normal)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
+                : 'border-[var(--accent-glow)] text-[var(--accent)] bg-[var(--accent-dim)]'
+            }`}
+            title={rightCollapsed ? 'Hiện khung chat' : 'Ẩn khung chat'}
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            Chat AI
+          </button>
+        </div>
       </header>
 
       {/* Main Grid */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* LEFT COLUMN: Collapsible Paper List */}
         <aside
-          className={`h-full border-r border-[var(--border-normal)] bg-[var(--bg-surface)]/40 backdrop-blur-sm flex flex-col transition-all duration-300 relative z-10 ${
-            leftCollapsed ? 'w-12' : 'w-80'
+          className={`h-full border-r border-[var(--border-normal)] bg-[var(--bg-surface)]/40 backdrop-blur-sm flex flex-col transition-all duration-300 relative z-10 overflow-hidden ${
+            leftCollapsed ? 'w-0 border-r-0' : 'w-80'
           }`}
         >
-          {leftCollapsed ? (
-            <div className="flex flex-col items-center py-4 gap-6 h-full">
-              <button
-                onClick={() => setLeftCollapsed(false)}
-                className="p-1.5 rounded-md hover:bg-[var(--bg-elevated)] transition-colors"
-                title="Mở rộng danh sách tài liệu"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                </svg>
-              </button>
-              <div className="writing-mode-vertical text-[10px] font-semibold text-[var(--text-secondary)] tracking-widest uppercase py-4 select-none">
-                DANH SÁCH TÀI LIỆU ({papers.length})
-              </div>
-            </div>
-          ) : (
+          {leftCollapsed ? null : (
             <div className="flex-1 flex flex-col h-full overflow-hidden">
               <div className="p-4 border-b border-[var(--border-normal)] flex items-center justify-between">
                 <span className="text-xs font-bold tracking-wider text-[var(--text-secondary)] uppercase">DANH SÁCH TÀI LIỆU ({papers.length})</span>
@@ -489,7 +537,7 @@ function SynthesisContent() {
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto px-10 py-8 select-text" onClick={handleContentClick}>
-              <div className="max-w-4xl mx-auto space-y-6">
+              <div className="max-w-6xl mx-auto space-y-6">
                 {/* Document styling customization */}
                 <style dangerouslySetInnerHTML={{__html: `
                   .synthesis-report-container h1 { font-size: 1.75rem; font-weight: 700; margin-top: 2rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-normal); padding-bottom: 0.5rem; color: var(--accent); }
@@ -515,26 +563,11 @@ function SynthesisContent() {
 
         {/* RIGHT COLUMN: AI Synthesis Chat Panel */}
         <aside
-          className={`h-full border-l border-[var(--border-normal)] bg-[var(--bg-surface)]/40 backdrop-blur-sm flex flex-col transition-all duration-300 relative z-10 ${
-            rightCollapsed ? 'w-12' : 'w-[420px]'
+          className={`h-full border-l border-[var(--border-normal)] bg-[var(--bg-surface)]/40 backdrop-blur-sm flex flex-col transition-all duration-300 relative z-10 overflow-hidden ${
+            rightCollapsed ? 'w-0 border-l-0' : 'w-[420px]'
           }`}
         >
-          {rightCollapsed ? (
-            <div className="flex flex-col items-center py-4 gap-6 h-full">
-              <button
-                onClick={() => setRightCollapsed(false)}
-                className="p-1.5 rounded-md hover:bg-[var(--bg-elevated)] transition-colors"
-                title="Mở rộng khung chat"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                </svg>
-              </button>
-              <div className="writing-mode-vertical text-[10px] font-semibold text-[var(--text-secondary)] tracking-widest uppercase py-4 select-none">
-                AI SYNTHESIS TUTOR CHAT
-              </div>
-            </div>
-          ) : (
+          {rightCollapsed ? null : (
             <div className="flex-1 flex flex-col h-full overflow-hidden">
               <div className="p-4 border-b border-[var(--border-normal)] flex items-center justify-between">
                 <span className="text-xs font-bold tracking-wider text-[var(--text-secondary)] uppercase">AI SYNTHESIS TUTOR CHAT</span>
@@ -565,7 +598,7 @@ function SynthesisContent() {
                           : 'bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-tl-none'
                       }`}
                       dangerouslySetInnerHTML={{
-                        __html: msg.sender === 'user' ? msg.text : parseChatCitations(msg.text),
+                        __html: msg.sender === 'user' ? msg.text : renderMarkdown(parseChatCitations(msg.text)),
                       }}
                     />
                   </div>

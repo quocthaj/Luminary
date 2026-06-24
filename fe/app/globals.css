@@ -253,3 +253,8 @@ body {
   margin: -4px -8px;
 }
 
+/* ── Writing mode vertical for collapsed panels ── */
+.writing-mode-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}

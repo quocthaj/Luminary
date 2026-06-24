@@ -33,7 +33,7 @@ export async function saveResultToS3(
             ContentType: contentType,
             Metadata: {
                 jobId,
-                fileName,
+                fileName: encodeURIComponent(fileName),
                 processedAt: new Date().toISOString(),
             },
         })

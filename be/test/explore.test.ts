@@ -197,7 +197,7 @@ describe('handleAsyncExploreJob()', () => {
     expect(mockProcessWithGroq).toHaveBeenCalled();
     expect(mockProcessWithGemini).not.toHaveBeenCalled();
     expect(mockS3Send).toHaveBeenCalled();
-    expect(mockUpdateJobStatus).toHaveBeenCalledWith('exp-123', 'completed', expect.any(Object));
+    expect(mockUpdateJobStatus).toHaveBeenCalledWith('exp-123', 'COMPLETED', expect.any(Object));
   });
 
   it('falls back to Gemini if Groq output is invalid', async () => {
@@ -221,7 +221,7 @@ describe('handleAsyncExploreJob()', () => {
     expect(mockProcessWithGroq).toHaveBeenCalled();
     expect(mockProcessWithGemini).toHaveBeenCalled();
     expect(mockS3Send).toHaveBeenCalled();
-    expect(mockUpdateJobStatus).toHaveBeenCalledWith('exp-123', 'completed', expect.any(Object));
+    expect(mockUpdateJobStatus).toHaveBeenCalledWith('exp-123', 'COMPLETED', expect.any(Object));
   });
 
   it('fails the job if both Groq and Gemini outputs are invalid', async () => {

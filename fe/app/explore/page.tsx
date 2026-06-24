@@ -52,34 +52,91 @@ function cleanMermaidCode(code: string): string {
     } catch (_) {}
   }
 
-  // Remove parenthesis/bracket/curly shapes and strip outer quotes
-  clean = clean.replace(/\(\("(.+?)"\)\)/g, '$1');
-  clean = clean.replace(/\(\((.+?)\)\)/g, '$1');
-  clean = clean.replace(/^(\s*)"(.+)"$/gm, '$1$2');
+  // Detect diagram type
+  const firstLine = clean.trim().split('\n')[0].trim().toLowerCase();
+  const isMindmap = firstLine.startsWith('mindmap');
 
-  const lines = clean.split('\n');
-  const sanitizedLines = lines.map((line) => {
-    const indentMatch = line.match(/^(\s*)/);
-    const indent = indentMatch ? indentMatch[1] : '';
-    const trimmed = line.trim();
+  if (isMindmap) {
+    clean = clean.replace(/\(\("(.+?)"\)\)/g, '$1');
+    clean = clean.replace(/\(\((.+?)\)\)/g, '$1');
+    clean = clean.replace(/^(\s*)"(.+)"$/gm, '$1$2');
 
-    if (trimmed === '' || trimmed.toLowerCase() === 'mindmap' || trimmed.startsWith('graph')) {
-      return line;
-    }
+    const lines = clean.split('\n');
+    const sanitizedLines = lines.map((line) => {
+      const indentMatch = line.match(/^(\s*)/);
+      const indent = indentMatch ? indentMatch[1] : '';
+      const trimmed = line.trim();
 
-    const cleanText = trimmed
-      .replace(/[()\[\]{}]/g, '')
-      .replace(/"/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+      if (trimmed === '' || trimmed.toLowerCase() === 'mindmap') {
+        return line;
+      }
 
-    if (cleanText === '') {
-      return '';
-    }
-    return `${indent}${cleanText}`;
-  });
+      const cleanText = trimmed
+        .replace(/[()\[\]{}]/g, '')
+        .replace(/"/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
 
-  return sanitizedLines.filter((l) => l !== '').join('\n');
+      if (cleanText === '') {
+        return '';
+      }
+      return `${indent}${cleanText}`;
+    });
+
+    return sanitizedLines.filter((l) => l !== '').join('\n');
+  } else {
+    const lines = clean.split('\n');
+    const sanitizedLines = lines.map((line) => {
+      const indentMatch = line.match(/^(\s*)/);
+      const indent = indentMatch ? indentMatch[1] : '';
+      let trimmed = line.trim();
+
+      if (trimmed === '') return '';
+
+      // Fix invalid arrow endings like -->|Text|> or -->|>
+      trimmed = trimmed.replace(/(-->\|[^|]+)\|>\s*/g, '$1| ');
+      trimmed = trimmed.replace(/-->\|>\s*/g, '--> ');
+
+      // Remove HTML tags inside labels
+      trimmed = trimmed.replace(/<[^>]*>/g, '');
+
+      // Wrap labels containing special characters in double quotes for Mermaid compliance
+      // Matches nodes like: A[Some (text) here] or B(Detailed: description) or C{Decision - node}
+      // and converts to: A["Some (text) here"] or B("Detailed: description") or C{"Decision - node"}
+      const labelMatch = trimmed.match(/^(\w+)([(\[{])(.*)([)\]}])$/);
+      if (labelMatch) {
+        const nodeId = labelMatch[1];
+        const openBracket = labelMatch[2];
+        const labelText = labelMatch[3];
+        const closeBracket = labelMatch[4];
+        
+        // Only wrap in quotes if not already wrapped
+        if (!labelText.startsWith('"') && !labelText.endsWith('"')) {
+          // Replace single quotes inside label text to prevent breaks
+          const escapedLabel = labelText.replace(/"/g, "'");
+          trimmed = `${nodeId}${openBracket}"${escapedLabel}"${closeBracket}`;
+        }
+      }
+
+      return `${indent}${trimmed}`;
+    });
+
+    return sanitizedLines.filter((l) => l !== '').join('\n');
+  }
+}
+
+// Helper: Slugify Vietnamese text to standard URL/Anchor safe ID
+function slugify(text: string): string {
+  return text
+    .toString()
+    .toLowerCase()
+    .normalize('NFD') // decompose combined graphemes into base + diacritic
+    .replace(/[\u0300-\u036f]/g, '') // remove diacritics
+    .replace(/[đĐ]/g, 'd')
+    .replace(/[^a-z0-9\s-]/g, '') // remove special characters
+    .trim()
+    .replace(/\s+/g, '-') // replace spaces with hyphens
+    .replace(/-+/g, '-'); // remove consecutive hyphens
 }
 
 // Simple Markdown + LaTeX parser
@@ -127,12 +184,24 @@ function renderMarkdown(md: string): string {
     return `\x00IM${inlineMaths.length - 1}\x00`;
   });
 
-  // Basic Markdown tags rendering
+  // Basic Markdown tags rendering with id injection for headings
   h = h
-    .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/^#### (.+)$/gm, (_, text) => {
+      const cleanText = text.replace(/[*_`]/g, '');
+      return `<h4 id="${slugify(cleanText)}">${text}</h4>`;
+    })
+    .replace(/^### (.+)$/gm, (_, text) => {
+      const cleanText = text.replace(/[*_`]/g, '');
+      return `<h3 id="${slugify(cleanText)}">${text}</h3>`;
+    })
+    .replace(/^## (.+)$/gm, (_, text) => {
+      const cleanText = text.replace(/[*_`]/g, '');
+      return `<h2 id="${slugify(cleanText)}">${text}</h2>`;
+    })
+    .replace(/^# (.+)$/gm, (_, text) => {
+      const cleanText = text.replace(/[*_`]/g, '');
+      return `<h1 id="${slugify(cleanText)}">${text}</h1>`;
+    })
     .replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>')
     .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
@@ -287,39 +356,64 @@ function ExplorePageContent() {
     const containers = document.querySelectorAll('.mermaid-diagram-container');
     if (containers.length === 0) return;
 
+    let mermaidLib: any = null;
     try {
-      const mermaid = (await import('mermaid')).default;
-      mermaid.initialize({
+      const imported = await import('mermaid');
+      mermaidLib = imported.default || imported;
+      
+      // Some ESM packaging structures wrap it twice
+      if (mermaidLib.default) {
+        mermaidLib = mermaidLib.default;
+      }
+
+      mermaidLib.initialize({
         startOnLoad: false,
         theme: 'dark',
         securityLevel: 'loose',
         fontFamily: 'Inter, system-ui, sans-serif',
       });
-
-      containers.forEach(async (container, idx) => {
+    } catch (importErr: any) {
+      console.error('Failed to dynamically load mermaid library:', importErr);
+      containers.forEach((container) => {
         const target = container.querySelector('.mermaid-target');
-        const rawCode = container.getAttribute('data-mermaid');
-        if (!target || !rawCode) return;
-
-        try {
-          const code = decodeURIComponent(rawCode);
-          const cleaned = cleanMermaidCode(code);
-          const uniqueId = `mermaid-explore-${idx}-${Date.now()}`;
-          const { svg } = await mermaid.render(uniqueId, cleaned);
-          target.innerHTML = svg;
-        } catch (err: any) {
-          console.error('Mermaid rendering failed inside markdown:', err);
+        if (target) {
           target.innerHTML = `
-            <div class="text-xs text-[var(--error)] bg-red-950/20 p-3 rounded-lg border border-red-900/50 w-full">
-              <p class="font-bold mb-1">Không thể vẽ sơ đồ quy trình:</p>
-              <pre class="overflow-x-auto text-[10px] font-mono whitespace-pre-wrap">${err.message || 'Cú pháp Mermaid không hợp lệ.'}</pre>
+            <div class="text-xs text-[var(--error)] bg-red-950/20 p-3 rounded-lg border border-red-900/50 w-full text-left">
+              <p class="font-bold mb-1">Lỗi tải thư viện vẽ sơ đồ:</p>
+              <pre class="overflow-x-auto text-[10px] font-mono whitespace-pre-wrap">${importErr.message || 'Không thể load thư viện Mermaid.'}</pre>
             </div>
           `;
         }
       });
-    } catch (importErr) {
-      console.error('Failed to dynamically load mermaid library:', importErr);
+      return;
     }
+
+    containers.forEach(async (container, idx) => {
+      const target = container.querySelector('.mermaid-target');
+      const rawCode = container.getAttribute('data-mermaid');
+      if (!target || !rawCode) return;
+
+      try {
+        let code = '';
+        try {
+          code = decodeURIComponent(rawCode);
+        } catch {
+          code = unescape(rawCode); // Fallback for legacy escaping
+        }
+        const cleaned = cleanMermaidCode(code);
+        const uniqueId = `mermaid-explore-${idx}-${Date.now()}`;
+        const { svg } = await mermaidLib.render(uniqueId, cleaned);
+        target.innerHTML = svg;
+      } catch (err: any) {
+        console.error('Mermaid rendering failed inside markdown:', err);
+        target.innerHTML = `
+          <div class="text-xs text-[var(--error)] bg-red-950/20 p-3 rounded-lg border border-red-900/50 w-full text-left">
+            <p class="font-bold mb-1">Không thể vẽ sơ đồ quy trình:</p>
+            <pre class="overflow-x-auto text-[10px] font-mono whitespace-pre-wrap">${err.message || 'Cú pháp Mermaid không hợp lệ.'}</pre>
+          </div>
+        `;
+      }
+    });
   }, []);
 
   // 4. Generate dynamic Table of Contents (TOC) synchronously from markdown string
@@ -327,7 +421,6 @@ function ExplorePageContent() {
     if (!articleContent) return [];
     const lines = articleContent.split('\n');
     const items: TocItem[] = [];
-    let headingIdx = 0;
 
     for (let line of lines) {
       const trimmed = line.trim();
@@ -335,26 +428,21 @@ function ExplorePageContent() {
       if (match) {
         const level = match[1].length;
         const text = match[2].trim();
-        const id = `heading-${headingIdx++}`;
-        items.push({ id, text, level });
+        const cleanTextForSlug = text.replace(/[*_`]/g, '');
+        const id = slugify(cleanTextForSlug);
+        items.push({ id, text: cleanTextForSlug, level });
       }
     }
     return items;
   }, [articleContent]);
 
-  // Trigger post-rendering logic (assigning IDs to headings in the DOM and rendering mermaid diagrams)
+  // Trigger post-rendering logic (rendering mermaid diagrams)
   useEffect(() => {
     if (articleContent) {
-      // Small timeout to allow DOM to commit HTML update before scanning headings/rendering mermaid
+      // Allow DOM to commit HTML update before rendering mermaid
       const timeout = setTimeout(() => {
-        if (contentAreaRef.current) {
-          const headings = contentAreaRef.current.querySelectorAll('h1, h2, h3');
-          headings.forEach((heading, idx) => {
-            heading.id = `heading-${idx}`;
-          });
-        }
         loadMermaidDiagrams();
-      }, 100);
+      }, 300);
       return () => clearTimeout(timeout);
     }
   }, [articleContent, loadMermaidDiagrams]);
@@ -530,15 +618,20 @@ function ExplorePageContent() {
     document.body.removeChild(link);
   };
 
+  // Trigger PDF print/save
+  const handleDownloadPdf = () => {
+    window.print();
+  };
+
   return (
     <div
       className="min-h-screen flex flex-col p-6 pb-16 animate-fade-in relative"
       style={{ background: 'var(--bg-base)' }}
     >
-      <div aria-hidden className="dot-grid pointer-events-none fixed inset-0" />
+      <div aria-hidden className="no-print dot-grid pointer-events-none fixed inset-0" />
 
       {/* ─── HEADER ─── */}
-      <div className="flex items-center justify-between w-full max-w-5xl mx-auto mb-10 z-10">
+      <div className="no-print flex items-center justify-between w-full max-w-5xl mx-auto mb-10 z-10">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push('/')}>
           <span className="text-xl">🎓</span>
           <span
@@ -801,16 +894,26 @@ function ExplorePageContent() {
             </div>
 
             {/* Right sidebar Table of Contents & Quick Actions (25%) */}
-            <div className="w-full md:w-1/4 flex flex-col gap-6 md:sticky md:top-24 h-fit">
+            <div className="no-print w-full md:w-1/4 flex flex-col gap-6 md:sticky md:top-24 h-fit">
               {/* Actions card */}
               <div
                 className="p-5 rounded-2xl flex flex-col gap-3"
                 style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}
               >
                 <button
+                  onClick={handleDownloadPdf}
+                  className="w-full flex items-center justify-center gap-2 bg-[var(--success)] text-[#080b12] text-xs font-bold py-3 rounded-xl hover:opacity-95 transition-all cursor-pointer border-none"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Tải về PDF
+                </button>
+
+                <button
                   onClick={handleDownloadMd}
                   disabled={!downloadUrl}
-                  className="w-full flex items-center justify-center gap-2 bg-[var(--success)] text-[#080b12] text-xs font-bold py-3 rounded-xl hover:opacity-95 transition-all cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2 bg-transparent border border-[var(--border-normal)] text-[var(--text-secondary)] hover:text-white hover:border-[var(--border-subtle)] text-xs font-bold py-3 rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -929,6 +1032,9 @@ function ExplorePageContent() {
           margin: 2rem 0;
         }
         /* Custom scrollbar for left column */
+        .scroll-container {
+          scroll-behavior: smooth;
+        }
         .scroll-container::-webkit-scrollbar {
           width: 6px;
         }
@@ -967,6 +1073,41 @@ function ExplorePageContent() {
         .mermaid-diagram-container svg .marker {
           fill: rgba(56, 189, 248, 0.4) !important;
           stroke: rgba(56, 189, 248, 0.4) !important;
+        }
+
+        /* Print styles */
+        @media print {
+          .no-print {
+            display: none !important;
+          }
+          body, html, .min-h-screen, .flex-1, .w-full.md\:w-3\/4, .relative.w-full.rounded-2xl {
+            background: white !important;
+            color: #000000 !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            display: block !important;
+          }
+          .markdown-preview {
+            background: white !important;
+            color: #000000 !important;
+            max-height: none !important;
+            overflow: visible !important;
+            padding: 0 !important;
+          }
+          .markdown-preview * {
+            color: #000000 !important;
+          }
+          .copy-latex-btn {
+            display: none !important;
+          }
+          .mermaid-diagram-container {
+            border: 1px solid #ccc !important;
+            background: #fafafa !important;
+          }
         }
       `}</style>
     </div>

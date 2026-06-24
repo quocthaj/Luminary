@@ -354,4 +354,101 @@ describe('Chat Handler - RAG QA Assistant', () => {
     const result = await handleChatJob(event);
     expect(result.answer).toBe('Đóng góp chính là Đóng góp A.');
   });
+
+  it('should support searchExternalPapers tool querying Semantic Scholar API', async () => {
+    mockGetJobItem.mockResolvedValue({
+      userId: { S: 'user-123' },
+      jobId: { S: 'job-abc' },
+    });
+    mockGetSecret.mockResolvedValue(JSON.stringify({
+      url: 'https://mock-qdrant.tech',
+      apiKey: 'mock-key',
+    }));
+
+    // Mock fetch for Semantic Scholar search
+    const mockPapers = {
+      data: [
+        {
+          paperId: 'paper-111',
+          title: 'Attention Is All You Need',
+          authors: [{ name: 'Ashish Vaswani' }],
+          year: 2017,
+          abstract: 'The dominant sequence transduction models...',
+          url: 'https://semanticscholar.org/paper/111',
+          openAccessPdf: { url: 'https://arxiv.org/pdf/1706.03762.pdf' }
+        }
+      ]
+    };
+
+    const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation((url: any) => {
+      if (typeof url === 'string' && url.includes('api.semanticscholar.org')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(mockPapers),
+        } as any);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ choices: [{ message: { content: 'Groq response' } }] }),
+        text: () => Promise.resolve('ok')
+      } as any);
+    });
+
+    // Mock Gemini calling tool
+    mockGenerateContent.mockResolvedValueOnce({
+      response: {
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [
+                {
+                  functionCall: {
+                    name: 'searchExternalPapers',
+                    args: { query: 'attention mechanism', limit: 2 }
+                  }
+                }
+              ]
+            },
+            finishReason: 'STOP'
+          }
+        ],
+        functionCalls: () => [
+          {
+            name: 'searchExternalPapers',
+            args: { query: 'attention mechanism', limit: 2 }
+          }
+        ],
+        text: () => ''
+      }
+    });
+
+    mockGenerateContent.mockResolvedValueOnce({
+      response: {
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [{ text: 'Đây là các bài viết liên quan: [Attention Is All You Need](https://semanticscholar.org/paper/111)' }]
+            },
+            finishReason: 'STOP'
+          }
+        ],
+        functionCalls: () => [],
+        text: () => 'Đây là các bài viết liên quan: [Attention Is All You Need](https://semanticscholar.org/paper/111)'
+      }
+    });
+
+    const event = {
+      jobId: 'job-abc',
+      userId: 'user-123',
+      message: 'Tìm tài liệu liên quan về attention mechanism',
+    };
+
+    const result = await handleChatJob(event);
+    expect(result.answer).toContain('Attention Is All You Need');
+    expect(fetchSpy).toHaveBeenCalled();
+  });
 });

@@ -313,15 +313,21 @@ ${summaries.map((s, idx) => `
 `).join('\n---\n')}
 
 Nhiệm vụ của bạn:
-1. Tạo một bảng so sánh đối chiếu song ngữ Anh - Việt chi tiết (Bảng có các cột: Tiêu chí/Tài liệu | Tài liệu 1 | Tài liệu 2 | ...).
-   Bảng so sánh phải bao gồm các tiêu chí: Mục tiêu nghiên cứu (Research Objective), Phương pháp luận (Methodology), Kết quả chính (Key Results), Hạn chế (Limitations).
-2. Viết một báo cáo phân tích tổng hợp (Synthesis Report) khoảng 500-1000 từ bằng tiếng Việt chia sẻ:
-   - Các điểm tương đồng (common themes) và các điểm khác biệt (differences) giữa các nghiên cứu.
-   - Các nghiên cứu này bổ khuyết hay tương phản với nhau như thế nào?
-   - Kết luận tổng quan về hướng nghiên cứu chung này.
-3. Đảm bảo toàn bộ nội dung hiển thị dưới dạng Markdown chuẩn, chuyên nghiệp, giữ nguyên các công thức toán học dạng LaTeX (ví dụ: $E = mc^2$ hoặc $$y = ax + b$$) nếu có.
+1. Tạo một bảng so sánh đối chiếu (Bảng có các cột: Tiêu chí | Tài liệu 1 | Tài liệu 2 | ...).
+   Bảng so sánh phải bao gồm các tiêu chí: Mục tiêu, Phương pháp, Kết quả chính, Hạn chế.
+   YÊU CẦU ĐỊNH DẠNG BẢNG:
+   - Mỗi ô trong bảng tối đa 1-2 câu ngắn gọn.
+   - TUYỆT ĐỐI KHÔNG viết paragraph dài hay danh sách bullet trong ô bảng.
+   - Dùng từ khóa và cụm từ ngắn thay vì câu đầy đủ.
+   - Viết hoàn toàn bằng tiếng Việt. KHÔNG viết song ngữ hay kèm bản tiếng Anh.
+2. Viết một báo cáo phân tích tổng hợp (Synthesis Report) ngắn gọn khoảng 300-600 từ bằng tiếng Việt:
+   - Các điểm tương đồng và khác biệt chính giữa các nghiên cứu.
+   - Các nghiên cứu bổ khuyết hay tương phản với nhau thế nào?
+   - Kết luận tổng quan ngắn gọn.
+   QUAN TRỌNG: Viết súc tích, đi thẳng vào trọng tâm. KHÔNG lặp lại nội dung đã có trong bảng. KHÔNG viết phần mở đầu dài dòng hay giới thiệu bối cảnh chung chung.
+3. Đảm bảo Markdown chuẩn, giữ nguyên công thức LaTeX nếu có.
 
-Hãy tạo báo cáo đối chiếu song ngữ chất lượng cao.`;
+Hãy tạo báo cáo đối chiếu chất lượng cao.`;
 
     const gemini = await getGeminiClient();
     const model = gemini.getGenerativeModel({ model: 'gemini-2.5-flash' });

@@ -825,3 +825,133 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 - npm run build: Pass
 - TypeScript errors: 0
 - Playwright E2E test suite: Pass (3/3 tests passed)
+
+---
+
+### ✅ Story 5.3: Scholar Search Agent & related Papers Web Search & Pipeline Hardening
+**Status:** Done  
+**Time:** 12 hours  
+**Date:** 2026-06-23
+
+#### Đã làm:
+1. **Tích hợp Semantic Scholar & OpenAlex Fallback (`be/lambda/handlers/chat.ts`):**
+   - Triển khai tool `searchExternalPapers` cho Gemini 2.5 Flash.
+   - Thiết lập cơ chế fallback tự động: Gọi API Semantic Scholar trước, nếu thất bại (rate limit hoặc kết nối lỗi), tự động chuyển sang OpenAlex API kèm logic giải nén inverted index abstract để bảo toàn kết quả tìm kiếm.
+2. **Hardening lỗi Unicode trong S3 Metadata (`be/lambda/handlers/explore.ts` & `be/lambda/utils/s3-helpers.ts`):**
+   - Mã hóa URL (`encodeURIComponent`) các trường thông tin tiếng Việt có dấu như `topic` và `fileName` khi lưu vào metadata của S3 để triệt tiêu hoàn toàn lỗi AWS SDK `"Invalid character in header content"`.
+3. **Hardening bộ phân tích và render Mermaid.js & KaTeX (`fe/app/explore/page.tsx` & `fe/components/MindmapModal.tsx`):**
+   - Nâng cấp hàm dọn dẹp `cleanMermaidCode` phân biệt rõ sơ đồ `mindmap` và `flowchart`/`graph`, tự động loại bỏ các thẻ HTML lỗi và chuẩn hóa dấu mũi tên/ký tự đặc biệt trước khi render để tránh lỗi treo parser của Mermaid.
+4. **Sửa lỗi Workspace Chat History Wipeout (`fe/components/WorkspaceView.tsx`):**
+   - Khắc phục triệt để race condition khi cập nhật session của NextAuth làm thay đổi `userName`, gây kích hoạt lại hiệu ứng phụ xóa sạch lịch sử chat của người dùng. Giao diện giờ đây giữ nguyên các tin nhắn cũ và chỉ thêm câu chào nếu lịch sử trống.
+5. **Viết và Chạy Playwright E2E Tests:**
+   - Tạo bộ test E2E `fe/tests/scholar-search.spec.ts` kiểm thử đầy đủ luồng kích hoạt Scholar Search Agent từ toolbar hoặc quick-actions trong chat.
+
+#### Kết quả kiểm thử:
+- **Playwright E2E Test Suite:** 100% PASS (50/50 test cases chạy thành công trên toàn bộ hệ thống).
+- **Backend Unit Tests (Jest):** PASS (Mọi unit tests chạy mock qua Jest đều hoàn thành tốt).
+
+#### Vấn đề gặp phải:
+- NextAuth session trigger cập nhật lại username làm wipe-out lịch sử chat khi test E2E. -> **Giải pháp**: Tinh chỉnh logic khởi tạo của `messages` trong `useEffect` để chỉ ghi đè khi mảng tin nhắn trống hoặc chỉ có 1 phần tử chào ban đầu.
+
+#### Bước tiếp theo:
+- Sẵn sàng bàn giao toàn bộ Epic 5, tiến tới Epic 6 (Podcasts & Audio generation).
+
+#### Files thay đổi:
+- `be/lambda/handlers/chat.ts` - Tích hợp OpenAlex fallback và tool search bài báo ngoài.
+- `be/lambda/handlers/explore.ts` - Mã hóa URL trường `topic` trong S3 Metadata.
+- `be/lambda/utils/s3-helpers.ts` - Mã hóa URL trường `fileName` trong S3 Metadata.
+- `fe/app/explore/page.tsx` - Tinh chỉnh `cleanMermaidCode` cho Mindmap/Flowchart.
+- `fe/components/MindmapModal.tsx` - Tinh chỉnh `cleanMermaidCode` và SVG rendering.
+- `fe/components/WorkspaceView.tsx` - Khắc phục lỗi reset lịch sử chat khi NextAuth cập nhật session.
+- `fe/tests/scholar-search.spec.ts` - Tạo bộ test E2E kiểm chứng Scholar Search Agent.
+
+#### Build status:
+- npm run build: Pass
+- TypeScript errors: 0
+- Playwright E2E test suite: Pass (50/50 tests passed)
+
+---
+
+### ✅ Bug Fixes: Synthesis Table Formatting & OpenAlex Proxy Fallback
+**Status:** Done  
+**Time:** 2 hours  
+**Date:** 2026-06-24
+
+#### Đã làm:
+1. **Sửa Prompt Synthesis (`be/lambda/handlers/synthesis.ts`):**
+   - Thêm phần yêu cầu định dạng bảng (YÊU CẦU ĐỊNH DẠNG BẢNG: tối đa 2-3 câu ngắn gọn/ô, không nhét paragraph hay bullet list, ưu tiên từ khóa) vào system prompt.
+   - Xóa cache cũ trên AWS S3 (`synthesis/` folder) để đảm bảo lần chạy tiếp theo cập nhật prompt mới thay vì dùng cache cũ.
+2. **Sửa Fallback OpenAlex Proxy (`fe/app/api/semantic-scholar/route.ts`):**
+   - Thay thế hoàn toàn phần mock papers hardcode bằng hàm calls API OpenAlex thực tế và giải mã inverted index abstracts để bảo toàn dữ liệu liên quan.
+   - Sửa catch/fallback để thực hiện gọi OpenAlex khi Semantic Scholar bị rate limit/fail và trả về mảng rỗng nếu cả 2 đều fail.
+3. **Cập nhật Trạng thái UI khi không tìm thấy bài báo (`fe/components/WorkspaceView.tsx`):**
+   - Thêm trạng thái `hasFetchedPapers` để phân biệt trạng thái ban đầu chưa tìm kiếm và trạng thái tìm kiếm xong nhưng rỗng.
+   - Hiển thị thông báo "Không tìm thấy bài báo liên quan" kèm nút "Thử tìm lại" nếu kết quả rỗng thay vì để trống/hiển thị nút khởi đầu.
+
+#### Kết quả kiểm thử:
+- **Playwright E2E Tests:** `tests/semantic-scholar.spec.ts` & `tests/synthesis.spec.ts` PASS 100%.
+- **S3 Cache Clean:** Xóa sạch toàn bộ tệp cache cũ trong folder `synthesis/` trên S3 bucket `vietai-results-042360978148`.
+
+#### Files thay đổi:
+- `be/lambda/handlers/synthesis.ts` - Thêm chỉ định format bảng so sánh đối chiếu.
+- `fe/app/api/semantic-scholar/route.ts` - Tích hợp gọi OpenAlex API thực tế làm fallback.
+- `fe/components/WorkspaceView.tsx` - Quản lý trạng thái trống (empty results) khi tìm kiếm bài viết liên quan.
+
+#### Build status:
+- npm run build: Pass
+- TypeScript errors: 0
+- Playwright E2E tests: Pass
+
+---
+
+### ✅ Bug Fixes: NextAuth ClientFetchError (Untrusted Host Configuration)
+**Status:** Done  
+**Time:** 0.5 hours  
+**Date:** 2026-06-24
+
+#### Đã làm:
+1. **Khắc phục lỗi NextAuth ClientFetchError (`fe/auth.ts`):**
+   - Thêm cấu hình `trustHost: true` vào hàm cấu hình `NextAuth` của Auth.js. Lỗi xảy ra do trong môi trường local development/production, Auth.js từ chối xử lý request và trả về trang HTML thông báo lỗi `UntrustedHost` thay vì JSON, dẫn đến parser phía client crash với lỗi `"Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON"`.
+2. **Cấu hình biến môi trường (`fe/.env.local`):**
+   - Bổ sung `AUTH_TRUST_HOST="true"` để đảm bảo đồng bộ cấu hình trên mọi môi trường chạy.
+3. **Regenerate Dev Types:**
+   - Dọn dẹp thư mục `.next` bị lỗi cấu trúc kiểu dữ liệu sinh tự động (`routes.d.ts` bị hỏng) và chạy build thành công để xác minh tính toàn vẹn của ứng dụng.
+
+#### Files thay đổi:
+- `fe/auth.ts` - Thêm cấu hình `trustHost: true`.
+- `fe/.env.local` - Thêm biến môi trường `AUTH_TRUST_HOST="true"`.
+
+#### Build status:
+- npm run build: Pass
+- TypeScript errors: 0
+- Dev Server Status: Running OK (200 OK on `/api/auth/session`)
+
+---
+
+### ✅ Bug Fixes: TOC Navigation & PDF Export support in Explore Mode
+**Status:** Done  
+**Time:** 0.5 hours  
+**Date:** 2026-06-24
+
+#### Đã làm:
+1. **Sửa lỗi TOC không scroll đến section (`fe/app/explore/page.tsx`):**
+   - Định nghĩa hàm chuẩn hóa tên Tiếng Việt không dấu `slugify(text)`.
+   - Cải tiến hàm parse markdown `renderMarkdown` gán trực tiếp thuộc tính `id={slugify(cleanHeadingText)}` cho các thẻ `<h1>` đến `<h4>` lúc biên dịch HTML.
+   - Cập nhật hàm tạo `useMemo(toc)` sử dụng chung `slugify` giúp đồng bộ ID tuyệt đối.
+   - Thêm `scroll-behavior: smooth;` vào lớp CSS `.scroll-container` để đảm bảo hành động cuộn tự nhiên, mượt mà. Loại bỏ side-effect thao tác DOM thủ công trong `useEffect`.
+2. **Hỗ trợ Xuất/Tải PDF thực tế (`fe/app/explore/page.tsx`):**
+   - Đổi tên nút hành động chính từ "Tải về Markdown" thành "Tải về PDF", kích hoạt trình sinh PDF tự động của trình duyệt bằng `window.print()`.
+   - Cung cấp nút tải Markdown gốc (.md) dưới dạng hành động phụ (secondary action).
+   - Thêm các lớp CSS `@media print` và thuộc tính `.no-print` để ẩn toàn bộ thành phần thừa (Header, Sidebar, Background Grid, Buttons) khi in, chỉ hiển thị duy nhất nội dung bài học thu được giúp bản in PDF chuyên nghiệp, sạch sẽ.
+3. **Sửa TypeScript E2E Evals (`fe/tests/explore.spec.ts`):**
+   - Thêm kiểu tường minh `route: any` cho tham số mock route của Playwright E2E để tránh lỗi compiler `TS7006`.
+
+#### Files thay đổi:
+- `fe/app/explore/page.tsx` - Tích hợp `slugify`, `id` headings, print PDF styles & button.
+- `fe/tests/explore.spec.ts` - Fix kiểu dữ liệu compile-time trong test suite.
+
+#### Build status:
+- npm run build: Pass
+- TypeScript errors: 0
+- Playwright E2E tests: Pass (4/4 tests passed)
+
