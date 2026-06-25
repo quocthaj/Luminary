@@ -8,6 +8,7 @@ import { LoginModal } from './LoginModal';
 import { QuizModal } from './QuizModal';
 import { FlashcardModal } from './FlashcardModal';
 import { MindmapModal } from './MindmapModal';
+import { usePodcastPlayer } from './PodcastPlayer';
 
 
 type Lang = 'en' | 'vi';
@@ -171,6 +172,16 @@ export function WorkspaceView({
 }) {
   const { data: session, status } = useSession();
   const [jobId, setJobId] = useState(initialJobId);
+
+  // Podcast Player states
+  const {
+    jobId: activeJobId,
+    status: podcastPlayerStatus,
+    isPlaying: isPodcastPlaying,
+    playPodcast,
+    togglePlay,
+  } = usePodcastPlayer();
+  const [podcastHdMode, setPodcastHdMode] = useState(true);
 
   // Layout states
   const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
@@ -825,6 +836,94 @@ export function WorkspaceView({
                     : 'AI vẽ mindmap cấu trúc bài viết'}
                 </span>
               </button>
+
+              {/* Hội thoại AI (Podcast) */}
+              <div
+                className={`p-2.5 rounded-xl border transition-all flex flex-col gap-2 ${
+                  activeJobId === jobId && podcastPlayerStatus === 'COMPLETED'
+                    ? 'border-[var(--success)]/30 bg-[var(--success-dim)]'
+                    : 'border-[var(--border-subtle)] bg-transparent'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-xs font-semibold text-[var(--text-primary)]">Hội thoại AI (Podcast)</span>
+                  {activeJobId === jobId && podcastPlayerStatus === 'COMPLETED' && (
+                    <span className="text-[8px] bg-[var(--success-dim)] text-[var(--success)] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                      Sẵn sàng
+                    </span>
+                  )}
+                  {activeJobId === jobId && podcastPlayerStatus === 'GENERATING' && (
+                    <span className="text-[8px] bg-[var(--warning-dim)] text-[var(--warning)] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider animate-pulse flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--warning)] animate-ping" />
+                      Đang tạo
+                    </span>
+                  )}
+                </div>
+
+                <span className="text-[10px] text-[var(--text-secondary)] opacity-75 leading-normal">
+                  Nghe cuộc đối thoại ngắn giữa 2 chuyên gia phân tích bài báo này.
+                </span>
+
+                <div className="flex items-center justify-between mt-1 text-[10px]">
+                  <span className="text-[var(--text-secondary)]">Chất lượng cao (HD)</span>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input 
+                      type="checkbox"
+                      checked={podcastHdMode}
+                      onChange={(e) => setPodcastHdMode(e.target.checked)}
+                      disabled={activeJobId === jobId && podcastPlayerStatus === 'GENERATING'}
+                      className="sr-only peer"
+                    />
+                    <div className="w-7 h-4 bg-[var(--border-normal)] rounded-full peer peer-checked:after:translate-x-[12px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[var(--text-primary)] after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[var(--accent)]" />
+                  </label>
+                </div>
+
+                <button
+                  onClick={() => {
+                    const currentTitle = libraryJobs.find(j => j.jobId === jobId)?.fileName || 'Tài liệu học thuật';
+                    playPodcast(jobId, currentTitle, podcastHdMode);
+                  }}
+                  disabled={loading || (activeJobId === jobId && podcastPlayerStatus === 'GENERATING')}
+                  className="w-full mt-1.5 py-1.5 rounded-lg bg-[var(--accent)] hover:opacity-90 disabled:opacity-50 text-[#080b12] text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {activeJobId === jobId ? (
+                    podcastPlayerStatus === 'GENERATING' ? (
+                      <>
+                        <span className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent border-[var(--bg-surface)] animate-spin" />
+                        Đang tạo...
+                      </>
+                    ) : podcastPlayerStatus === 'COMPLETED' ? (
+                      isPodcastPlaying ? (
+                        <>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                          </svg>
+                          Tạm dừng nghe
+                        </>
+                      ) : (
+                        <>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                          Tiếp tục nghe
+                        </>
+                      )
+                    ) : podcastPlayerStatus === 'FAILED' ? (
+                      'Thử lại'
+                    ) : (
+                      'Nghe Podcast'
+                    )
+                  ) : (
+                    <>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                        <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+                      </svg>
+                      Nghe Podcast
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -922,6 +1021,39 @@ export function WorkspaceView({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                   Tải về Markdown
+                </button>
+
+                <button
+                  onClick={() => {
+                    const currentTitle = libraryJobs.find(j => j.jobId === jobId)?.fileName || 'Tài liệu học thuật';
+                    playPodcast(jobId, currentTitle, podcastHdMode);
+                  }}
+                  disabled={loading || (activeJobId === jobId && podcastPlayerStatus === 'GENERATING')}
+                  className="flex items-center gap-1.5 rounded-lg border border-[var(--border-normal)] bg-[var(--bg-elevated)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-subtle)] px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer"
+                  title="Nghe podcast hội thoại phân tích bài báo"
+                >
+                  {activeJobId === jobId && podcastPlayerStatus === 'GENERATING' ? (
+                    <>
+                      <span className="inline-block w-3 h-3 rounded-full border border-t-transparent border-[var(--text-secondary)] animate-spin" />
+                      Đang tạo...
+                    </>
+                  ) : activeJobId === jobId && isPodcastPlaying ? (
+                    <>
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--success)] opacity-75 animate-duration-1000"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--success)]"></span>
+                      </span>
+                      Tạm dừng nghe
+                    </>
+                  ) : (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)]">
+                        <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                        <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+                      </svg>
+                      Nghe Podcast
+                    </>
+                  )}
                 </button>
 
                 <button

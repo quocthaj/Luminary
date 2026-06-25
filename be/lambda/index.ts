@@ -28,6 +28,8 @@ import { handleChatJob } from './handlers/chat';
 import { handleQuizPost, handleQuizGet } from './handlers/quiz';
 import { handleFlashcardPost, handleFlashcardGet } from './handlers/flashcard';
 import { handleMindmapPost, handleMindmapGet } from './handlers/mindmap';
+import { handlePodcastPost, handlePodcastGet } from './handlers/podcast';
+
 
 const STATE_MACHINE_ARN = process.env.STATE_MACHINE_ARN || '';
 const sfnClient = new SFNClient({ region: process.env.AWS_REGION || 'ap-southeast-1' });
@@ -54,6 +56,9 @@ export const handler = async (event: any) => {
             } else if (tool === 'explore') {
                 const { handleAsyncExploreJob } = require('./handlers/explore');
                 return await handleAsyncExploreJob(event);
+            } else if (tool === 'podcast') {
+                const { handleAsyncPodcastJob } = require('./handlers/podcast');
+                return await handleAsyncPodcastJob(event);
             } else {
                 // Default to quiz for backward compatibility (where tool is undefined or 'quiz')
                 const { handleAsyncQuizJob } = require('./handlers/quiz');
@@ -232,6 +237,40 @@ export const handler = async (event: any) => {
                     return respond(409, { error: 'Bản dịch song ngữ chưa hoàn thành để vẽ sơ đồ tư duy.' });
                 }
                 console.error('❌ Mindmap routing error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
+        if (path?.startsWith('/job/') && path?.endsWith('/podcast')) {
+            const userId = event.requestContext?.authorizer?.userId;
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const parts = path.split('/');
+            const jobId = parts[2];
+
+            try {
+                if (httpMethod === 'POST') {
+                    const result = await handlePodcastPost({ jobId, userId, hdMode: requestBody.hdMode });
+                    const statusCode = result.status === 'COMPLETED' ? 200 : 202;
+                    return respond(statusCode, result);
+                } else if (httpMethod === 'GET') {
+                    const result = await handlePodcastGet({ jobId, userId });
+                    return respond(200, result);
+                } else {
+                    return respond(405, { error: 'Method not allowed' });
+                }
+            } catch (err: any) {
+                if (err.message === 'JOB_NOT_FOUND') {
+                    return respond(404, { error: 'Job not found' });
+                }
+                if (err.message === 'FORBIDDEN') {
+                    return respond(403, { error: 'Forbidden' });
+                }
+                if (err.message === 'ANALYSIS_NOT_FOUND') {
+                    return respond(409, { error: 'Bản dịch song ngữ chưa hoàn thành để tạo podcast.' });
+                }
+                console.error('❌ Podcast routing error:', err);
                 return respond(500, { error: err.message || 'Internal server error' });
             }
         }

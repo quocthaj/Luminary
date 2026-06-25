@@ -955,3 +955,47 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 - TypeScript errors: 0
 - Playwright E2E tests: Pass (4/4 tests passed)
 
+---
+
+### ✅ Story 5.4: Đối thoại Audio 2 người - Tóm tắt đa tài liệu (2-Person Audio Overview & TTS Podcast Generator)
+**Status:** Done  
+**Time:** 12 hours  
+**Date:** 2026-06-25
+
+#### Đã làm:
+1. **Backend – Podcast Handler & Route (`be/lambda/handlers/podcast.ts` & `be/lambda/index.ts`):**
+   - Triển khai endpoint `POST /job/{jobId}/podcast` để nhận yêu cầu từ client, kiểm tra cache S3 (`results/${jobId}/podcast.mp3`) và trạng thái khóa DynamoDB. Nếu chưa có, kích hoạt async Lambda worker tự gọi bất đồng bộ (`asyncRun: true, tool: 'podcast', hdMode: requestBody.hdMode`) và trả về `202 Accepted`.
+   - Triển khai endpoint `GET /job/{jobId}/podcast` để client poll định kỳ mỗi 2 giây. Khi hoàn thành, sinh pre-signed S3 URL với thời hạn 1 giờ (`expiresIn: 3600`).
+   - Xây dựng background task worker `handleAsyncPodcastJob` sinh kịch bản đối thoại bằng Gemini 2.5 Flash thông qua Structured Output.
+   - Hỗ trợ chế độ âm thanh HD (`hdMode`) sử dụng Edge-TTS (với giới hạn concurrency = 3 và cơ chế auto-retry/backoff) và chế độ Standard sử dụng Amazon Polly (với giọng nói Tiếng Việt `HoaiMy` và `NamMinh`). Cập nhật các giọng nói AWS Polly để tương thích chuẩn với quy định ràng buộc `voiceId` của AWS Polly.
+   - Triển khai thuật toán loại bỏ thẻ ID3v1/ID3v2 và ghép nối các luồng buffer MP3 tự động trong Node.js để tạo file âm thanh hoàn chỉnh không bị ngắt quãng.
+2. **Backend – CDK Stack (`be/lib/be-stack.ts`):**
+   - Định nghĩa các resource `/job/{jobId}/podcast` cho hai phương thức `POST` và `GET`, cấu hình bảo vệ bằng `jwtAuthorizer` và cấp quyền ghi/đọc S3 Results Bucket cho Lambda role.
+3. **Frontend – API Proxy Next.js & UI Components:**
+   - Tạo proxy API Next.js tại `fe/app/api/tools/[jobId]/podcast/route.ts` để chuyển tiếp an toàn các yêu cầu từ Client đến Backend kèm session authorization và mock-bypass.
+   - Thiết kế Floating Audio Player (`fe/components/PodcastPlayer.tsx`) sang trọng bằng CSS glassmorphism, hỗ trợ thanh trượt tiến trình, điều chỉnh tốc độ đọc (0.5x đến 2.0x), tua nhanh/chậm 10 giây, thu nhỏ/phóng to widget.
+   - Thêm nút "Nghe Podcast" kèm icon tai nghe vào thanh công cụ Reader Workspace.
+4. **Kiểm thử tự động & Build validation:**
+   - Viết Jest Unit Test cho thuật toán gộp file MP3 (`be/test/podcast.test.ts`) kiểm chứng xử lý thành công ID3v1, ID3v2, tag lỗi và ghép thô.
+   - Viết Playwright E2E Test (`fe/tests/podcast.spec.ts`) kiểm tra toàn bộ luồng tạo, poll trạng thái và phát nhạc trên player.
+
+#### Vấn đề gặp phải & Ghi chú bổ sung:
+- **Lỗi VoiceId Constraints của AWS Polly:** AWS Polly chỉ cho phép một danh sách các voice ID cụ thể (như `Joanna`, `Matthew`, v.v.). Chúng tôi đã điều chỉnh backend để sử dụng các giọng nói nằm trong tập hợp được hỗ trợ.
+- **Yêu cầu tương lai (Ghi chú):** Hiện tại Podcast mặc định tạo bằng Tiếng Việt hoặc Tiếng Anh dựa theo cấu hình/prompt và tài liệu. Người dùng muốn thêm tùy chọn chọn ngôn ngữ (Tiếng Anh / Tiếng Việt) trên giao diện cấu hình trước khi tạo Podcast.
+
+#### Files thay đổi:
+- `be/lambda/handlers/podcast.ts` - Xử lý logic sinh kịch bản đối thoại, EdgeTTS/AWS Polly, ID3 tag stripping & merge.
+- `be/lambda/index.ts` - Routing cho HTTP & async background worker.
+- `be/lib/be-stack.ts` - Định nghĩa CDK endpoints.
+- `be/test/podcast.test.ts` - Unit tests backend.
+- `fe/app/api/tools/[jobId]/podcast/route.ts` - Next.js Proxy API.
+- `fe/components/PodcastPlayer.tsx` - Floating Player UI.
+- `fe/components/WorkspaceView.tsx` - Tích hợp nút trigger & modal cấu hình.
+- `fe/tests/podcast.spec.ts` - E2E Playwright tests.
+
+#### Build status:
+- npm run build: Pass
+- TypeScript errors: 0
+- Playwright E2E tests: Pass (6/6 tests passed)
+- Jest Backend tests: Pass (28/28 tests passed)
+

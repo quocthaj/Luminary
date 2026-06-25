@@ -260,6 +260,11 @@ export class VietAIScholarStack extends cdk.Stack {
       effect: iam.Effect.ALLOW,
     }));
     orchestratorLambda.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['polly:SynthesizeSpeech'],
+      resources: ['*'],
+      effect: iam.Effect.ALLOW,
+    }));
+    orchestratorLambda.addToRolePolicy(new iam.PolicyStatement({
       actions: [
         'textract:DetectDocumentText',
         'textract:AnalyzeDocument',
@@ -615,6 +620,26 @@ export class VietAIScholarStack extends cdk.Stack {
       }
     );
     mindmapResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+
+    // ============================================
+    // API Endpoint 2.10: POST & GET /job/{jobId}/podcast
+    // Returns: { status } — AI podcast generator
+    // ============================================
+    const podcastResource = jobIdResource.addResource('podcast');
+    podcastResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+    podcastResource.addMethod(
       'GET',
       new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
       {
