@@ -1,6 +1,6 @@
 'use client';
 import { useState, useCallback, useEffect } from 'react';
-import { UploadView } from '../components/UploadView';
+import { LandingView } from '../components/LandingView';
 import { ProcessingView } from '../components/ProcessingView';
 import { WorkspaceView } from '../components/WorkspaceView';
 
@@ -34,10 +34,10 @@ export default function Home() {
   const handleReprocess = useCallback(() => setState('processing'), []);
 
   if (state === 'upload') {
-    return <UploadView onJobCreated={handleJobCreated} />;
+    return <LandingView onJobCreated={handleJobCreated} />;
   }
   if (state === 'processing') {
-    return <ProcessingView jobId={jobId} onComplete={handleComplete} />;
+    return <ProcessingView jobId={jobId} onComplete={handleComplete} onBack={handleReset} />;
   }
   return <WorkspaceView jobId={jobId} onReset={handleReset} onReprocess={handleReprocess} />;
 }

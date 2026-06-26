@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { createUploadUrl, uploadFile, ApiError } from '../lib/api';
+import { createUploadUrl, uploadFile, ApiError, getJobs, JobStatus } from '../lib/api';
 import { useSession, signOut } from 'next-auth/react';
 import { LoginModal } from './LoginModal';
 
@@ -23,6 +23,41 @@ export function UploadView({ onJobCreated }: { onJobCreated: (jobId: string) => 
 
   const [simulateNetworkFailure, setSimulateNetworkFailure] = useState(false);
   const [simulateUploadTimeout, setSimulateUploadTimeout] = useState(false);
+
+  const [recentJobs, setRecentJobs] = useState<JobStatus[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(false);
+
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    let active = true;
+
+    async function fetchRecentJobs() {
+      try {
+        if (recentJobs.length === 0) setLoadingJobs(true);
+        const data = await getJobs();
+        if (!active) return;
+        const sorted = data
+          .filter(j => !j.jobId?.startsWith('exp-'))
+          .sort((a, b) => {
+            const timeA = parseInt(a.createdAt || '0');
+            const timeB = parseInt(b.createdAt || '0');
+            return timeB - timeA;
+          });
+        setRecentJobs(sorted.slice(0, 3));
+      } catch (err) {
+        console.error('Failed to fetch recent jobs:', err);
+      } finally {
+        if (active) setLoadingJobs(false);
+      }
+    }
+
+    fetchRecentJobs();
+    const interval = setInterval(fetchRecentJobs, 10000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [status, recentJobs.length]);
 
   const isBlocked = trialExceeded && status !== 'authenticated';
 
@@ -499,6 +534,83 @@ export function UploadView({ onJobCreated }: { onJobCreated: (jobId: string) => 
         >
           Kết quả xuất ra Markdown song ngữ · LaTeX và citations giữ nguyên
         </p>
+
+        {/* Recent Documents Section */}
+        {status === 'authenticated' && (recentJobs.length > 0 || loadingJobs) && (
+          <div className="mt-8 pt-6 border-t border-[var(--border-subtle)] w-full text-left animate-fade-up">
+            <div className="flex items-center justify-between mb-4">
+              <h3 
+                className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]"
+                style={{ fontFamily: 'var(--font-be-vietnam)' }}
+              >
+                Tài liệu gần đây
+              </h3>
+              <a 
+                href="/library" 
+                className="text-xs text-[var(--accent)] hover:underline font-semibold"
+              >
+                Thư viện →
+              </a>
+            </div>
+
+            {loadingJobs && recentJobs.length === 0 ? (
+              <div className="flex flex-col gap-2.5">
+                {[1, 2].map(i => (
+                  <div key={i} className="h-16 w-full rounded-xl border border-[var(--border-normal)] bg-[var(--bg-surface)] animate-pulse" />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {recentJobs.map(job => {
+                  const isProcessing = ['pending', 'queued', 'extracting', 'processing', 'agents_completed'].includes(job.status);
+                  const isCompleted = job.status === 'completed';
+                  const isFailed = job.status === 'failed';
+
+                  return (
+                    <div 
+                      key={job.jobId}
+                      className="p-3.5 rounded-xl border border-[var(--border-normal)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] transition-all flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-[var(--text-primary)] truncate" title={job.fileName}>
+                          {job.fileName || 'Tài liệu không tên.pdf'}
+                        </p>
+                        <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">
+                          {job.createdAt ? new Date(parseInt(job.createdAt) * 1000).toLocaleDateString('vi-VN') : ''}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {isProcessing && (
+                          <button
+                            onClick={() => onJobCreated(job.jobId)}
+                            className="text-[10px] font-semibold px-2.5 py-1 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/20 transition-all cursor-pointer flex items-center gap-1"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                            Theo dõi
+                          </button>
+                        )}
+                        {isCompleted && (
+                          <button
+                            onClick={() => onJobCreated(job.jobId)}
+                            className="text-[10px] font-bold px-2.5 py-1 rounded bg-[var(--accent)] text-[#080b12] hover:opacity-90 transition-all cursor-pointer"
+                          >
+                            Đọc ngay
+                          </button>
+                        )}
+                        {isFailed && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                            Lỗi
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Login Requirement Modal */}

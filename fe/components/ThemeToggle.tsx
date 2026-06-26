@@ -16,23 +16,23 @@ const MoonIcon = (
 );
 
 export function ThemeToggle() {
-  // Server default = dark; useEffect syncs with actual localStorage state
+  // Server default = light (false); useEffect syncs with actual localStorage state
   // This avoids hydration mismatch (rendering-hydration-no-flicker)
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsDark(!document.documentElement.classList.contains('light'));
+    setIsDark(document.documentElement.classList.contains('dark'));
   }, []);
 
   const toggle = useCallback(() => {
     setIsDark(prev => {
       const next = !prev;
       if (next) {
-        document.documentElement.classList.remove('light');
+        document.documentElement.classList.add('dark');
         localStorage.setItem('theme', 'dark');
       } else {
-        document.documentElement.classList.add('light');
+        document.documentElement.classList.remove('dark');
         localStorage.setItem('theme', 'light');
       }
       return next;
