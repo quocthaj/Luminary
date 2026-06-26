@@ -39,7 +39,7 @@ export default function RootLayout({
         {/* Apply saved theme before first paint — prevents flash (rendering-hydration-no-flicker) */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light')}catch(_){}`,
+            __html: `try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(_){}`,
           }}
         />
       </head>
