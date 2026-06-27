@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { generateQuiz, checkQuizStatus, QuizData, QuizQuestion } from '../lib/api';
+import { generateQuiz, checkQuizStatus, createQuizShare, QuizData, QuizQuestion } from '../lib/api';
 import katex from 'katex';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -73,6 +73,8 @@ export function QuizModal({ isOpen, jobId, onClose }: QuizModalProps) {
   const [selected, setSelected] = useState<(number | null)[]>([]);
   const [currentQ, setCurrentQ] = useState(0);
   const [questionCount, setQuestionCount] = useState<number>(10);
+  const [sharing, setSharing] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const loadingText = useProgressiveLoading(phase === 'loading' && isOpen);
 
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -214,6 +216,22 @@ export function QuizModal({ isOpen, jobId, onClose }: QuizModalProps) {
     setPhase('playing');
   }, [quiz]);
 
+  const handleShareQuiz = useCallback(async () => {
+    if (!jobId) return;
+    try {
+      setSharing(true);
+      const res = await createQuizShare(jobId, quiz?.questionCount || 5);
+      const fullUrl = `${window.location.origin}${res.shareUrl}`;
+      await navigator.clipboard.writeText(fullUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Không thể tạo liên kết chia sẻ.');
+    } finally {
+      setSharing(false);
+    }
+  }, [jobId, quiz]);
+
   const score = quiz
     ? quiz.questions.reduce((acc, q, i) => acc + (selected[i] === q.correctOptionIndex ? 1 : 0), 0)
     : 0;
@@ -257,15 +275,32 @@ export function QuizModal({ isOpen, jobId, onClose }: QuizModalProps) {
               )}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            id="quiz-modal-close"
-            className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            {quiz && phase !== 'loading' && phase !== 'setup' && (
+              <button
+                onClick={handleShareQuiz}
+                disabled={sharing}
+                id="quiz-share-btn"
+                data-testid="quiz-share-btn"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-[var(--accent)] text-xs font-semibold hover:bg-[var(--accent)] hover:text-[#080b12] transition-all cursor-pointer"
+                title="Chia sẻ bài trắc nghiệm này"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                {shareCopied ? 'Đã chép link! ✓' : sharing ? 'Đang tạo...' : 'Chia sẻ'}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              id="quiz-modal-close"
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* ── Body ── */}

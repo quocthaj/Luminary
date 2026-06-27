@@ -216,6 +216,57 @@ export async function checkQuizStatus(jobId: string, count?: number): Promise<Qu
   return res.json();
 }
 
+export interface QuizShareResult {
+  shareId: string;
+  shareUrl: string;
+  expiresAt: number;
+}
+
+export interface PublicQuizData {
+  downloadUrl: string;
+  count: number;
+  title: string;
+  expiresAt: number;
+  questions?: QuizQuestion[];
+  mockQuestions?: QuizQuestion[];
+}
+
+export async function createQuizShare(jobId: string, count: number = 5): Promise<QuizShareResult> {
+  const url = `/api/tools/${jobId}/share/quiz`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ count }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const status = res.status;
+    if (status === 401) throw new ApiError('Bạn cần đăng nhập để chia sẻ bài trắc nghiệm.', 401);
+    if (status === 403) throw new ApiError('Bạn không có quyền chia sẻ bài trắc nghiệm này.', 403);
+    if (status === 409) throw new ApiError('Bộ câu hỏi trắc nghiệm chưa được tạo để chia sẻ.', 409);
+    if (status === 429) throw new ApiError('Đã đạt giới hạn tối đa 10 liên kết chia sẻ cho bài báo này.', 429);
+    throw new ApiError(err.error || `Tạo liên kết chia sẻ thất bại: ${status}`, status);
+  }
+  return res.json();
+}
+
+export async function getPublicQuizShare(shareId: string): Promise<PublicQuizData> {
+  const url = `/api/share/quiz/${shareId}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const status = res.status;
+    if (status === 404) throw new ApiError('Liên kết chia sẻ không tồn tại hoặc đã bị xóa.', 404);
+    if (status === 410) throw new ApiError('Liên kết chia sẻ này đã hết hạn (30 ngày).', 410);
+    throw new ApiError(err.error || `Tải bài trắc nghiệm công khai thất bại: ${status}`, status);
+  }
+  return res.json();
+}
+
+
 export interface FlashcardItem {
   term: string;
   pronunciation: string;
