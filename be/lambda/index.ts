@@ -29,6 +29,7 @@ import { handleQuizPost, handleQuizGet } from './handlers/quiz';
 import { handleFlashcardPost, handleFlashcardGet } from './handlers/flashcard';
 import { handleMindmapPost, handleMindmapGet } from './handlers/mindmap';
 import { handlePodcastPost, handlePodcastGet } from './handlers/podcast';
+import { handleCreateQuizShare, handleGetPublicQuiz } from './handlers/share';
 
 
 const STATE_MACHINE_ARN = process.env.STATE_MACHINE_ARN || '';
@@ -129,7 +130,7 @@ export const handler = async (event: any) => {
             }
         }
 
-        if (path?.startsWith('/job/') && path?.endsWith('/quiz')) {
+        if (path?.startsWith('/job/') && path?.endsWith('/quiz') && !path?.includes('/share/')) {
             const userId = event.requestContext?.authorizer?.userId;
             if (!userId) {
                 return respond(401, { error: 'Unauthorized' });
@@ -164,6 +165,44 @@ export const handler = async (event: any) => {
                     return respond(400, { error: 'Tham số count không hợp lệ. Chỉ hỗ trợ 5, 10, hoặc 20 câu hỏi.' });
                 }
                 console.error('❌ Quiz routing error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
+        if (httpMethod === 'POST' && path?.startsWith('/job/') && path?.includes('/share/quiz')) {
+            const userId = event.requestContext?.authorizer?.userId;
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const parts = path.split('/');
+            const jobId = parts[2];
+            const countParam = requestBody.count || event.queryStringParameters?.count;
+            const count = countParam ? parseInt(countParam, 10) : undefined;
+
+            try {
+                const result = await handleCreateQuizShare({ jobId, userId, count });
+                return respond(200, result);
+            } catch (err: any) {
+                if (err.message === 'JOB_NOT_FOUND') return respond(404, { error: 'Job not found' });
+                if (err.message === 'FORBIDDEN') return respond(403, { error: 'Forbidden' });
+                if (err.message === 'QUIZ_NOT_READY') return respond(409, { error: 'Bộ câu hỏi trắc nghiệm chưa được tạo để chia sẻ.' });
+                if (err.message === 'MAX_SHARES_REACHED') return respond(429, { error: 'Đã đạt giới hạn tối đa 10 liên kết chia sẻ cho bài báo này.' });
+                if (err.message === 'INVALID_COUNT') return respond(400, { error: 'Số lượng câu hỏi không hợp lệ.' });
+                console.error('❌ Quiz share creation error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
+        if (httpMethod === 'GET' && path?.startsWith('/share/quiz/')) {
+            const parts = path.split('/');
+            const shareId = parts[3];
+            try {
+                const result = await handleGetPublicQuiz({ shareId });
+                return respond(200, result);
+            } catch (err: any) {
+                if (err.message === 'SHARE_NOT_FOUND') return respond(404, { error: 'Liên kết chia sẻ không tồn tại hoặc đã bị xóa.' });
+                if (err.message === 'SHARE_EXPIRED') return respond(410, { error: 'Liên kết chia sẻ này đã hết hạn.' });
+                console.error('❌ Public quiz share fetch error:', err);
                 return respond(500, { error: err.message || 'Internal server error' });
             }
         }

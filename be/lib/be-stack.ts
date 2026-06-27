@@ -58,6 +58,14 @@ export class VietAIScholarStack extends cdk.Stack {
           expiration: cdk.Duration.days(30), // Cache 30 days
         },
       ],
+      cors: [
+        {
+          allowedOrigins: ['*'],
+          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],
+          allowedHeaders: ['*'],
+          maxAge: 3000,
+        },
+      ],
     });
 
     // Bucket for frontend SPA (React build)
@@ -104,6 +112,19 @@ export class VietAIScholarStack extends cdk.Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
+    // Table: vietai-quiz-shares (Dedicated table for public quiz share links)
+    const quizSharesTable = new dynamodb.Table(this, 'QuizSharesTable', {
+      tableName: 'vietai-quiz-shares',
+      partitionKey: {
+        name: 'shareId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      timeToLiveAttribute: 'expiresAt',
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // ============================================
     // 3. IAM ROLE FOR LAMBDA
     // ============================================
@@ -120,6 +141,7 @@ export class VietAIScholarStack extends cdk.Stack {
 
     // DynamoDB permissions
     jobsTable.grantReadWriteData(lambdaRole);
+    quizSharesTable.grantReadWriteData(lambdaRole);
 
     // Textract permissions (sync + async OCR fallback for PDF)
     lambdaRole.addToPrincipalPolicy(
@@ -203,6 +225,7 @@ export class VietAIScholarStack extends cdk.Stack {
           S3_UPLOADS_BUCKET: uploadsBucket.bucketName,
           S3_RESULTS_BUCKET: resultsBucket.bucketName,
           DYNAMODB_TABLE: jobsTable.tableName,
+          QUIZ_SHARES_TABLE: quizSharesTable.tableName,
           GROQ_SECRET_ARN: groqSecret.secretName,
           GEMINI_SECRET_ARN: geminiSecret.secretName,
           DEEPSEEK_SECRET_ARN: deepseekSecret.secretName,
@@ -248,6 +271,7 @@ export class VietAIScholarStack extends cdk.Stack {
     uploadsBucket.grantReadWrite(orchestratorLambda);
     resultsBucket.grantReadWrite(orchestratorLambda);
     jobsTable.grantReadWriteData(orchestratorLambda);
+    quizSharesTable.grantReadWriteData(orchestratorLambda);
     groqSecret.grantRead(orchestratorLambda);
     geminiSecret.grantRead(orchestratorLambda);
     deepseekSecret.grantRead(orchestratorLambda);
@@ -584,6 +608,36 @@ export class VietAIScholarStack extends cdk.Stack {
       new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
       {
         authorizer,
+      }
+    );
+
+    // ============================================
+    // API Endpoint 2.7b: POST /job/{jobId}/share/quiz
+    // Returns: { shareId, shareUrl, expiresAt } — Share Quiz Link Generator
+    // ============================================
+    const shareResource = jobIdResource.addResource('share');
+    const shareQuizResource = shareResource.addResource('quiz');
+    shareQuizResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+        methodResponses: [{ statusCode: '200' }],
+      }
+    );
+
+    // ============================================
+    // API Endpoint 2.7c: GET /share/quiz/{shareId} (Public Endpoint with EDoS Throttling)
+    // Returns: { downloadUrl, count, expiresAt } — S3 Pre-signed URL for Quiz
+    // ============================================
+    const publicShareResource = api.root.addResource('share');
+    const publicShareQuizResource = publicShareResource.addResource('quiz');
+    const publicShareIdResource = publicShareQuizResource.addResource('{shareId}');
+    publicShareIdResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        // Public endpoint, no authorizer
       }
     );
  

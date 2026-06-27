@@ -32,6 +32,7 @@ export const textractClient = new TextractClient({ region: REGION });
 export const UPLOADS_BUCKET = process.env.S3_UPLOADS_BUCKET || '';
 export const RESULTS_BUCKET = process.env.S3_RESULTS_BUCKET || '';
 export const JOBS_TABLE = process.env.DYNAMODB_TABLE || '';
+export const QUIZ_SHARES_TABLE = process.env.QUIZ_SHARES_TABLE || 'vietai-quiz-shares';
 export const GROQ_SECRET_ARN = process.env.GROQ_SECRET_ARN || '';
 export const GEMINI_SECRET_ARN = process.env.GEMINI_SECRET_ARN || '';
 export const DEEPSEEK_SECRET_ARN = process.env.DEEPSEEK_SECRET_ARN || '';

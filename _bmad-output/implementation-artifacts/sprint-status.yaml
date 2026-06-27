@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-07T11:05:00Z
-last_updated: 2026-06-25T22:25:00+07:00
+last_updated: 2026-06-27T18:20:00+07:00
 project: viet-ai-scholar
 project_key: NOKEY
 tracking_system: file-system
@@ -76,6 +76,6 @@ development_status:
   5-2-che-do-kham-pha-ai-agent-tu-sinh-noi-dung-hoc-thuat-theo-chu-de-explore-mode-topic-based-generation: done
   5-3-scholar-search-agent-tim-kiem-bai-bao-lien-quan-scholar-search-agent-related-papers-web-search: done
   5-4-doi-thoai-audio-2-nguoi-tts-podcast-tong-hop-2-person-audio-overview-tts-podcast: done
-  5-5-chia-se-va-lam-bai-trac-nghiem-lien-ket-cong-khai-quiz-sharing-public-quiz-player: backlog
+  5-5-chia-se-va-lam-bai-trac-nghiem-lien-ket-cong-khai-quiz-sharing-public-quiz-player: done
   epic-5-retrospective: optional
 

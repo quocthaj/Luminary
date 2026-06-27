@@ -78,3 +78,18 @@ export interface RelatedParagraph {
     text_translated: string;
 }
 
+export interface QuizShareItem {
+    shareId: string;
+    jobId: string;
+    userId: string;
+    count: number;
+    createdAt: number;
+    expiresAt: number;
+}
+
+export interface QuizShareResponse {
+    shareId: string;
+    shareUrl: string;
+    expiresAt: number;
+}
+
