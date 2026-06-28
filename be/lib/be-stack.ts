@@ -179,6 +179,9 @@ export class VietAIScholarStack extends cdk.Stack {
     const nomicSecret = secretsmanager.Secret.fromSecretNameV2(
       this, 'NomicSecret', 'vietai/nomic-api-key'
     );
+    const googleTtsSecret = secretsmanager.Secret.fromSecretNameV2(
+      this, 'GoogleTtsSecret', 'vietai/google-tts'
+    );
 
     // Grant Lambda read access to all secrets
     groqSecret.grantRead(lambdaRole);
@@ -188,6 +191,7 @@ export class VietAIScholarStack extends cdk.Stack {
     qdrantSecret.grantRead(lambdaRole);
     geminiEmbedSecret.grantRead(lambdaRole);
     nomicSecret.grantRead(lambdaRole);
+    googleTtsSecret.grantRead(lambdaRole);
 
     // Grant fallback access for friendly secret names and suffixes to prevent AccessDeniedException
     lambdaRole.addToPrincipalPolicy(
@@ -234,6 +238,8 @@ export class VietAIScholarStack extends cdk.Stack {
           NOMIC_SECRET_ARN: nomicSecret.secretName,
           QDRANT_SECRET_ARN: qdrantSecret.secretName,
           AUTH_SECRET_SECRET_NAME: 'vietai/auth-secret',
+          GOOGLE_TTS_SECRET_ARN: googleTtsSecret.secretName,
+          GCP_TTS_API_KEY: process.env.GCP_TTS_API_KEY || '',
           // AWS_REGION is automatically available in Lambda runtime
         },
         description: 'Main orchestrator for PDF processing pipeline',
@@ -278,6 +284,7 @@ export class VietAIScholarStack extends cdk.Stack {
     mistralSecret.grantRead(orchestratorLambda);
     qdrantSecret.grantRead(orchestratorLambda);
     nomicSecret.grantRead(orchestratorLambda);
+    googleTtsSecret.grantRead(orchestratorLambda);
     orchestratorLambda.addToRolePolicy(new iam.PolicyStatement({
       actions: ['lambda:InvokeFunction'],
       resources: [`arn:aws:lambda:${this.region}:${this.account}:function:vietai-orchestrator`],

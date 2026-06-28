@@ -39,6 +39,7 @@ export const DEEPSEEK_SECRET_ARN = process.env.DEEPSEEK_SECRET_ARN || '';
 export const MISTRAL_SECRET_ARN = process.env.MISTRAL_SECRET_ARN || '';
 export const GEMINI_EMBEDDING_SECRET_ARN = process.env.GEMINI_EMBEDDING_SECRET_ARN || '';
 export const NOMIC_SECRET_ARN = process.env.NOMIC_SECRET_ARN || '';
+export const GOOGLE_TTS_SECRET_ARN = process.env.GOOGLE_TTS_SECRET_ARN || '';
 
 // ============================================
 // SECRET CACHE
