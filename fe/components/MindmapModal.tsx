@@ -1,13 +1,14 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { generateMindmap, checkMindmapStatus } from '../lib/api';
+import ObsidianGraphView, { GraphData } from './ObsidianGraphView';
 
 // Progressive loading messages
 const LOADING_STAGES = [
   { at: 0,     text: '🔍 Đang phân tích nội dung bài viết...' },
   { at: 4000,  text: '🧠 Đang trích xuất cấu trúc phân cấp...' },
-  { at: 10000, text: '✨ Đang tạo sơ đồ Mermaid.js...' },
-  { at: 18000, text: '⏳ Đang dựng bản vẽ trực quan...' },
+  { at: 10000, text: '✨ Đang tạo mạng lưới tri thức...' },
+  { at: 18000, text: '⏳ Đang dựng bản vẽ vật lý Obsidian...' },
 ];
 
 function useProgressiveLoading(active: boolean) {
@@ -80,6 +81,37 @@ function parseMindmapToTree(code: string): TreeNode | null {
     console.error('Failed to parse mindmap to tree:', err);
     return null;
   }
+}
+
+function convertTreeToGraph(root: TreeNode): GraphData {
+  const nodes: any[] = [];
+  const links: any[] = [];
+  let idCounter = 0;
+
+  function traverse(node: TreeNode, parentId?: string, depth: number = 0) {
+    const currentId = `node_${idCounter++}`;
+    const val = depth === 0 ? 14 : depth === 1 ? 9 : 5;
+    nodes.push({
+      id: currentId,
+      name: node.label,
+      val,
+      group: depth,
+    });
+
+    if (parentId) {
+      links.push({
+        source: parentId,
+        target: currentId,
+      });
+    }
+
+    if (node.children) {
+      node.children.forEach(child => traverse(child, currentId, depth + 1));
+    }
+  }
+
+  traverse(root);
+  return { nodes, links };
 }
 
 function RenderTextTree({ node }: { node: TreeNode }) {
@@ -169,15 +201,17 @@ interface MindmapModalProps {
 }
 
 type MindmapPhase = 'setup' | 'loading' | 'viewing';
+type ViewMode = 'graph' | 'tree';
 
 export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
   const [phase, setPhase] = useState<MindmapPhase>('setup');
+  const [viewMode, setViewMode] = useState<ViewMode>('graph');
   const [mermaidCode, setMermaidCode] = useState<string>('');
   const [svgMarkup, setSvgMarkup] = useState<string>('');
   const [renderError, setRenderError] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Pan & Zoom
+  // Pan & Zoom for Mermaid tree
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -211,7 +245,6 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
       setRenderError(true);
     }
   }, []);
-
 
   // Cleanup on unmount
   useEffect(() => {
@@ -301,8 +334,6 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
       });
   }, [isOpen, jobId, loadAndRenderMermaid]);
 
-
-
   const handleStartGeneration = useCallback(() => {
     setPhase('loading');
     setErrorMsg(null);
@@ -377,9 +408,9 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
       });
   }, [jobId, loadAndRenderMermaid]);
 
-  // Pan & Zoom mouse events
+  // Pan & Zoom mouse events for Mermaid view
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return; // Only left click
+    if (e.button !== 0) return;
     setIsDragging(true);
     dragStart.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
   };
@@ -397,7 +428,6 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
   };
 
   const handleWheel = (e: React.WheelEvent) => {
-    // Only zoom if hovering the inner container
     const zoomFactor = 1.05;
     const newScale = e.deltaY < 0 ? scale * zoomFactor : scale / zoomFactor;
     setScale(Math.min(Math.max(newScale, 0.4), 3));
@@ -424,6 +454,7 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
   if (!isOpen) return null;
 
   const parsedTree = mermaidCode ? parseMindmapToTree(mermaidCode) : null;
+  const graphData = parsedTree ? convertTreeToGraph(parsedTree) : null;
 
   return (
     <div
@@ -439,7 +470,6 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
         .animate-fadeIn {
           animation: fadeIn 0.2s ease-out forwards;
         }
-        /* Style node background and lines inside rendered SVG */
         .mindmap-viewport svg {
           max-width: none !important;
           height: auto !important;
@@ -460,15 +490,44 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
         }
       `}</style>
 
-      <div className="relative w-full max-w-4xl h-[85vh] bg-[#0e131f] border border-[var(--border-normal,rgba(255,255,255,0.1))] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="relative w-full max-w-5xl h-[88vh] bg-[#0e131f] border border-[var(--border-normal,rgba(255,255,255,0.1))] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-[var(--border-subtle,rgba(255,255,255,0.05))] flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="px-6 py-3.5 border-b border-[var(--border-subtle,rgba(255,255,255,0.05))] flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <div className="h-2.5 w-2.5 rounded-full bg-[var(--accent,#38bdf8)] animate-pulse" />
             <h3 className="text-sm font-bold text-white tracking-wide">
               Sơ Đồ Tư Duy Bài Báo (Mindmap)
             </h3>
           </div>
+
+          {/* Mode Switcher */}
+          {phase === 'viewing' && (
+            <div className="flex items-center bg-[#090d16] border border-white/10 rounded-xl p-1 gap-1">
+              <button
+                onClick={() => setViewMode('graph')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  viewMode === 'graph'
+                    ? 'bg-[var(--accent,#38bdf8)] text-[#080b12] shadow-md font-bold'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <span>🕸️</span>
+                <span>Obsidian Graph</span>
+              </button>
+              <button
+                onClick={() => setViewMode('tree')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  viewMode === 'tree'
+                    ? 'bg-[var(--accent,#38bdf8)] text-[#080b12] shadow-md font-bold'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <span>🌿</span>
+                <span>Sơ đồ cây</span>
+              </button>
+            </div>
+          )}
+
           <button
             onClick={onClose}
             id="mindmap-close-btn"
@@ -493,9 +552,9 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
               </div>
 
               <div>
-                <h4 className="text-base font-semibold text-white mb-2">Tạo Sơ Đồ Tư Duy Tự Động</h4>
+                <h4 className="text-base font-semibold text-white mb-2">Tạo Mạng Lưới Tri Thức AI</h4>
                 <p className="text-xs text-gray-400 leading-relaxed">
-                  Trình tạo sơ đồ tư duy AI sẽ tổng hợp và trực quan hóa cấu trúc của bài báo thành một sơ đồ mindmap phân cấp sống động.
+                  Trình tạo sơ đồ AI sẽ trực quan hóa cấu trúc bài báo dưới dạng đồ thị tri thức Obsidian sinh động và sơ đồ tư duy phân cấp.
                 </p>
               </div>
 
@@ -517,7 +576,7 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
                 data-testid="mindmap-start-btn"
                 className="w-full bg-[var(--accent,#38bdf8)] text-[#080b12] text-xs font-bold py-3.5 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-[var(--accent,#38bdf8)]/20"
               >
-                Bắt đầu vẽ sơ đồ tư duy
+                Bắt đầu dựng đồ thị tri thức
               </button>
             </div>
           )}
@@ -536,7 +595,7 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
 
               <div className="flex flex-col gap-2">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                  AI IS SYNTHESIZING MINDMAP
+                  AI IS SYNTHESIZING KNOWLEDGE GRAPH
                 </h4>
                 <p className="text-sm font-semibold text-white animate-pulse min-h-[1.5rem]">
                   {loadingText}
@@ -545,116 +604,124 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
             </div>
           )}
 
-          {/* ─── VIEWING STATE (SVG Render / Text Fallback) ─── */}
+          {/* ─── VIEWING STATE ─── */}
           {phase === 'viewing' && (
             <div className="w-full h-full flex flex-col relative overflow-hidden" id="mindmap-viewing-state">
-              {/* Controls Overlay (Zoom & Fallback Mode Selector) */}
-              <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
-                {!renderError && (
-                  <div className="flex items-center bg-[#0e131f]/90 border border-white/10 rounded-xl p-1.5 shadow-lg backdrop-blur-sm">
-                    <button
-                      onClick={handleZoomIn}
-                      title="Phóng to"
-                      className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                      </svg>
-                    </button>
-                    <span className="text-[10px] font-bold text-gray-300 min-w-[32px] text-center">
-                      {Math.round(scale * 100)}%
-                    </span>
-                    <button
-                      onClick={handleZoomOut}
-                      title="Thu nhỏ"
-                      className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
-                      </svg>
-                    </button>
-                    <div className="h-4 w-px bg-white/10 mx-1" />
-                    <button
-                      onClick={handleResetZoom}
-                      title="Đặt lại zoom"
-                      className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer text-[10px] font-bold px-2.5"
-                    >
-                      Khôi phục
-                    </button>
-                  </div>
-                )}
-                
-                {renderError && (
-                  <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5">
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <span>Lỗi dựng đồ họa. Hiển thị dạng sơ đồ cây thay thế.</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="absolute top-4 right-4 z-10 flex gap-2">
-                {!renderError && (
-                  <button
-                    onClick={handleDownloadSvg}
-                    className="flex items-center gap-1.5 px-3.5 py-2.5 bg-[#0e131f]/90 hover:bg-[#151b2c] border border-white/10 text-[11px] font-bold text-white rounded-xl shadow-lg backdrop-blur-sm transition-all cursor-pointer"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Tải ảnh SVG
-                  </button>
-                )}
-              </div>
-
-              {/* Viewport content */}
-              <div
-                ref={viewportRef}
-                className={`flex-1 overflow-hidden relative cursor-grab active:cursor-grabbing select-none ${isDragging ? 'active:cursor-grabbing' : ''}`}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                onWheel={handleWheel}
-              >
-                {!renderError && svgMarkup ? (
-                  <div
-                    className="mindmap-viewport absolute origin-center flex items-center justify-center min-w-full min-h-full"
-                    style={{
-                      transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-                      transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-                    }}
-                    dangerouslySetInnerHTML={{ __html: svgMarkup }}
-                  />
-                ) : (
-                  // Fallback state: Nested Text Tree
-                  <div className="w-full h-full overflow-y-auto p-12 flex flex-col justify-start">
-                    <div className="max-w-xl mx-auto w-full bg-[#0e131f] border border-white/5 rounded-2xl p-6 shadow-xl">
-                      <div className="border-b border-white/5 pb-3 mb-4 flex items-center justify-between">
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                          Sơ đồ cấu trúc dạng cây
+              {/* VIEW 1: OBSIDIAN GRAPH VIEW */}
+              {viewMode === 'graph' && graphData ? (
+                <ObsidianGraphView data={graphData} />
+              ) : (
+                /* VIEW 2: MERMAID TREE VIEW / TEXT FALLBACK */
+                <div className="w-full h-full flex flex-col relative overflow-hidden">
+                  {/* Controls Overlay */}
+                  <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
+                    {!renderError && (
+                      <div className="flex items-center bg-[#0e131f]/90 border border-white/10 rounded-xl p-1.5 shadow-lg backdrop-blur-sm">
+                        <button
+                          onClick={handleZoomIn}
+                          title="Phóng to"
+                          className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                          </svg>
+                        </button>
+                        <span className="text-[10px] font-bold text-gray-300 min-w-[32px] text-center">
+                          {Math.round(scale * 100)}%
                         </span>
+                        <button
+                          onClick={handleZoomOut}
+                          title="Thu nhỏ"
+                          className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+                          </svg>
+                        </button>
+                        <div className="h-4 w-px bg-white/10 mx-1" />
+                        <button
+                          onClick={handleResetZoom}
+                          title="Đặt lại zoom"
+                          className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer text-[10px] font-bold px-2.5"
+                        >
+                          Khôi phục
+                        </button>
                       </div>
-                      {parsedTree ? (
-                        <RenderTextTree node={parsedTree} />
-                      ) : (
-                        <div className="text-xs text-gray-500 py-6 text-center">
-                          Không thể hiển thị sơ đồ.
-                        </div>
-                      )}
-                    </div>
+                    )}
+                    
+                    {renderError && (
+                      <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5">
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span>Lỗi dựng đồ họa. Hiển thị dạng sơ đồ cây thay thế.</span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Tip banner */}
-              {!renderError && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#0e131f]/95 border border-white/5 rounded-full px-4 py-1.5 text-[10px] text-gray-400 shadow-md backdrop-blur-sm flex items-center gap-1.5 select-none pointer-events-none">
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
-                  </svg>
-                  Cuộn chuột để Phóng to/Thu nhỏ • Kéo chuột để Di chuyển sơ đồ
+                  <div className="absolute top-4 right-4 z-10 flex gap-2">
+                    {!renderError && (
+                      <button
+                        onClick={handleDownloadSvg}
+                        className="flex items-center gap-1.5 px-3.5 py-2.5 bg-[#0e131f]/90 hover:bg-[#151b2c] border border-white/10 text-[11px] font-bold text-white rounded-xl shadow-lg backdrop-blur-sm transition-all cursor-pointer"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Tải ảnh SVG
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Viewport content */}
+                  <div
+                    ref={viewportRef}
+                    className={`flex-1 overflow-hidden relative cursor-grab active:cursor-grabbing select-none ${isDragging ? 'active:cursor-grabbing' : ''}`}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                    onWheel={handleWheel}
+                  >
+                    {!renderError && svgMarkup ? (
+                      <div
+                        className="mindmap-viewport absolute origin-center flex items-center justify-center min-w-full min-h-full"
+                        style={{
+                          transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+                          transition: isDragging ? 'none' : 'transform 0.15s ease-out',
+                        }}
+                        dangerouslySetInnerHTML={{ __html: svgMarkup }}
+                      />
+                    ) : (
+                      /* Fallback state: Nested Text Tree */
+                      <div className="w-full h-full overflow-y-auto p-12 flex flex-col justify-start">
+                        <div className="max-w-xl mx-auto w-full bg-[#0e131f] border border-white/5 rounded-2xl p-6 shadow-xl">
+                          <div className="border-b border-white/5 pb-3 mb-4 flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                              Sơ đồ cấu trúc dạng cây
+                            </span>
+                          </div>
+                          {parsedTree ? (
+                            <RenderTextTree node={parsedTree} />
+                          ) : (
+                            <div className="text-xs text-gray-500 py-6 text-center">
+                              Không thể hiển thị sơ đồ.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tip banner */}
+                  {!renderError && (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#0e131f]/95 border border-white/5 rounded-full px-4 py-1.5 text-[10px] text-gray-400 shadow-md backdrop-blur-sm flex items-center gap-1.5 select-none pointer-events-none">
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                      </svg>
+                      Cuộn chuột để Phóng to/Thu nhỏ • Kéo chuột để Di chuyển sơ đồ
+                    </div>
+                  )}
                 </div>
               )}
             </div>

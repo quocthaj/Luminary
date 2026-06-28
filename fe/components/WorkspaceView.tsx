@@ -351,7 +351,7 @@ export function WorkspaceView({
       const url = new URL(window.location.href);
       if (url.searchParams.get('jobId') !== jobId) {
         url.searchParams.set('jobId', jobId);
-        window.history.pushState({}, '', url.toString());
+        window.history.replaceState({}, '', url.toString());
       }
     }
   }, [jobId]);
@@ -439,6 +439,42 @@ export function WorkspaceView({
       return updated;
     });
   }, [userName]);
+
+  // Dynamic content-aware question suggestions derived from the PDF
+  const suggestedQuestions = useMemo(() => {
+    const questions: string[] = [];
+    const textToScan = sections?.vi || rawContent || '';
+
+    // 1. Scan for markdown headings in the PDF content
+    const headingMatches = Array.from(textToScan.matchAll(/^#{1,3}\s+(.+)$/gm));
+    const headings = headingMatches
+      .map((m) => m[1].replace(/\{#.*?\}/, '').trim())
+      .filter((h) => h.length > 3 && !/tiếng việt|english|bản dịch/i.test(h));
+
+    if (headings.length > 0) {
+      const topHeadings = headings.slice(0, 2);
+      topHeadings.forEach((h) => {
+        questions.push(`Phân tích nội dung phần "${h}"`);
+      });
+    }
+
+    // 2. Add math or formula analysis if LaTeX syntax is detected
+    if (textToScan.includes('$') || textToScan.includes('\\(')) {
+      questions.push('Giải thích chi tiết các công thức toán học trong bài');
+    } else {
+      questions.push('Các giả thuyết hoặc luận điểm chính của bài báo là gì?');
+    }
+
+    // 3. Fallbacks to guarantee at least 3 high-quality questions
+    if (questions.length < 3) {
+      questions.push('Tóm tắt đóng góp nghiên cứu quan trọng nhất');
+    }
+    if (questions.length < 3) {
+      questions.push('Phương pháp và dữ liệu thực nghiệm được sử dụng');
+    }
+
+    return questions.slice(0, 3);
+  }, [rawContent, sections]);
 
   // Auto-scroll chat container to bottom
   useEffect(() => {
@@ -1378,15 +1414,11 @@ export function WorkspaceView({
                   </div>
                 ))}
 
-                {/* Suggestions shown only when there is only 1 message (the greeting) */}
-                {messages.length === 1 && (
+                {/* Dynamic Suggestions based on PDF content */}
+                {messages.length === 1 && suggestedQuestions.length > 0 && (
                   <div className="flex flex-col gap-1.5 ml-8 mt-1">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)] mb-1">Gợi ý câu hỏi:</span>
-                    {[
-                      'Tóm tắt mục Phương pháp nghiên cứu',
-                      'Giải thích công thức toán học chính',
-                      'Định nghĩa các thuật ngữ chuyên ngành',
-                    ].map((q, idx) => (
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)] mb-1">Gợi ý câu hỏi theo PDF:</span>
+                    {suggestedQuestions.map((q, idx) => (
                       <button
                         key={idx}
                         onClick={() => {
@@ -1424,22 +1456,6 @@ export function WorkspaceView({
 
               {/* Chat input box */}
               <div className="border-t border-[var(--border-subtle)] pt-4 flex-shrink-0">
-                <div className="flex gap-2 mb-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleSendMessage("Tìm các bài viết liên quan đến tài liệu này");
-                    }}
-                    disabled={loading || isSending}
-                    className="flex items-center gap-1.5 rounded-lg border border-[var(--border-normal)] bg-[var(--bg-elevated)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-subtle)] px-2.5 py-1 text-[10px] font-bold transition-all cursor-pointer"
-                    data-testid="chat-find-related-btn"
-                  >
-                    <svg className="h-3 w-3 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    Tìm liên quan
-                  </button>
-                </div>
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
