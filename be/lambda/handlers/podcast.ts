@@ -133,8 +133,8 @@ export class GoogleTTSProvider implements TTSProvider {
       throw new Error('Missing GCP_TTS_API_KEY environment variable and google-tts secret');
     }
 
-    // Phân vai: hostA -> vi-VN-Wavenet-B | hostB -> vi-VN-Wavenet-A
-    const voiceName = speaker === 'hostA' ? 'vi-VN-Wavenet-B' : 'vi-VN-Wavenet-A';
+    // Phân vai: hostA -> vi-VN-Wavenet-A (Nữ) | hostB -> vi-VN-Wavenet-B (Nam)
+    const voiceName = speaker === 'hostA' ? 'vi-VN-Wavenet-A' : 'vi-VN-Wavenet-B';
 
     console.log(`🎙️ [GoogleTTS] Synthesizing: "${text.substring(0, 30)}..." for ${speaker} (Voice: ${voiceName})`);
 
@@ -531,26 +531,42 @@ export async function handlePodcastJob(input: PodcastInput): Promise<{ s3Key: st
   }
   console.log(`✅ [podcast] Generated script with ${script.turns.length} turns.`);
 
-  // Step 2: Synthesis Audio Chunks (Priority 1: Google Cloud TTS Wavenet, Priority 2: AWS Polly)
+  // Step 2: Synthesis Audio Chunks (Standard Mode: AWS Polly | HD Mode: Google Cloud TTS with fallbacks)
   let fallbackUsed = false;
   const audioBuffers: Buffer[] = [];
 
-  console.log(`🎙️ [podcast] Synthesizing audio turns (Priority 1: Google Cloud TTS Wavenet, Priority 2: AWS Polly)...`);
-  const googleProvider = new GoogleTTSProvider();
-  const pollyProvider = new PollyTTSProvider();
-
-  for (const turn of script.turns) {
-    let buffer: Buffer;
-    try {
-      buffer = await googleProvider.synthesize(turn.text, turn.speaker);
-    } catch (googleErr: any) {
-      console.warn(`⚠️ [podcast] Google TTS failed for speaker ${turn.speaker}, falling back to AWS Polly...`, googleErr?.message || googleErr);
-      buffer = await pollyProvider.synthesize(turn.text, turn.speaker);
-      fallbackUsed = true;
+  if (!hdMode) {
+    console.log(`🎙️ [podcast] Synthesizing audio turns in Standard Mode (AWS Polly)...`);
+    const pollyProvider = new PollyTTSProvider();
+    for (const turn of script.turns) {
+      const buffer = await pollyProvider.synthesize(turn.text, turn.speaker);
+      audioBuffers.push(buffer);
     }
-    audioBuffers.push(buffer);
+  } else {
+    console.log(`🎙️ [podcast] Synthesizing audio turns in HD Mode (Google Cloud TTS -> Edge TTS -> AWS Polly)...`);
+    const googleProvider = new GoogleTTSProvider();
+    const edgeProvider = new EdgeTTSProvider();
+    const pollyProvider = new PollyTTSProvider();
+
+    for (const turn of script.turns) {
+      let buffer: Buffer;
+      try {
+        buffer = await googleProvider.synthesize(turn.text, turn.speaker);
+      } catch (googleErr: any) {
+        console.warn(`⚠️ [podcast] Google TTS failed for speaker ${turn.speaker}, trying Edge TTS...`, googleErr?.message || googleErr);
+        try {
+          buffer = await retryWithBackoff(() => edgeProvider.synthesize(turn.text, turn.speaker), 2, 500);
+          fallbackUsed = true;
+        } catch (edgeErr: any) {
+          console.warn(`⚠️ [podcast] Edge TTS also failed, falling back to AWS Polly...`, edgeErr?.message || edgeErr);
+          buffer = await pollyProvider.synthesize(turn.text, turn.speaker);
+          fallbackUsed = true;
+        }
+      }
+      audioBuffers.push(buffer);
+    }
   }
-  console.log(`✅ [podcast] Audio synthesis completed (${audioBuffers.length} turns, fallbackUsed=${fallbackUsed}).`);
+  console.log(`✅ [podcast] Audio synthesis completed (${audioBuffers.length} turns, fallbackUsed=${fallbackUsed}, hdMode=${hdMode}).`);
 
   // Step 3: Merge audio segments removing ID3 tags
   console.log(`🎛️ [podcast] Merging ${audioBuffers.length} audio buffers...`);

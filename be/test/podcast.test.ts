@@ -239,6 +239,65 @@ describe('handlePodcastJob()', () => {
       Key: 'results/job-abc/podcast.mp3'
     }));
   });
+
+  it('runs HD mode successfully with Google Cloud TTS (no fallback)', async () => {
+    mockGetJobItem.mockResolvedValue(VALID_JOB_ITEM);
+    mockGetResultFromS3.mockResolvedValueOnce('Paper bilingual analysis goes here.');
+    mockGetSecret.mockResolvedValueOnce('fake-gemini-key'); // Gemini key
+    mockGetSecret.mockResolvedValueOnce('fake-google-tts-key'); // Google TTS key
+    mockGenerateContent.mockResolvedValueOnce({
+      response: { text: () => JSON.stringify(makeValidScriptPayload()) }
+    });
+
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ audioContent: Buffer.from([1, 2, 3]).toString('base64') }),
+    }) as any;
+
+    const result = await handlePodcastJob({ jobId: 'job-abc', userId: 'user-123', hdMode: true });
+    expect(result.fallbackUsed).toBe(false);
+    expect(result.s3Key).toBe('results/job-abc/podcast.mp3');
+    expect(mockS3Send).toHaveBeenCalledWith(expect.objectContaining({
+      Bucket: 'mock-results-bucket',
+      Key: 'results/job-abc/podcast.mp3'
+    }));
+
+    global.fetch = originalFetch;
+  });
+
+  it('runs HD mode falling back to AWS Polly if Google TTS and Edge TTS both fail', async () => {
+    mockGetJobItem.mockResolvedValue(VALID_JOB_ITEM);
+    mockGetResultFromS3.mockResolvedValueOnce('Paper bilingual analysis goes here.');
+    mockGetSecret.mockResolvedValueOnce('fake-gemini-key'); // Gemini key
+    mockGetSecret.mockResolvedValueOnce('fake-google-tts-key'); // Google TTS key
+    mockGenerateContent.mockResolvedValueOnce({
+      response: { text: () => JSON.stringify(makeValidScriptPayload()) }
+    });
+
+    // Google TTS throws error
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockRejectedValue(new Error('Google TTS API Error'));
+
+    // Mock EdgeTTSProvider.prototype.synthesize to reject
+    const EdgeTTSProvider = require('../lambda/handlers/podcast').EdgeTTSProvider;
+    const originalEdgeSynthesize = EdgeTTSProvider.prototype.synthesize;
+    EdgeTTSProvider.prototype.synthesize = jest.fn().mockRejectedValue(new Error('Edge TTS Socket Error'));
+
+    mockPollySend.mockResolvedValue({
+      AudioStream: {
+        transformToByteArray: () => Promise.resolve(new Uint8Array([4, 5, 6]))
+      }
+    });
+
+    const result = await handlePodcastJob({ jobId: 'job-abc', userId: 'user-123', hdMode: true });
+    expect(result.fallbackUsed).toBe(true);
+    expect(result.s3Key).toBe('results/job-abc/podcast.mp3');
+    expect(mockPollySend).toHaveBeenCalledTimes(2);
+
+    global.fetch = originalFetch;
+    EdgeTTSProvider.prototype.synthesize = originalEdgeSynthesize;
+  });
 });
 
 describe('Polling API Controllers', () => {

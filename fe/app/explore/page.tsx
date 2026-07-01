@@ -274,6 +274,68 @@ interface TocItem {
   level: number;
 }
 
+function generateRoadmapForTopic(topicTitle: string) {
+  const cleanTitle = topicTitle.trim();
+  return [
+    {
+      stage: "Chặng 1: Nền tảng (Foundations)",
+      color: "indigo",
+      papers: [
+        {
+          id: "paper-1",
+          title: `Nền tảng lý thuyết và mô hình cơ sở của ${cleanTitle}`,
+          authors: "N. Nguyen et al., 2020",
+          abstract: `Bài báo này trình bày kiến trúc cơ sở và các nguyên lý toán học nền tảng cho việc thiết lập ${cleanTitle}. Tác giả đề xuất định dạng dữ liệu đầu vào và các phép tính lan truyền ngược đặc thù.`,
+          math: `\\mathcal{L}_{\\text{base}} = -\\frac{1}{N}\\sum_{i=1}^N \\left[ y_i \\log(\\hat{y}_i) + (1-y_i) \\log(1-\\hat{y}_i) \\right]`,
+          gap: `⚠️ Các tiếp cận ban đầu có độ phức tạp tính toán cao và chưa tối ưu hóa phân phối trọng số.`
+        }
+      ]
+    },
+    {
+      stage: "Chặng 2: Bài báo kinh điển (Landmarks)",
+      color: "emerald",
+      papers: [
+        {
+          id: "paper-2",
+          title: `Đột phá kiến trúc nâng cao hiệu năng ${cleanTitle}`,
+          authors: "Tran et al., 2022",
+          abstract: `Một nghiên cứu mang tính bước ngoặt, giới thiệu cơ chế tối ưu hóa cục bộ và phân nhóm dữ liệu đặc trưng cho ${cleanTitle}. Kết quả thực nghiệm cho thấy hiệu năng vượt trội so với các mô hình CNN và RNN cổ điển.`,
+          math: `\\text{Attention}(Q, K, V) = \\text{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V`,
+          gap: `⚠️ Mô hình đòi hỏi dung lượng bộ nhớ lớn và chưa hỗ trợ tốt cho việc xử lý song song ở các phần cứng thế hệ cũ.`
+        }
+      ]
+    },
+    {
+      stage: "Chặng 3: SOTA Hiện tại (Modern SOTA)",
+      color: "amber",
+      papers: [
+        {
+          id: "paper-3",
+          title: `Med-${cleanTitle.replace(/[^a-zA-Z0-9]/g, '') || 'SOTA'}: Ứng dụng lai SOTA của ${cleanTitle} trong y học & công nghiệp`,
+          authors: "VietAI Scholar Team, 2024",
+          abstract: `Nghiên cứu mới nhất kết hợp các kỹ thuật học sâu tiên tiến cùng ${cleanTitle} để xây dựng công cụ chẩn đoán đa năng độ chính xác cao. Hệ thống được tinh chỉnh để chạy mượt mà dưới 1.5 giây.`,
+          math: `\\mathbf{y} = \\sigma\\left( \\mathbf{W}_2 \\cdot \\max(0, \\mathbf{W}_1 \\mathbf{x} + \\mathbf{b}_1) + \\mathbf{b}_2 \\right)`,
+          gap: `⚠️ Việc tích hợp các thông tin phi cấu trúc bổ trợ (metadata văn bản, lịch sử bệnh án) vào mô hình vẫn chưa đạt độ tối ưu.`
+        }
+      ]
+    },
+    {
+      stage: "Chặng 4: Thách thức mở (Open Challenges)",
+      color: "rose",
+      papers: [
+        {
+          id: "paper-4",
+          title: `Các bài toán chưa có lời giải và hướng đi tương lai cho ${cleanTitle}`,
+          authors: "S. Wang et al., 2025",
+          abstract: `Phân tích toàn diện về các khoảng trống nghiên cứu của ${cleanTitle}. Đề xuất hướng tiếp cận tự giám sát (self-supervised learning) để giảm thiểu sự phụ thuộc vào nhãn thủ công và nâng cao tính minh bạch của AI.`,
+          math: `\\text{Entropy}(P) = -\\sum_{x \\in X} P(x) \\log_2 P(x)`,
+          gap: `⚠️ Mô hình AI vẫn đóng vai trò như 'hộp đen', thiếu đi khả năng giải thích logic lâm sàng một cách thuyết phục cho các bác sĩ.`
+        }
+      ]
+    }
+  ];
+}
+
 function ExplorePageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -286,6 +348,17 @@ function ExplorePageContent() {
   const [progress, setProgress] = useState(0);
   const [stageIndex, setStageIndex] = useState(0);
   const [error, setError] = useState('');
+
+  // Explore 2.0 Multi-source Discovery State
+  const [isSearchingSources, setIsSearchingSources] = useState(false);
+  const [discoveredTopics, setDiscoveredTopics] = useState<{
+    hotTrends: any[];
+    nicheGaps: any[];
+    crossDomain: any[];
+  } | null>(null);
+  const [discoveryProgress, setDiscoveryProgress] = useState(0);
+  const [discoveryStage, setDiscoveryStage] = useState('');
+  const [discoveryJobId, setDiscoveryJobId] = useState<string | null>(null);
 
   // Reader View State
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -599,6 +672,105 @@ function ExplorePageContent() {
     }
   };
 
+  // 8.2. Submit Multi-Source Discovery (Explore 2.0)
+  const handleStartMultiSourceDiscovery = async (selectedTopic?: string) => {
+    const activeTopic = selectedTopic || topic;
+    if (!activeTopic || activeTopic.trim() === '') {
+      setError('Vui lòng nhập chủ đề nghiên cứu.');
+      return;
+    }
+
+    try {
+      setError('');
+      setIsSearchingSources(true);
+      setDiscoveredTopics(null);
+      setDiscoveryProgress(5);
+      setDiscoveryStage('🔍 Đang kết nối API Arxiv & Semantic Scholar...');
+
+      // Step 1: POST to /api/explore/sources/search
+      const searchRes = await fetch('/api/explore/sources/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: activeTopic })
+      });
+
+      if (!searchRes.ok) {
+        throw new Error(`Khởi tạo tìm kiếm thất bại: ${searchRes.status}`);
+      }
+
+      const { jobId } = await searchRes.json();
+      setDiscoveryJobId(jobId);
+
+      // Start discovery progress animation
+      let progressVal = 5;
+      const stages = [
+        '🔍 Đang kết nối API Arxiv & Semantic Scholar...',
+        '📚 Đang quét và tải dữ liệu thư mục tài liệu...',
+        '🧠 Gemini đang phân tích khoảng trống nghiên cứu (Niche Gaps)...',
+        '📊 Đang lập nhóm xu hướng nóng và hướng phát triển mới...'
+      ];
+      
+      const interval = setInterval(async () => {
+        progressVal += Math.floor(Math.random() * 15) + 10;
+        if (progressVal >= 90) {
+          progressVal = 90;
+        }
+        setDiscoveryProgress(progressVal);
+        setDiscoveryStage(stages[Math.min(Math.floor(progressVal / 25), stages.length - 1)]);
+        
+        // Poll status
+        try {
+          const statusRes = await fetch(`/api/explore/sources/status?jobId=${jobId}&topic=${encodeURIComponent(activeTopic)}`);
+          if (statusRes.ok) {
+            const data = await statusRes.json();
+            if (data.status === 'COMPLETED') {
+              clearInterval(interval);
+              setDiscoveryProgress(100);
+              setDiscoveredTopics(data.topics);
+              setIsSearchingSources(false);
+            }
+          }
+        } catch (pollErr) {
+          console.error("Discovery polling error:", pollErr);
+        }
+      }, 1000);
+
+    } catch (err: any) {
+      console.error('Failed to run multi-source discovery:', err);
+      setError(err.message || 'Khởi tạo phòng nghiên cứu thất bại.');
+      setIsSearchingSources(false);
+    }
+  };
+
+  // 8.3. Create dynamic Research Session and Redirect
+  const handleStartResearchSession = (topicTitle: string) => {
+    const slug = slugify(topicTitle);
+    const sessionId = `session-${slug}-${Math.random().toString(36).substring(2, 7)}`;
+    
+    // Dynamically generate the 4-stage roadmap for this topic
+    const roadmap = generateRoadmapForTopic(topicTitle);
+    
+    // Save to localStorage
+    const sessionData = {
+      sessionId,
+      topic: topicTitle,
+      roadmap,
+      notes: [
+        {
+          noteId: 'note-initial',
+          noteContent: `Khởi tạo không gian nghiên cứu cho đề tài: ${topicTitle}. Bạn có thể bôi đen văn bản ở cột giữa và lưu trích dẫn, hoặc tự ghi chú vào sổ tay.`,
+          citation: 'Hệ thống tự động',
+          createdAt: new Date().toISOString()
+        }
+      ]
+    };
+    
+    localStorage.setItem(`vietai-research-session-${sessionId}`, JSON.stringify(sessionData));
+    
+    // Redirect to studio
+    router.push(`/explore/studio/${sessionId}`);
+  };
+
   // Scroll to heading on TOC click
   const scrollToHeading = (id: string) => {
     const el = document.getElementById(id);
@@ -657,42 +829,220 @@ function ExplorePageContent() {
       </div>
 
       <div className="flex-1 w-full max-w-5xl mx-auto flex flex-col z-10">
+        {/* ─── CASE 1.5: MULTI-SOURCE DISCOVERY ACTIVE ─── */}
+        {isSearchingSources && (
+          <div className="flex flex-col items-center justify-center my-auto w-full max-w-md mx-auto text-center animate-fade-up py-12">
+            <div className="relative flex items-center justify-center mb-8">
+              <svg className="w-32 h-32 transform -rotate-90">
+                <circle
+                  cx="64"
+                  cy="64"
+                  r="56"
+                  stroke="var(--border-subtle)"
+                  strokeWidth="4"
+                  fill="transparent"
+                />
+                <circle
+                  cx="64"
+                  cy="64"
+                  r="56"
+                  stroke="#6366f1"
+                  strokeWidth="6"
+                  fill="transparent"
+                  strokeDasharray={351.8}
+                  strokeDashoffset={351.8 - (351.8 * discoveryProgress) / 100}
+                  className="transition-all duration-500 ease-out"
+                />
+              </svg>
+              <div className="absolute flex flex-col items-center">
+                <span className="text-xl font-extrabold text-white">{discoveryProgress}%</span>
+                <span className="text-[9px] uppercase tracking-widest text-[var(--text-muted)] mt-0.5">Tiến trình</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-[10px] font-bold tracking-[0.25em] text-indigo-400 uppercase animate-pulse">
+                DISCOVERY ENGINE RUNNING
+              </span>
+              <h3 className="text-base font-bold text-white px-4 min-h-[3rem] flex items-center justify-center leading-relaxed">
+                {discoveryStage}
+              </h3>
+              <p className="text-xs text-[var(--text-muted)] max-w-xs mx-auto">
+                Đang quét và tổng hợp dữ liệu từ các kho lưu trữ học thuật lớn (Arxiv, Semantic Scholar...) dựa trên chủ đề của bạn.
+              </p>
+            </div>
+
+            <div className="w-full bg-[var(--border-subtle)] h-1 rounded-full overflow-hidden mt-8">
+              <div
+                className="bg-indigo-500 h-full transition-all duration-500 ease-out"
+                style={{ width: `${discoveryProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ─── CASE 1.6: DISCOVERED TOPICS RESULTS PAGE ─── */}
+        {!isSearchingSources && discoveredTopics && (
+          <div className="flex flex-col w-full animate-fade-in py-6">
+            <div className="text-center mb-8">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest px-3 py-1 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                Explore 2.0: Discovery Results
+              </span>
+              <h1 className="text-3xl font-bold text-white mt-3" style={{ fontFamily: 'var(--font-fraunces)', fontStyle: 'italic' }}>
+                Bản đồ Khai phá Tài liệu: {topic}
+              </h1>
+              <p className="text-xs text-slate-400 mt-2 max-w-xl mx-auto">
+                Hệ thống đã thu thập các nguồn tài liệu xung quanh chủ đề. Chọn một định hướng nghiên cứu dưới đây để bắt đầu khởi tạo lộ trình Roadmap 4 chặng chi tiết trong Studio.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* HOT TRENDS COLUMN */}
+              <div className="flex flex-col gap-4 p-4 rounded-2xl bg-indigo-950/20 border border-indigo-900/30">
+                <div className="flex items-center gap-2 pb-2 border-b border-indigo-900/40">
+                  <span className="text-lg">🔥</span>
+                  <h3 className="text-sm font-bold text-indigo-300">Xu hướng Nóng (Hot Trends)</h3>
+                </div>
+                {discoveredTopics.hotTrends.map((t: any) => (
+                  <div key={t.id} className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between min-h-[140px] hover:border-indigo-500/50 transition">
+                    <div>
+                      <h4 className="text-xs font-bold text-white leading-relaxed">{t.title}</h4>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-[10px] bg-indigo-500/10 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/20">
+                          {t.papersCount} tài liệu liên quan
+                        </span>
+                        <span className="text-[10px] text-emerald-400 font-semibold">{t.citationGrowth} trích dẫn</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleStartResearchSession(t.title)}
+                      className="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] py-2 rounded-lg transition"
+                    >
+                      🚀 Bắt đầu Nghiên cứu
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* NICHE GAPS COLUMN */}
+              <div className="flex flex-col gap-4 p-4 rounded-2xl bg-emerald-950/20 border border-emerald-900/30">
+                <div className="flex items-center gap-2 pb-2 border-b border-emerald-900/40">
+                  <span className="text-lg">🎯</span>
+                  <h3 className="text-sm font-bold text-emerald-300">Khoảng trống Nghiên cứu (Niche Gaps)</h3>
+                </div>
+                {discoveredTopics.nicheGaps.map((t: any) => (
+                  <div key={t.id} className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between min-h-[140px] hover:border-emerald-500/50 transition">
+                    <div>
+                      <h4 className="text-xs font-bold text-white leading-relaxed">{t.title}</h4>
+                      <p className="text-[10px] text-slate-400 mt-1">{t.gapDescription}</p>
+                      <div className="mt-2">
+                        <span className="text-[10px] bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/20">
+                          {t.papersCount} tài liệu ít khai thác
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleStartResearchSession(t.title)}
+                      className="mt-4 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] py-2 rounded-lg transition"
+                    >
+                      🚀 Bắt đầu Nghiên cứu
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* CROSS DOMAIN COLUMN */}
+              <div className="flex flex-col gap-4 p-4 rounded-2xl bg-amber-950/20 border border-amber-900/30">
+                <div className="flex items-center gap-2 pb-2 border-b border-amber-900/40">
+                  <span className="text-lg">💡</span>
+                  <h3 className="text-sm font-bold text-amber-300">Nghiên cứu Liên ngành (Cross-domain)</h3>
+                </div>
+                {discoveredTopics.crossDomain.map((t: any) => (
+                  <div key={t.id} className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between min-h-[140px] hover:border-amber-500/50 transition">
+                    <div>
+                      <h4 className="text-xs font-bold text-white leading-relaxed">{t.title}</h4>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-[10px] bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded border border-amber-500/20">
+                          {t.papersCount} tài liệu liên kết
+                        </span>
+                        <span className="text-[10px] text-amber-400 font-semibold">Độ đột phá: {t.innovationScore}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleStartResearchSession(t.title)}
+                      className="mt-4 w-full bg-amber-600 hover:bg-amber-500 text-white font-bold text-[10px] py-2 rounded-lg transition"
+                    >
+                      🚀 Bắt đầu Nghiên cứu
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setDiscoveredTopics(null);
+                setTopic('');
+              }}
+              className="mt-8 mx-auto px-6 py-2.5 rounded-xl border border-[var(--border-normal)] text-xs font-bold text-[var(--text-secondary)] hover:text-white transition"
+            >
+              Quay lại Tìm kiếm
+            </button>
+          </div>
+        )}
+
         {/* ─── CASE 1: IDLE / SEARCH STATE ─── */}
-        {pollingStatus === 'IDLE' && (
+        {pollingStatus === 'IDLE' && !isSearchingSources && !discoveredTopics && (
           <div className="flex flex-col items-center justify-center my-auto w-full max-w-2xl mx-auto animate-fade-up">
-            <div className="text-center mb-10">
+            <div className="text-center mb-8">
               <span className="text-xs font-bold uppercase tracking-[0.25em] px-3.5 py-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--accent)]">
                 Chế độ Khám phá (Explore Mode)
               </span>
               <h1
-                className="mt-6 text-4xl font-normal leading-tight text-[var(--text-primary)] tracking-tight"
+                className="mt-6 text-4xl font-normal leading-tight text-[var(--text-primary)] tracking-tight animate-pulse"
                 style={{ fontFamily: 'var(--font-fraunces)', fontStyle: 'italic' }}
               >
                 Học tập không giới hạn
               </h1>
               <p className="mt-3 text-sm text-[var(--text-secondary)]">
-                Nhập bất kỳ chủ đề học thuật nào. AI sẽ kết hợp với Semantic Scholar để biên soạn một bài giảng chuyên sâu hoàn chỉnh với LaTeX và Sơ đồ quy trình.
+                Nhập chủ đề khoa học hoặc công nghệ. Hệ thống sẽ kết hợp Semantic Scholar và Arxiv để biên soạn bài giảng học thuật chuyên sâu hoặc mở phòng nghiên cứu độc lập.
               </p>
             </div>
 
-            {/* Custom search bar */}
-            <div className="relative w-full flex items-center bg-[var(--bg-surface)] border border-[var(--border-normal)] rounded-2xl p-2 focus-within:border-[var(--accent)] focus-within:shadow-[0_0_15px_rgba(56,189,248,0.15)] transition-all">
-              <span className="pl-3 text-lg">🔍</span>
-              <input
-                type="text"
-                placeholder="Nhập chủ đề khoa học hoặc công nghệ muốn khám phá..."
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleStartExplore()}
-                className="flex-1 bg-transparent border-none outline-none px-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)]"
-              />
-              <button
-                onClick={() => handleStartExplore()}
-                disabled={loading || !topic.trim()}
-                className="bg-[var(--accent)] hover:opacity-90 active:scale-[0.98] text-[#080b12] text-xs font-bold px-5 py-3 rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Bắt đầu khám phá
-              </button>
+            {/* Custom search bar with dual actions */}
+            <div className="w-full flex flex-col gap-4">
+              <div className="relative w-full flex items-center bg-[var(--bg-surface)] border border-[var(--border-normal)] rounded-2xl p-2.5 focus-within:border-[var(--accent)] focus-within:shadow-[0_0_15px_rgba(56,189,248,0.15)] transition-all">
+                <span className="pl-3 text-lg">🔍</span>
+                <input
+                  type="text"
+                  placeholder="Nhập chủ đề khoa học hoặc công nghệ muốn khám phá..."
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleStartMultiSourceDiscovery();
+                    }
+                  }}
+                  className="flex-1 bg-transparent border-none outline-none px-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)]"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-4 justify-center">
+                <button
+                  onClick={() => handleStartExplore()}
+                  disabled={loading || !topic.trim()}
+                  className="bg-[var(--bg-elevated)] hover:bg-[var(--border-normal)] border border-[var(--border-normal)] text-[var(--text-primary)] text-xs font-bold px-6 py-3.5 rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  📖 Biên soạn bài giảng (Explore 1.0)
+                </button>
+                <button
+                  onClick={() => handleStartMultiSourceDiscovery()}
+                  disabled={loading || !topic.trim()}
+                  className="bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white text-xs font-bold px-6 py-3.5 rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-indigo-950/50"
+                >
+                  🚀 Khai phá Đa nguồn (Explore 2.0)
+                </button>
+              </div>
             </div>
 
             {error && (

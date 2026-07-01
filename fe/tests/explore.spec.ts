@@ -135,7 +135,7 @@ test.describe('Explore Mode - E2E Tests (Story 5.2)', () => {
 
     // 4. Submit research topic
     await searchInput.fill('Học máy lượng tử');
-    const submitBtn = page.locator('button:has-text("Bắt đầu khám phá")');
+    const submitBtn = page.locator('button:has-text("Biên soạn bài giảng")');
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
 

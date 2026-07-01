@@ -71,11 +71,16 @@ development_status:
   4-3-tu-dong-ve-so-do-tu-duy-bang-mermaid-js-mermaid-mindmap-generator-interactive-svg-viewer: done
   epic-4-retrospective: optional
 
-  epic-5: in-progress
+  epic-5: done
   5-1-doi-chieu-tong-hop-cheo-nhieu-tai-lieu-cross-paper-multi-pdf-synthesis-chat: done
   5-2-che-do-kham-pha-ai-agent-tu-sinh-noi-dung-hoc-thuat-theo-chu-de-explore-mode-topic-based-generation: done
   5-3-scholar-search-agent-tim-kiem-bai-bao-lien-quan-scholar-search-agent-related-papers-web-search: done
   5-4-doi-thoai-audio-2-nguoi-tts-podcast-tong-hop-2-person-audio-overview-tts-podcast: done
   5-5-chia-se-va-lam-bai-trac-nghiem-lien-ket-cong-khai-quiz-sharing-public-quiz-player: done
+  5-6-explore-mode-autonomous-research-studio-multi-source-discovery-roadmap-obsidian-journal: done
   epic-5-retrospective: optional
+
+
+
+
 

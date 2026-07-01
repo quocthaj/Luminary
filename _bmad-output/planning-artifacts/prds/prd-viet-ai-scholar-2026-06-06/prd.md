@@ -123,7 +123,17 @@ Bằng cách kết hợp sức mạnh của hệ thống dịch thuật đa tác
 **Functional Requirements:**
 - **FR-19 (Quiz Sharing):** Cho phép người dùng tạo liên kết chia sẻ công khai cho một bài trắc nghiệm (Quiz). Người nhận liên kết có thể làm bài trắc nghiệm trực tiếp mà không cần đăng nhập hay truy cập vào tài liệu gốc.
 
+### 4.6 Autonomous Research Studio (Explore Mode 2.0)
+**Description:** Chuyển đổi chế độ Khám Phá thành một môi trường trợ lý nghiên cứu khoa học chuyên sâu toàn diện, tự động tìm kiếm đề tài từ đa nguồn, thiết lập lộ trình học tập phân cấp và hướng dẫn ghi chép nhật ký nghiên cứu tích hợp.
+- Realizes: UJ-3
+
+**Functional Requirements:**
+- **FR-20 (Multi-Source Discovery Engine):** Tự động truy vấn và tổng hợp từ các nguồn học thuật uy tín (Arxiv, Semantic Scholar, GitHub Trends, Medical News) để đưa ra 3 nhóm gợi ý đề tài nghiên cứu: *Hot Trends*, *Niche Gaps*, và *Cross-domain*.
+- **FR-21 (Guided Research Roadmap):** Tự động thiết lập Lộ trình nghiên cứu 4 chặng phân cấp (*Foundations -> Landmark Papers -> Modern SOTA -> Open Challenges*) kèm theo thanh đo phần trăm tiến trình hoàn thành.
+- **FR-22 (Integrated Research Journal & Lab Notebook):** Cung cấp giao diện Research Studio 3 cột tích hợp khung sổ tay ghi chép cá nhân. Hỗ trợ tự động trích dẫn nguồn (Auto-Citations), gợi ý câu hỏi nhật ký hàng ngày (Daily Log Prompts), và đồng bộ/xuất toàn bộ bộ dữ liệu dưới dạng file nén `.zip` chứa các file Markdown chuẩn Obsidian Vault.
+
 ---
+
 
 ## 5. Non-Goals (Explicit)
 - **Không hỗ trợ dịch thuật ngoại tuyến (Offline translation):** Hệ thống bắt buộc phải có kết nối mạng ổn định để gọi API các AI providers.

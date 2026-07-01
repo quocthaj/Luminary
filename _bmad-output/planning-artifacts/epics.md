@@ -425,3 +425,18 @@ So that họ có thể học và làm trắc nghiệm trực tuyến mà không 
 - **Then** Client gọi API công khai `GET /api/share/quiz/[shareId]`. Backend kiểm tra trạng thái chia sẻ trong DynamoDB và stream file `quiz-{count}.json` tương ứng từ S3 về.
 - **And** Giao diện hiển thị trình chơi Quiz độc lập căn giữa màn hình (đẹp mắt, responsive) chỉ chứa nội dung câu hỏi, nút nộp bài và màn hình kết quả/giải thích mà không hiển thị Sidebar hay tài liệu gốc.
 
+### Story 5.6: Explore Mode 2.0 - Autonomous Research Studio (Multi-source Discovery, Roadmap & Obsidian Journal)
+As a nhà nghiên cứu khoa học và học giả,
+I want khai phá đề tài nghiên cứu từ đa nguồn học thuật, theo dõi lộ trình 4 chặng và ghi chép nhật ký nghiên cứu tương tác có khả năng xuất đồng bộ sang Obsidian Vault,
+So that tôi có thể quản lý và thực hiện toàn bộ quy trình nghiên cứu khoa học một cách bài bản và tập trung.
+
+**Acceptance Criteria:**
+- **Given** Người dùng truy cập Chế độ Khám phá (Explore Mode) từ thanh điều hướng,
+- **When** Nhập từ khóa hoặc chọn lĩnh vực quan tâm, client gọi API `POST /api/explore/sources/search`:
+  - Hệ thống truy vấn song song các nguồn (Arxiv, Semantic Scholar, GitHub Trends) và gọi Gemini 2.0 Flash phân loại trả về 3 nhóm đề tài: *Hot Trends*, *Niche Gaps*, và *Cross-domain*.
+- **Then** Khi người dùng chọn 1 đề tài, hệ thống kích hoạt Step Functions khởi tạo **Lộ trình nghiên cứu 4 chặng (Roadmap)** trong DynamoDB table `vietai-research-sessions` (*1. Foundations -> 2. Landmark Papers -> 3. Modern SOTA -> 4. Open Challenges*).
+- **And** Giao diện chuyển sang **Research Studio 3 Cột**: Cột trái (Cây tiến trình Lộ trình), Cột giữa (Trình đọc tài liệu song ngữ KaTeX), Cột phải (Sổ tay Nhật ký Nghiên cứu).
+- **And** Khi bôi đen văn bản ở Cột giữa và chọn "Lưu vào Sổ tay", Cột phải tự động ghi nhận thẻ trích dẫn (Auto-Citation) và lưu tự động vào DynamoDB qua `PUT /api/explore/journal/save`.
+- **And** Khi bấm "Đóng gói Nghiên cứu", client gọi `GET /api/explore/export?sessionId=...&format=obsidian`, backend đóng gói toàn bộ Lộ trình và Nhật ký thành file nén `.zip` chứa các file Markdown chuẩn Obsidian Vault để người dùng tải về máy cá nhân.
+
+

@@ -2,6 +2,16 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Multi-Document Synthesis Workspace - E2E (Story 5.1)', () => {
   test.beforeEach(async ({ page }) => {
+    // Set test_mode cookie to bypass server-side middleware on all routes
+    await page.context().addCookies([
+      {
+        name: 'test_mode',
+        value: 'true',
+        domain: 'localhost',
+        path: '/',
+      },
+    ]);
+
     // 1. Mock NextAuth Session API to bypass auth redirects
     await page.route('**/api/auth/session', async (route) => {
       await route.fulfill({
@@ -70,7 +80,7 @@ test.describe('Multi-Document Synthesis Workspace - E2E (Story 5.1)', () => {
 
   test('should load workspace, show paper metadata, render report with math formulas, and interact with AI Tutor chat', async ({ page }) => {
     // Navigate to synthesis workspace page with 2 mock jobs
-    await page.goto('/synthesis?ids=mock-job-1,mock-job-2');
+    await page.goto('/synthesis?ids=mock-job-1,mock-job-2&test_mode=true');
 
     // Wait for the page title and elements to render
     await expect(page.locator('h1')).toContainText('Đối chiếu & Tổng hợp liên bài viết');
