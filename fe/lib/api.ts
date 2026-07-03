@@ -449,6 +449,129 @@ export async function getExploreJobStatus(jobId: string): Promise<ExploreRespons
   return res.json();
 }
 
+export interface DefenseSession {
+  sessionId: string;
+  userId: string;
+  jobId: string;
+  status: 'ACTIVE' | 'CLOSED';
+  recent_turns: {
+    question: string;
+    answer?: string;
+    convincing?: boolean;
+    gaps?: string[];
+  }[];
+  concept_status: {
+    concept_id: string;
+    status: 'MASTERED' | 'WARNING' | 'GAP';
+    last_gap_summary?: string;
+  }[];
+  createdAt: string;
+  updatedAt: string;
+  archivedAt?: string;
+}
+
+export interface DefenseAnswerResponse {
+  sessionId: string;
+  thinking_steps: string[];
+  next_question: string;
+  status: 'ACTIVE' | 'CLOSED';
+  recent_turns: any[];
+  concept_status: any[];
+  report?: {
+    concepts_evaluated: any[];
+    facts: any[];
+  };
+}
+
+export interface CopilotSuggestion {
+  title: string;
+  description: string;
+  action: 'SCHOLAR_SEARCH' | 'SYNTHESIS_DOCS' | 'THESIS_DEFENSE' | 'READ_MORE';
+  payload: string;
+}
+
+export interface CopilotResponse {
+  suggestions: CopilotSuggestion[];
+}
+
+export async function initDefenseSession(jobId: string): Promise<DefenseSession> {
+  const res = await fetch('/api/explore/defense/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jobId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(err.error || `Failed to init defense session: ${res.status}`, res.status);
+  }
+  return res.json();
+}
+
+export async function submitDefenseAnswer(sessionId: string, userAnswer: string): Promise<DefenseAnswerResponse> {
+  const res = await fetch('/api/explore/defense/answer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, userAnswer }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(err.error || `Failed to submit defense answer: ${res.status}`, res.status);
+  }
+  return res.json();
+}
+
+export async function closeDefenseSession(sessionId: string): Promise<any> {
+  const res = await fetch('/api/explore/defense/session/close', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(err.error || `Failed to close defense session: ${res.status}`, res.status);
+  }
+  return res.json();
+}
+
+export async function getCopilotSuggestions(jobId: string, sessionId?: string): Promise<CopilotResponse> {
+  let url = `/api/explore/copilot/suggest?jobId=${jobId}`;
+  if (sessionId) {
+    url += `&sessionId=${sessionId}`;
+  }
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(err.error || `Failed to fetch copilot suggestions: ${res.status}`, res.status);
+  }
+  return res.json();
+}
+
+export interface CompetencyProfile {
+  [conceptId: string]: {
+    status: 'MASTERED' | 'WARNING' | 'GAP';
+    mastery_score: number;
+  };
+}
+
+export interface CompetencyProfileResponse {
+  profile: CompetencyProfile;
+}
+
+export async function fetchCompetencyProfile(): Promise<CompetencyProfileResponse> {
+  const res = await fetch('/api/explore/competency/profile', {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(err.error || `Failed to fetch competency profile: ${res.status}`, res.status);
+  }
+  return res.json();
+}
+
 
 
 

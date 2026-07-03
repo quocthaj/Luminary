@@ -19,22 +19,22 @@
 
 ---
 
-## Story 3.6 — Agentic RAG & Summary Routing (CURRENT)
+## Story 3.6 — Agentic RAG & Summary Routing (DONE)
 
 **User story:** Trợ lý AI tự động phân tích câu hỏi để chọn giữa vector search cục bộ, lấy đoạn liền kề, hoặc đọc executive summary toàn tài liệu — không bị mất ngữ nghĩa do chunking.
 
 ### Acceptance Criteria tóm tắt
-- [ ] Gemini 2.0 Flash với Tool Calling: `vectorSearch`, `fetchAdjacentParagraphs`, `readExecutiveSummary`
-- [ ] Executive Summary (tldr, keyContributions, methodology, limitations) tự động sinh trong ingest, lưu DynamoDB
-- [ ] Sliding window 6 messages trong React state (stateless Lambda)
-- [ ] Câu trả lời trích dẫn nguồn (tool nào được dùng)
+- [x] Gemini 2.0 Flash với Tool Calling: `vectorSearch`, `fetchAdjacentParagraphs`, `readExecutiveSummary`
+- [x] Executive Summary (tldr, keyContributions, methodology, limitations) tự động sinh trong ingest, lưu DynamoDB
+- [x] Sliding window 6 messages trong React state (stateless Lambda)
+- [x] Câu trả lời trích dẫn nguồn (tool nào được dùng)
 
 ### Phân chia task
-- [ ] **Task 1:** Cập nhật `be/lambda/handlers/ingest.ts` — sinh Executive Summary (Gemini Structured Output) + lưu DynamoDB
-- [ ] **Task 2:** Cập nhật DynamoDB schema — thêm field `executiveSummary`
-- [ ] **Task 3:** Implement ReAct loop trong `fe/app/api/chat/[jobId]/route.ts` — Gemini Tool Routing
-- [ ] **Task 4:** Cập nhật Chat UI — hiển thị tool đang được dùng, sliding window state
-- [ ] **Task 5:** Viết E2E tests
+- [x] **Task 1:** Cập nhật `be/lambda/handlers/ingest.ts` — sinh Executive Summary (Gemini Structured Output) + lưu DynamoDB
+- [x] **Task 2:** Cập nhật DynamoDB schema — thêm field `executiveSummary`
+- [x] **Task 3:** Implement ReAct loop trong `fe/app/api/chat/[jobId]/route.ts` — Gemini Tool Routing
+- [x] **Task 4:** Cập nhật Chat UI — hiển thị tool đang được dùng, sliding window state
+- [x] **Task 5:** Viết E2E tests
 
 ### Quyết định kỹ thuật đã chốt
 - **Memory:** Client-side Sliding Window (6 tin nhắn gần nhất trong React state) — không cần Redis, giữ Lambda stateless

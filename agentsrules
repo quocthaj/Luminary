@@ -128,6 +128,6 @@ Upload PDF → S3 → Orchestrator Lambda → Step Functions:
 
 ## Story hiện tại
 
-**Story 3.6: Agentic RAG & Summary Routing** — In Progress
+**Story 3.6: Agentic RAG & Summary Routing** — Done
 
 Xem spec đầy đủ tại `_bmad-output/implementation-artifacts/` (tìm file 3-6-*).

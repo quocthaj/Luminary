@@ -9,8 +9,8 @@
 | Epic 1 | Core Translation & LaTeX | ✅ Done |
 | Epic 2 | Auth & Personal Library | ✅ Done |
 | Epic 3 | Workspace & RAG Chat | ✅ Done |
-| Epic 4 | Learning Tools (Quiz/Flashcard/Mindmap) | 🔄 In Progress |
-| Epic 5 | Multi-PDF Synthesis & Explore | 📋 Backlog |
+| Epic 4 | Learning Tools (Quiz/Flashcard/Mindmap) | ✅ Done |
+| Epic 5 | Multi-PDF Synthesis & Explore | ✅ Done |
 
 ### Epic 3 — Chi tiết
 
@@ -27,9 +27,21 @@
 
 | Story | Tên | Trạng thái |
 |-------|-----|-----------|
-| **4.1** | **AI Quiz Generator & Play Modal** | **📋 Next** |
-| 4.2 | AI Flashcard Generator & Swiper UI | 📋 Backlog |
-| 4.3 | Mermaid Mindmap Generator | 📋 Backlog |
+| 4.1 | AI Quiz Generator & Play Modal | ✅ Done |
+| 4.2 | AI Flashcard Generator & Swiper UI | ✅ Done |
+| 4.3 | Mermaid Mindmap Generator | ✅ Done |
+
+### Epic 5 — Chi tiết
+
+| Story | Tên | Trạng thái |
+|-------|-----|-----------|
+| 5.1 | Cross-Paper Multi-PDF Synthesis Chat | ✅ Done |
+| 5.2 | Explore Mode (Topic-Based Generation) | ✅ Done |
+| 5.3 | Scholar Search Agent (Related Papers Web Search) | ✅ Done |
+| 5.4 | 2-Person Audio Overview (TTS Podcast) | ✅ Done |
+| 5.5 | Quiz Sharing & Public Quiz Player | ✅ Done |
+| 5.6 | Explore Mode: Autonomous Research Studio | ✅ Done |
+| 5.7 | Agentic Thesis Defense & Research Copilot | ✅ Done |
 
 ---
 

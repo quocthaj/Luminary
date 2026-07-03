@@ -383,6 +383,95 @@ export const handler = async (event: any) => {
             }
         }
 
+        // ============================================
+        // THESIS DEFENSE & RESEARCH COPILOT ENDPOINTS
+        // ============================================
+        if (httpMethod === 'POST' && path === '/explore/defense/session') {
+            const authHeader = event.headers?.Authorization || event.headers?.authorization;
+            const userId = event.requestContext?.authorizer?.userId || (authHeader ? await verifyToken(authHeader).catch(() => null) : null);
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const { handleDefenseSessionInit } = require('./handlers/explore');
+            try {
+                const result = await handleDefenseSessionInit({ userId, jobId: requestBody.jobId });
+                return respond(200, result);
+            } catch (err: any) {
+                console.error('❌ Defense Session Init error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
+        if (httpMethod === 'POST' && path === '/explore/defense/answer') {
+            const authHeader = event.headers?.Authorization || event.headers?.authorization;
+            const userId = event.requestContext?.authorizer?.userId || (authHeader ? await verifyToken(authHeader).catch(() => null) : null);
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const { handleDefenseSessionAnswer } = require('./handlers/explore');
+            try {
+                const result = await handleDefenseSessionAnswer({
+                    userId,
+                    sessionId: requestBody.sessionId,
+                    userAnswer: requestBody.userAnswer
+                });
+                return respond(200, result);
+            } catch (err: any) {
+                console.error('❌ Defense Answer error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
+        if (httpMethod === 'POST' && path === '/explore/defense/session/close') {
+            const authHeader = event.headers?.Authorization || event.headers?.authorization;
+            const userId = event.requestContext?.authorizer?.userId || (authHeader ? await verifyToken(authHeader).catch(() => null) : null);
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const { handleDefenseSessionClose } = require('./handlers/explore');
+            try {
+                const result = await handleDefenseSessionClose({ userId, sessionId: requestBody.sessionId });
+                return respond(200, result);
+            } catch (err: any) {
+                console.error('❌ Defense Session Close error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
+        if (httpMethod === 'GET' && path === '/explore/copilot/suggest') {
+            const authHeader = event.headers?.Authorization || event.headers?.authorization;
+            const userId = event.requestContext?.authorizer?.userId || (authHeader ? await verifyToken(authHeader).catch(() => null) : null);
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const jobId = event.queryStringParameters?.jobId;
+            const sessionId = event.queryStringParameters?.sessionId;
+            const { handleCopilotSuggest } = require('./handlers/explore');
+            try {
+                const result = await handleCopilotSuggest({ userId, jobId, sessionId });
+                return respond(200, result);
+            } catch (err: any) {
+                console.error('❌ Copilot Suggest error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
+        if (httpMethod === 'GET' && path === '/explore/competency/profile') {
+            const authHeader = event.headers?.Authorization || event.headers?.authorization;
+            const userId = event.requestContext?.authorizer?.userId || (authHeader ? await verifyToken(authHeader).catch(() => null) : null);
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+            const { handleGetCompetencyProfile } = require('./handlers/explore');
+            try {
+                const result = await handleGetCompetencyProfile({ userId });
+                return respond(200, result);
+            } catch (err: any) {
+                console.error('❌ Get Competency Profile error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
         if (httpMethod === 'GET' && path?.startsWith('/explore/')) {
             const userId = event.requestContext?.authorizer?.userId;
             if (!userId) {

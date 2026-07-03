@@ -1038,3 +1038,42 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 - npm run build: Pass
 - TypeScript errors: 0
 
+---
+
+### ✅ Story 3.6: Agentic RAG & Summary Routing (Active Agentic RAG & Dynamic Tool Routing)
+**Status:** Done  
+**Time:** 8 hours  
+**Date:** 2026-07-03  
+
+#### Đã triển khai:
+1. **Định nghĩa kiểu dữ liệu đồng bộ (Sync Types):**
+   - Đã định nghĩa các interfaces `ExecutiveSummary` và `RelatedParagraph` trong `be/lambda/types.ts`.
+   - Tạo script frontend `fe/scripts/sync-types.js` để tự động copy-sync kiểu dữ liệu sang `fe/types/jobs.ts` khi chạy prebuild.
+2. **Cập nhật luồng Ingestion (Ingest Update):**
+   - Tạo hàm helper `updateJobSummary` trong `be/lambda/utils/dynamodb-helpers.ts` để lưu bản tóm tắt qua `UpdateItemCommand`.
+   - Cập nhật `be/lambda/handlers/ingest.ts` gọi Gemini 2.0 Flash với chế độ Structured Output (`SchemaType`) để trích xuất `tldr`, `keyContributions`, `methodology`, `limitations` từ tài liệu đã dịch và lưu vào DynamoDB.
+3. **Xây dựng bộ Tool cho Agent (Agent Tools):**
+   - Định nghĩa 3 tools: `vectorSearch`, `fetchAdjacentParagraphs` (sử dụng Qdrant scroll API), và `readExecutiveSummary` (đọc summary từ DynamoDB) trong `be/lambda/handlers/chat.ts`.
+4. **Tích hợp ReAct reasoning loop (Gemini Reasoning):**
+   - Cấu hình Gemini Client nhận `tools` và chạy vòng lặp suy luận ReAct stateless (tối đa 3 vòng lặp `MAX_LOOPS = 3`).
+5. **Cập nhật Unit Tests & E2E Tests:**
+   - Cập nhật `be/test/chat.test.ts` và `be/test/ingest.test.ts` để mock đầy đủ `SchemaType` và cấu trúc cuộc gọi `functionCalls()` / ReAct của Gemini 2.0 Flash.
+   - Viết kịch bản kiểm thử E2E trong file `fe/tests/agentic-rag.spec.ts` để giả lập cuộc gọi API tới `/api/chat/[jobId]` và tương tác giao diện panel chat, xác nhận các hành động và trích dẫn [Đoạn X] hiển thị chính xác.
+
+#### Kết quả kiểm thử:
+- **Jest Backend tests:** 100% PASS (Tổng cộng 6/6 tests cho chat & ingest).
+- **Playwright E2E tests:** 100% PASS (file `agentic-rag.spec.ts` và `defense.spec.ts` đều PASSED).
+
+#### Files thay đổi:
+- `be/lambda/types.ts`
+- `be/lambda/utils/dynamodb-helpers.ts`
+- `be/lambda/handlers/ingest.ts`
+- `be/lambda/handlers/chat.ts`
+- `be/test/chat.test.ts`
+- `be/test/ingest.test.ts`
+- `fe/scripts/sync-types.js`
+- `fe/tests/agentic-rag.spec.ts`
+
+#### Build status:
+- npm run build: Pass
+- TypeScript errors: 0

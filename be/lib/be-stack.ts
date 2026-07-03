@@ -125,6 +125,34 @@ export class VietAIScholarStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // Table: vietai-thesis-defense-sessions
+    const thesisDefenseSessionsTable = new dynamodb.Table(this, 'ThesisDefenseSessionsTable', {
+      tableName: 'vietai-thesis-defense-sessions',
+      partitionKey: {
+        name: 'sessionId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // Table: vietai-user-competency-profile
+    const userCompetencyProfileTable = new dynamodb.Table(this, 'UserCompetencyProfileTable', {
+      tableName: 'vietai-user-competency-profile',
+      partitionKey: {
+        name: 'PK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'SK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // ============================================
     // 3. IAM ROLE FOR LAMBDA
     // ============================================
@@ -142,6 +170,8 @@ export class VietAIScholarStack extends cdk.Stack {
     // DynamoDB permissions
     jobsTable.grantReadWriteData(lambdaRole);
     quizSharesTable.grantReadWriteData(lambdaRole);
+    thesisDefenseSessionsTable.grantReadWriteData(lambdaRole);
+    userCompetencyProfileTable.grantReadWriteData(lambdaRole);
 
     // Textract permissions (sync + async OCR fallback for PDF)
     lambdaRole.addToPrincipalPolicy(
@@ -230,6 +260,8 @@ export class VietAIScholarStack extends cdk.Stack {
           S3_RESULTS_BUCKET: resultsBucket.bucketName,
           DYNAMODB_TABLE: jobsTable.tableName,
           QUIZ_SHARES_TABLE: quizSharesTable.tableName,
+          THESIS_DEFENSE_SESSIONS_TABLE: thesisDefenseSessionsTable.tableName,
+          USER_COMPETENCY_PROFILE_TABLE: userCompetencyProfileTable.tableName,
           GROQ_SECRET_ARN: groqSecret.secretName,
           GEMINI_SECRET_ARN: geminiSecret.secretName,
           DEEPSEEK_SECRET_ARN: deepseekSecret.secretName,
@@ -278,6 +310,8 @@ export class VietAIScholarStack extends cdk.Stack {
     resultsBucket.grantReadWrite(orchestratorLambda);
     jobsTable.grantReadWriteData(orchestratorLambda);
     quizSharesTable.grantReadWriteData(orchestratorLambda);
+    thesisDefenseSessionsTable.grantReadWriteData(orchestratorLambda);
+    userCompetencyProfileTable.grantReadWriteData(orchestratorLambda);
     groqSecret.grantRead(orchestratorLambda);
     geminiSecret.grantRead(orchestratorLambda);
     deepseekSecret.grantRead(orchestratorLambda);
@@ -772,6 +806,52 @@ export class VietAIScholarStack extends cdk.Stack {
     );
     const exploreJobIdResource = exploreResource.addResource('{jobId}');
     exploreJobIdResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+
+    // ============================================
+    // API Endpoint 5.7: Thesis Defense & Research Copilot
+    // ============================================
+    const defenseResource = exploreResource.addResource('defense');
+    const defenseSessionResource = defenseResource.addResource('session');
+    
+    // POST /explore/defense/session (Khởi tạo phiên bảo vệ)
+    defenseSessionResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+
+    // POST /explore/defense/answer (Gửi câu trả lời và chạy reasoning loop)
+    const defenseAnswerResource = defenseResource.addResource('answer');
+    defenseAnswerResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+
+    // POST /explore/defense/session/close (Kết thúc phiên, chạy extract+update)
+    const defenseCloseResource = defenseSessionResource.addResource('close');
+    defenseCloseResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+
+    // GET /explore/copilot/suggest (Lấy gợi ý Research Copilot)
+    const copilotResource = exploreResource.addResource('copilot');
+    const copilotSuggestResource = copilotResource.addResource('suggest');
+    copilotSuggestResource.addMethod(
       'GET',
       new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
       {

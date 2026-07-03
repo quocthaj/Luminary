@@ -267,3 +267,12 @@ Yêu cầu định dạng bài viết:
     await updateJobStatus(jobId, 'FAILED', { error: s3Err.message || 'S3/DB error during completion' });
   }
 }
+
+// Re-export Thesis Defense & Copilot Handlers
+export {
+  handleDefenseSessionInit,
+  handleDefenseSessionAnswer,
+  handleDefenseSessionClose,
+  handleCopilotSuggest,
+  handleGetCompetencyProfile
+} from './defense';

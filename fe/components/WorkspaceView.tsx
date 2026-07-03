@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { getResultUrl, fetchPreviewContent, resetMockProgress, getJobs, JobStatus, sendRAGChatMessage, RelatedPaper, getRelatedPapers, generateMindmap, checkMindmapStatus } from '../lib/api';
+import { getResultUrl, fetchPreviewContent, resetMockProgress, getJobs, JobStatus, sendRAGChatMessage, RelatedPaper, getRelatedPapers, generateMindmap, checkMindmapStatus, getCopilotSuggestions } from '../lib/api';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { useSession, signOut } from 'next-auth/react';
@@ -8,6 +8,7 @@ import { LoginModal } from './LoginModal';
 import { QuizModal } from './QuizModal';
 import { FlashcardModal } from './FlashcardModal';
 import { MindmapModal } from './MindmapModal';
+import { DefenseModal } from './DefenseModal';
 import { usePodcastPlayer } from './PodcastPlayer';
 
 
@@ -241,6 +242,14 @@ export function WorkspaceView({
   const [mindmapToast, setMindmapToast] = useState<{ type: 'generating' | 'success' | 'failed' | null; message: string }>({ type: null, message: '' });
   const mindmapPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Defense Modal state
+  const [showDefenseModal, setShowDefenseModal] = useState(false);
+
+  // Research Copilot states
+  const [copilotSuggestions, setCopilotSuggestions] = useState<any[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [isCopilotOpen, setIsCopilotOpen] = useState(true);
+
   const startMindmapPolling = useCallback(() => {
     if (mindmapPollRef.current) {
       clearInterval(mindmapPollRef.current);
@@ -408,6 +417,23 @@ export function WorkspaceView({
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
   }, [jobId]);
+
+  const fetchCopilot = useCallback(async () => {
+    if (!jobId || status !== 'authenticated') return;
+    setLoadingSuggestions(true);
+    try {
+      const data = await getCopilotSuggestions(jobId);
+      setCopilotSuggestions(data.suggestions || []);
+    } catch (err) {
+      console.warn('Failed to load copilot suggestions:', err);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }, [jobId, status]);
+
+  useEffect(() => {
+    fetchCopilot();
+  }, [jobId, status, fetchCopilot]);
 
   // Dynamic greeting message based on session user
   const userName = useMemo(() => {
@@ -700,7 +726,8 @@ export function WorkspaceView({
       <div aria-hidden className="dot-grid pointer-events-none fixed inset-0 z-0" />
 
       {/* ── CSS Shimmer & Animation Styles ── */}
-      <style dangerouslySetInnerHTML={{__html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes shimmer {
           0% { background-position: -200% 0; }
           100% { background-position: 200% 0; }
@@ -714,9 +741,8 @@ export function WorkspaceView({
 
       {/* ── LEFT SIDEBAR (15% on Desktop, collapsible) ── */}
       <aside
-        className={`hidden lg:flex flex-col h-full bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] transition-all duration-300 z-10 flex-shrink-0 select-none ${
-          isLeftCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-72 opacity-100'
-        }`}
+        className={`hidden lg:flex flex-col h-full bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] transition-all duration-300 z-10 flex-shrink-0 select-none ${isLeftCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-72 opacity-100'
+          }`}
       >
         {/* Brand Header */}
         <div className="p-5 border-b border-[var(--border-subtle)] flex items-center justify-between">
@@ -781,11 +807,10 @@ export function WorkspaceView({
                       key={job.jobId}
                       onClick={() => isCompleted && setJobId(job.jobId)}
                       disabled={!isCompleted}
-                      className={`text-left p-2.5 rounded-xl border transition-all text-xs flex flex-col gap-1 w-full ${
-                        isActive
+                      className={`text-left p-2.5 rounded-xl border transition-all text-xs flex flex-col gap-1 w-full ${isActive
                           ? 'bg-[var(--accent-dim)] border-[var(--accent)] text-[var(--text-primary)] font-medium'
                           : 'bg-transparent border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-normal)]'
-                      } ${!isCompleted ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        } ${!isCompleted ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                       <span className="truncate w-full font-semibold">{job.fileName || 'Tài liệu học thuật.pdf'}</span>
                       <span className="text-[9px] opacity-75">
@@ -844,11 +869,10 @@ export function WorkspaceView({
                 id="open-mindmap-btn"
                 data-testid="open-mindmap-btn"
                 title="Tạo sơ đồ tư duy trực quan từ bài báo này"
-                className={`text-left p-2.5 rounded-xl border transition-all flex flex-col gap-0.5 cursor-pointer relative group disabled:opacity-40 disabled:cursor-not-allowed ${
-                  mindmapStatus === 'COMPLETED'
+                className={`text-left p-2.5 rounded-xl border transition-all flex flex-col gap-0.5 cursor-pointer relative group disabled:opacity-40 disabled:cursor-not-allowed ${mindmapStatus === 'COMPLETED'
                     ? 'border-green-500/30 bg-green-500/5 hover:bg-green-500/10'
                     : 'border-[var(--border-subtle)] bg-transparent hover:bg-[var(--bg-elevated)]'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between w-full">
                   <span className="text-xs font-semibold text-[var(--text-primary)]">
@@ -873,13 +897,30 @@ export function WorkspaceView({
                 </span>
               </button>
 
+              {/* Phản biện luận án (Defense) */}
+              <button
+                onClick={() => setShowDefenseModal(true)}
+                disabled={loading}
+                id="open-defense-btn"
+                data-testid="open-defense-btn"
+                title="Bảo vệ đề tài luận án trước hội đồng phản biện AI"
+                className="text-left p-2.5 rounded-xl border border-[var(--border-subtle)] bg-transparent hover:bg-[var(--bg-elevated)] transition-all flex flex-col gap-0.5 cursor-pointer relative group disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-xs font-semibold text-[var(--text-primary)]">Phản biện luận án (Defense)</span>
+                  <span className="text-[8px] bg-[var(--accent-dim)] text-[var(--accent)] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider scale-90">
+                    Agentic
+                  </span>
+                </div>
+                <span className="text-[10px] text-[var(--text-secondary)] opacity-75">Bảo vệ đề tài trước hội đồng AI</span>
+              </button>
+
               {/* Hội thoại AI (Podcast) */}
               <div
-                className={`p-2.5 rounded-xl border transition-all flex flex-col gap-2 ${
-                  activeJobId === jobId && podcastPlayerStatus === 'COMPLETED'
+                className={`p-2.5 rounded-xl border transition-all flex flex-col gap-2 ${activeJobId === jobId && podcastPlayerStatus === 'COMPLETED'
                     ? 'border-[var(--success)]/30 bg-[var(--success-dim)]'
                     : 'border-[var(--border-subtle)] bg-transparent'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between w-full">
                   <span className="text-xs font-semibold text-[var(--text-primary)]">Hội thoại AI (Podcast)</span>
@@ -903,7 +944,7 @@ export function WorkspaceView({
                 <div className="flex items-center justify-between mt-1 text-[10px]">
                   <span className="text-[var(--text-secondary)]">Chất lượng cao (HD)</span>
                   <label className="relative inline-flex items-center cursor-pointer select-none">
-                    <input 
+                    <input
                       type="checkbox"
                       checked={podcastHdMode}
                       onChange={(e) => setPodcastHdMode(e.target.checked)}
@@ -1303,6 +1344,79 @@ export function WorkspaceView({
                 />
               </div>
             )}
+            {/* ── Research Copilot Floating Suggestion Panel ── */}
+            {status === 'authenticated' && copilotSuggestions.length > 0 && (
+              <div className="absolute bottom-4 right-4 z-30 max-w-sm w-full transition-all duration-300">
+                {isCopilotOpen ? (
+                  <div className="bg-[#0e131f]/95 border border-white/10 rounded-2xl p-4 shadow-2xl backdrop-blur-md flex flex-col gap-3">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                        <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">
+                          Research Copilot
+                        </h4>
+                      </div>
+                      <button
+                        onClick={() => setIsCopilotOpen(false)}
+                        className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/5 cursor-pointer"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div className="flex flex-col gap-2 max-h-48 overflow-y-auto scrollbar-thin">
+                      {copilotSuggestions.map((s, idx) => (
+                        <div key={idx} className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left flex flex-col gap-2">
+                          <div>
+                            <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">[{s.action}]</span>
+                            <h5 className="text-[11px] font-bold text-white leading-snug mt-0.5">{s.title}</h5>
+                            <p className="text-[10px] text-gray-400 leading-normal mt-0.5">{s.description}</p>
+                          </div>
+                          <div className="flex justify-end">
+                            <button
+                              onClick={() => {
+                                if (s.action === 'THESIS_DEFENSE') {
+                                  setShowDefenseModal(true);
+                                } else if (s.action === 'SCHOLAR_SEARCH') {
+                                  setIsRightCollapsed(false);
+                                  setRightTab('scholar');
+                                  fetchRelatedPapers(jobId);
+                                } else if (s.action === 'READ_MORE') {
+                                  setIsRightCollapsed(false);
+                                  setRightTab('tutor');
+                                  handleSendMessage(`Hãy giải thích chi tiết khái niệm: ${s.payload}`);
+                                } else {
+                                  alert(`Đang thực hiện hành động: ${s.action} - ${s.payload}`);
+                                }
+                              }}
+                              className="bg-red-600 hover:bg-red-500 text-white text-[9px] font-bold px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+                            >
+                              Thực hiện
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsCopilotOpen(true)}
+                    className="h-10 w-10 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-xl hover:scale-105 transition-all cursor-pointer border-none"
+                    title="Mở gợi ý từ Research Copilot"
+                  >
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                    </span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </main>
@@ -1331,29 +1445,26 @@ export function WorkspaceView({
 
       {/* ── RIGHT SIDEBAR (30% on Desktop, collapsible) ── */}
       <aside
-        className={`hidden lg:flex flex-col h-full bg-[var(--bg-surface)] border-l border-[var(--border-subtle)] transition-all duration-300 z-10 flex-shrink-0 select-none ${
-          isRightCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-96 opacity-100'
-        }`}
+        className={`hidden lg:flex flex-col h-full bg-[var(--bg-surface)] border-l border-[var(--border-subtle)] transition-all duration-300 z-10 flex-shrink-0 select-none ${isRightCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-96 opacity-100'
+          }`}
       >
         {/* Tab Headers */}
         <div className="flex border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]/20">
           <button
             onClick={() => setRightTab('tutor')}
-            className={`flex-1 py-4 text-xs font-bold uppercase tracking-wider text-center transition-all cursor-pointer border-b-2 ${
-              rightTab === 'tutor'
+            className={`flex-1 py-4 text-xs font-bold uppercase tracking-wider text-center transition-all cursor-pointer border-b-2 ${rightTab === 'tutor'
                 ? 'border-[var(--accent)] text-[var(--accent)]'
                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
+              }`}
           >
             AI Tutor Chat
           </button>
           <button
             onClick={() => setRightTab('scholar')}
-            className={`flex-1 py-4 text-xs font-bold uppercase tracking-wider text-center transition-all cursor-pointer border-b-2 ${
-              rightTab === 'scholar'
+            className={`flex-1 py-4 text-xs font-bold uppercase tracking-wider text-center transition-all cursor-pointer border-b-2 ${rightTab === 'scholar'
                 ? 'border-[var(--accent)] text-[var(--accent)]'
                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
+              }`}
           >
             Papers liên quan
           </button>
@@ -1377,11 +1488,10 @@ export function WorkspaceView({
                         U
                       </div>
                     )}
-                    <div className={`flex-1 p-3 rounded-2xl border text-xs leading-relaxed max-w-[85%] ${
-                      msg.role === 'user'
+                    <div className={`flex-1 p-3 rounded-2xl border text-xs leading-relaxed max-w-[85%] ${msg.role === 'user'
                         ? 'bg-[var(--accent-dim)] border-[var(--accent-glow)] rounded-tr-none text-[var(--text-primary)] self-end'
                         : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] rounded-tl-none text-[var(--text-primary)]'
-                    }`}>
+                      }`}>
                       {msg.role === 'assistant' && (
                         <p className="font-semibold mb-1" style={{ color: 'var(--accent)' }}>AI Tutor học thuật</p>
                       )}
@@ -1638,6 +1748,17 @@ export function WorkspaceView({
         isOpen={showMindmapModal}
         jobId={jobId}
         onClose={() => setShowMindmapModal(false)}
+      />
+
+      {/* ── Defense Modal ── */}
+      <DefenseModal
+        isOpen={showDefenseModal}
+        jobId={jobId}
+        onClose={() => {
+          setShowDefenseModal(false);
+          fetchCopilot(); // Refresh recommendations after session finishes
+        }}
+        fileName={libraryJobs.find(j => j.jobId === jobId)?.fileName}
       />
 
       {/* ── Background Mindmap Toast Notification ── */}

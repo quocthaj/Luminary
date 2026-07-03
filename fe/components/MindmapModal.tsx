@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { generateMindmap, checkMindmapStatus } from '../lib/api';
+import { generateMindmap, checkMindmapStatus, fetchCompetencyProfile, CompetencyProfile } from '../lib/api';
 import ObsidianGraphView, { GraphData } from './ObsidianGraphView';
 
 // Progressive loading messages
@@ -83,7 +83,7 @@ function parseMindmapToTree(code: string): TreeNode | null {
   }
 }
 
-function convertTreeToGraph(root: TreeNode): GraphData {
+function convertTreeToGraph(root: TreeNode, competencyProfile?: CompetencyProfile): GraphData {
   const nodes: any[] = [];
   const links: any[] = [];
   let idCounter = 0;
@@ -91,11 +91,36 @@ function convertTreeToGraph(root: TreeNode): GraphData {
   function traverse(node: TreeNode, parentId?: string, depth: number = 0) {
     const currentId = `node_${idCounter++}`;
     const val = depth === 0 ? 14 : depth === 1 ? 9 : 5;
+
+    // Determine color based on competency status if mapped
+    let color = undefined;
+    if (competencyProfile) {
+      const cleanLabel = node.label.toLowerCase().trim();
+      const matchKey = Object.keys(competencyProfile).find(key => {
+        const cleanKey = key.replace(/_/g, ' ').toLowerCase();
+        return cleanLabel.includes(cleanKey) || cleanKey.includes(cleanLabel);
+      });
+
+      if (matchKey) {
+        const status = competencyProfile[matchKey].status;
+        if (status === 'MASTERED') {
+          color = '#22c55e'; // Green
+        } else if (status === 'WARNING') {
+          color = '#eab308'; // Yellow
+        } else if (status === 'GAP') {
+          color = '#ef4444'; // Red
+        }
+      } else {
+        console.warn(`⚠️ [Mindmap Heatmap Match] Concept "${node.label}" was not matched to any key in competency profile. Profile keys:`, Object.keys(competencyProfile));
+      }
+    }
+
     nodes.push({
       id: currentId,
       name: node.label,
       val,
       group: depth,
+      color,
     });
 
     if (parentId) {
@@ -206,6 +231,7 @@ type ViewMode = 'graph' | 'tree';
 export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
   const [phase, setPhase] = useState<MindmapPhase>('setup');
   const [viewMode, setViewMode] = useState<ViewMode>('graph');
+  const [competencyProfile, setCompetencyProfile] = useState<CompetencyProfile | undefined>(undefined);
   const [mermaidCode, setMermaidCode] = useState<string>('');
   const [svgMarkup, setSvgMarkup] = useState<string>('');
   const [renderError, setRenderError] = useState<boolean>(false);
@@ -264,6 +290,16 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
       }
       return;
     }
+
+    // Fetch long-term competency profile to build the heatmap graph representation
+    fetchCompetencyProfile()
+      .then((res) => {
+        setCompetencyProfile(res.profile);
+      })
+      .catch((err) => {
+        console.error('Failed to load user competency profile in mindmap modal:', err);
+      });
+
     setPhase('loading');
     setMermaidCode('');
     setSvgMarkup('');
@@ -454,7 +490,7 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
   if (!isOpen) return null;
 
   const parsedTree = mermaidCode ? parseMindmapToTree(mermaidCode) : null;
-  const graphData = parsedTree ? convertTreeToGraph(parsedTree) : null;
+  const graphData = parsedTree ? convertTreeToGraph(parsedTree, competencyProfile) : null;
 
   return (
     <div

@@ -126,7 +126,10 @@ test.describe('Mindmap Modal & Background Polling — E2E (Story 4.3)', () => {
     await page.locator('[data-testid="open-mindmap-btn"]').click();
     await expect(page.locator('[data-testid="mindmap-modal"]')).toBeVisible();
 
-    // Reset zoom control should be visible
+    // Zoom controls only exist in the Mermaid tree view — switch to it first
+    await page.locator('button:has-text("Sơ đồ cây")').click();
+
+    // Reset zoom control should now be visible in tree view
     const resetBtn = page.getByTitle('Đặt lại zoom').or(page.getByText('Khôi phục'));
     await expect(resetBtn).toBeVisible();
 
@@ -154,11 +157,57 @@ test.describe('Mindmap Modal & Background Polling — E2E (Story 4.3)', () => {
     // Wait for viewing state
     await expect(page.locator('[data-testid="mindmap-modal"]')).toBeVisible();
 
+    // The render-error banner and text fallback are inside the Mermaid tree view — switch to it
+    await page.locator('button:has-text("Sơ đồ cây")').click();
+
     // Should display the fallback text tree containing parsed labels
     const fallbackMessage = page.locator('text=Lỗi dựng đồ họa. Hiển thị dạng sơ đồ cây thay thế.');
     await expect(fallbackMessage).toBeVisible({ timeout: 10000 });
 
     const treeLabel = page.locator('[data-testid="mindmap-modal"] .font-medium:has-text("invalid-syntax-mermaid-code")');
     await expect(treeLabel).toBeVisible();
+  });
+
+  test('[heatmap] handles mismatched concept IDs safely and renders default colors without crashing', async ({ page }) => {
+    // Mock completed mindmap response
+    await page.route('**/api/tools/**/mindmap', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'COMPLETED',
+          mermaidCode: MOCK_MINDMAP_CODE
+        }),
+      });
+    });
+
+    // Mock competency profile with one match and one mismatch
+    await page.route('**/api/explore/competency/profile', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          profile: {
+            supervised: { status: 'MASTERED', mastery_score: 0.95 },
+            // "classification" is missing (mismatch)
+          }
+        }),
+      });
+    });
+
+    await goToWorkspace(page);
+    await page.locator('[data-testid="open-mindmap-btn"]').click();
+
+    // Verify modal renders successfully without crashing
+    const modal = page.locator('[data-testid="mindmap-modal"]');
+    await expect(modal).toBeVisible();
+    await expect(page.locator('#mindmap-viewing-state')).toBeVisible();
+
+    // Wait a brief moment to allow canvas render
+    await page.waitForTimeout(1000);
+
+    // Close the modal
+    await page.locator('[data-testid="mindmap-close-btn"]').click();
+    await expect(modal).not.toBeVisible();
   });
 });
