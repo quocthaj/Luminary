@@ -24,7 +24,7 @@ export class ApiError extends Error {
 let cachedSession: any = null;
 let cacheExpiry = 0;
 
-// Helper to get standard API headers including Authorization token
+// Helper to get standard API headers including Authorization token and Agent configs
 async function getApiHeaders(extraHeaders: Record<string, string> = {}): Promise<HeadersInit> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -38,6 +38,21 @@ async function getApiHeaders(extraHeaders: Record<string, string> = {}): Promise
     }
     if (cachedSession?.accessToken) {
       headers['Authorization'] = `Bearer ${cachedSession.accessToken}`;
+    }
+
+    // Extract and inject user agent settings from localStorage if on browser
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('vietai_user_profile_settings');
+      if (stored) {
+        try {
+          const settings = JSON.parse(stored);
+          if (settings.agentDepth) headers['X-Agent-Depth'] = settings.agentDepth;
+          if (settings.defenseIntensity) headers['X-Defense-Intensity'] = settings.defenseIntensity;
+          if (settings.translationStyle) headers['X-Translation-Style'] = settings.translationStyle;
+          if (settings.role) headers['X-Academic-Role'] = settings.role;
+          if (settings.affiliation) headers['X-Academic-Affiliation'] = encodeURIComponent(settings.affiliation);
+        } catch (_) {}
+      }
     }
   } catch (err) {
     console.warn('Failed to retrieve session for API headers:', err);
@@ -468,6 +483,17 @@ export interface DefenseSession {
   createdAt: string;
   updatedAt: string;
   archivedAt?: string;
+  academicRole?: string;
+  defenseIntensity?: string;
+  academicAffiliation?: string;
+  report?: {
+    overallScore: number;
+    overallComment: string;
+    strengths: string[];
+    weaknesses: string[];
+    concepts_evaluated?: any[];
+    facts?: any[];
+  };
 }
 
 export interface DefenseAnswerResponse {
@@ -478,6 +504,10 @@ export interface DefenseAnswerResponse {
   recent_turns: any[];
   concept_status: any[];
   report?: {
+    overallScore: number;
+    overallComment: string;
+    strengths: string[];
+    weaknesses: string[];
     concepts_evaluated: any[];
     facts: any[];
   };

@@ -375,8 +375,10 @@ export const handler = async (event: any) => {
             }
             const { handleExplorePost } = require('./handlers/explore');
             try {
-                const result = await handleExplorePost({ userId, topic: requestBody.topic });
-                return respond(202, result);
+                const mode = requestBody.mode || 'lecture';
+                const result = await handleExplorePost({ userId, topic: requestBody.topic, mode });
+                const statusCode = (mode === 'discovery' || mode === 'roadmap') ? 200 : 202;
+                return respond(statusCode, result);
             } catch (err: any) {
                 console.error('❌ Explore POST error:', err);
                 return respond(500, { error: err.message || 'Internal server error' });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { getForwardHeaders } from '@/lib/proxy-utils';
 
 const API_BASE = 'https://5c2wlnvtsh.execute-api.ap-southeast-1.amazonaws.com/dev';
 
@@ -25,10 +26,7 @@ export async function POST(req: NextRequest) {
   try {
     const res = await fetch(backendUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.accessToken}`,
-      },
+      headers: getForwardHeaders(req, session.accessToken),
       body: JSON.stringify({ jobId }),
     });
 

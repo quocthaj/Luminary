@@ -50,3 +50,7 @@ fe/blob-report/
 Obisidian/.obsidian/workspace.json
 Obisidian/.obsidian/workspace-mobile.json
 Obisidian/.obsidian/graph.json
+
+# Logs
+be/lambda-logs.json
+

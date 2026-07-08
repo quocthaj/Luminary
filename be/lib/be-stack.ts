@@ -13,6 +13,19 @@ import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
+class LambdaIntegrationNoPermission extends apigateway.LambdaIntegration {
+  public override bind(method: apigateway.Method): apigateway.IntegrationConfig {
+    const config = super.bind(method);
+    const permissions = method.node.children.filter(
+      (child) => child instanceof lambda.CfnPermission
+    );
+    for (const permission of permissions) {
+      method.node.tryRemoveChild(permission.node.id);
+    }
+    return config;
+  }
+}
+
 export class VietAIScholarStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -455,6 +468,28 @@ export class VietAIScholarStack extends cdk.Stack {
       description: 'Ingest bilingual Markdown and upsert vectors to Qdrant Cloud',
     });
 
+    const defenseCopilotLambda = new lambdaNode.NodejsFunction(this, 'DefenseCopilotLambda', {
+      functionName: 'vietai-defense-copilot',
+      entry: path.join(__dirname, '../lambda/handlers/defense-router.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      role: lambdaRole,
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 512,
+      environment: {
+        DYNAMODB_TABLE: jobsTable.tableName,
+        THESIS_DEFENSE_SESSIONS_TABLE: thesisDefenseSessionsTable.tableName,
+        USER_COMPETENCY_PROFILE_TABLE: userCompetencyProfileTable.tableName,
+        GEMINI_SECRET_ARN: geminiSecret.secretName,
+        GROQ_SECRET_ARN: groqSecret.secretName,
+        GEMINI_EMBEDDING_SECRET_ARN: geminiEmbedSecret.secretName,
+        NOMIC_SECRET_ARN: nomicSecret.secretName,
+        QDRANT_SECRET_ARN: qdrantSecret.secretName,
+        AUTH_SECRET_SECRET_NAME: 'vietai/auth-secret',
+      },
+      description: 'Thesis Defense reasoning loop & Research Copilot suggestions',
+    });
+
     // ============================================
     // 5. STEP FUNCTIONS STATE MACHINE
     // ============================================
@@ -565,6 +600,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const authSecret = secretsmanager.Secret.fromSecretNameV2(this, 'AuthSecret', 'vietai/auth-secret');
     authSecret.grantRead(authorizerLambda);
     authSecret.grantRead(orchestratorLambda);
+    authSecret.grantRead(lambdaRole);
 
     const authorizer = new apigateway.TokenAuthorizer(this, 'JwtAuthorizer', {
       handler: authorizerLambda,
@@ -581,6 +617,11 @@ export class VietAIScholarStack extends cdk.Stack {
       sourceArn: api.arnForExecuteApi(),
     });
 
+    defenseCopilotLambda.addPermission('ApiGatewayInvoke', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: api.arnForExecuteApi(),
+    });
+
     // ============================================
     // API Endpoint 1: POST /upload
     // Returns: { uploadUrl, jobId }
@@ -588,7 +629,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const uploadResource = api.root.addResource('upload');
     uploadResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(orchestratorLambda, {
+      new LambdaIntegrationNoPermission(orchestratorLambda, {
         proxy: true, // Lambda nhận full HTTP request, tự xử lý response
       })
     );
@@ -601,7 +642,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const jobIdResource = jobResource.addResource('{jobId}');
     jobIdResource.addMethod(
       'GET',
-      new apigateway.LambdaIntegration(orchestratorLambda, {
+      new LambdaIntegrationNoPermission(orchestratorLambda, {
         proxy: true,
       })
     );
@@ -613,7 +654,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const reprocessResource = jobIdResource.addResource('reprocess');
     reprocessResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
@@ -626,7 +667,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const chatResource = jobIdResource.addResource('chat');
     chatResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
@@ -639,14 +680,14 @@ export class VietAIScholarStack extends cdk.Stack {
     const quizResource = jobIdResource.addResource('quiz');
     quizResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
     );
     quizResource.addMethod(
       'GET',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
@@ -660,7 +701,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const shareQuizResource = shareResource.addResource('quiz');
     shareQuizResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
         methodResponses: [{ statusCode: '200' }],
@@ -676,7 +717,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const publicShareIdResource = publicShareQuizResource.addResource('{shareId}');
     publicShareIdResource.addMethod(
       'GET',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         // Public endpoint, no authorizer
       }
@@ -689,14 +730,14 @@ export class VietAIScholarStack extends cdk.Stack {
     const flashcardResource = jobIdResource.addResource('flashcard');
     flashcardResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
     );
     flashcardResource.addMethod(
       'GET',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
@@ -709,14 +750,14 @@ export class VietAIScholarStack extends cdk.Stack {
     const mindmapResource = jobIdResource.addResource('mindmap');
     mindmapResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
     );
     mindmapResource.addMethod(
       'GET',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
@@ -729,14 +770,14 @@ export class VietAIScholarStack extends cdk.Stack {
     const podcastResource = jobIdResource.addResource('podcast');
     podcastResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
     );
     podcastResource.addMethod(
       'GET',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
@@ -750,7 +791,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const resultJobIdResource = resultResource.addResource('{jobId}');
     resultJobIdResource.addMethod(
       'GET',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true })
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true })
     );
 
     // ============================================
@@ -760,7 +801,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const jobsResource = api.root.addResource('jobs');
     jobsResource.addMethod(
       'GET',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
@@ -773,7 +814,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const synthesisResource = api.root.addResource('synthesis');
     synthesisResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
@@ -786,7 +827,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const synthesisChatResource = synthesisResource.addResource('chat');
     synthesisChatResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
@@ -799,7 +840,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const exploreResource = api.root.addResource('explore');
     exploreResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
@@ -807,7 +848,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const exploreJobIdResource = exploreResource.addResource('{jobId}');
     exploreJobIdResource.addMethod(
       'GET',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
       {
         authorizer,
       }
@@ -822,7 +863,7 @@ export class VietAIScholarStack extends cdk.Stack {
     // POST /explore/defense/session (Khởi tạo phiên bảo vệ)
     defenseSessionResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(defenseCopilotLambda, { proxy: true }),
       {
         authorizer,
       }
@@ -832,7 +873,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const defenseAnswerResource = defenseResource.addResource('answer');
     defenseAnswerResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(defenseCopilotLambda, { proxy: true }),
       {
         authorizer,
       }
@@ -842,7 +883,7 @@ export class VietAIScholarStack extends cdk.Stack {
     const defenseCloseResource = defenseSessionResource.addResource('close');
     defenseCloseResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(defenseCopilotLambda, { proxy: true }),
       {
         authorizer,
       }
@@ -853,7 +894,18 @@ export class VietAIScholarStack extends cdk.Stack {
     const copilotSuggestResource = copilotResource.addResource('suggest');
     copilotSuggestResource.addMethod(
       'GET',
-      new apigateway.LambdaIntegration(orchestratorLambda, { proxy: true }),
+      new LambdaIntegrationNoPermission(defenseCopilotLambda, { proxy: true }),
+      {
+        authorizer,
+      }
+    );
+
+    // GET /explore/competency/profile (Lấy hồ sơ năng lực của học viên)
+    const competencyResource = exploreResource.addResource('competency');
+    const competencyProfileResource = competencyResource.addResource('profile');
+    competencyProfileResource.addMethod(
+      'GET',
+      new LambdaIntegrationNoPermission(defenseCopilotLambda, { proxy: true }),
       {
         authorizer,
       }

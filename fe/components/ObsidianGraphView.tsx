@@ -1,6 +1,8 @@
 'use client';
+
 import React, { useRef, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
+import { useThemeColors } from '../hooks/useThemeColors';
 
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
 
@@ -31,6 +33,7 @@ interface ObsidianGraphViewProps {
 export default function ObsidianGraphView({ data }: ObsidianGraphViewProps) {
   const fgRef = useRef<any>(null);
   const [hoverNode, setHoverNode] = useState<GraphNode | null>(null);
+  const themeColors = useThemeColors();
 
   const handleNodeHover = useCallback((node: GraphNode | null) => {
     setHoverNode(node);
@@ -55,14 +58,14 @@ export default function ObsidianGraphView({ data }: ObsidianGraphViewProps) {
   };
 
   return (
-    <div className="w-full h-full relative bg-[#090d16] overflow-hidden flex flex-col justify-center items-center">
+    <div className="w-full h-full relative bg-[var(--bg-base)] overflow-hidden flex flex-col justify-center items-center">
       {/* Overlay Controls */}
       <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
-        <div className="flex items-center bg-[#0e131f]/90 border border-white/10 rounded-xl p-1.5 shadow-lg backdrop-blur-sm">
+        <div className="flex items-center bg-[var(--bg-surface)]/90 border border-[var(--border-normal)] rounded-xl p-1.5 shadow-lg backdrop-blur-sm">
           <button
             onClick={handleZoomIn}
             title="Phóng to"
-            className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer"
+            className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-elevated)]/40 cursor-pointer"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -71,17 +74,17 @@ export default function ObsidianGraphView({ data }: ObsidianGraphViewProps) {
           <button
             onClick={handleZoomOut}
             title="Thu nhỏ"
-            className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer"
+            className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-elevated)]/40 cursor-pointer"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
             </svg>
           </button>
-          <div className="h-4 w-px bg-white/10 mx-1" />
+          <div className="h-4 w-px bg-[var(--border-normal)] mx-1" />
           <button
             onClick={handleReset}
             title="Căn chỉnh vừa màn hình"
-            className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer text-[10px] font-bold px-2.5"
+            className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-elevated)]/40 cursor-pointer text-[10px] font-bold px-2.5"
           >
             Căn giữa
           </button>
@@ -90,11 +93,11 @@ export default function ObsidianGraphView({ data }: ObsidianGraphViewProps) {
 
       {/* Hover Info Card */}
       {hoverNode && (
-        <div className="absolute top-4 right-4 z-10 bg-[#0e131f]/95 border border-[var(--accent,#38bdf8)]/40 px-4 py-2.5 rounded-xl shadow-xl backdrop-blur-md max-w-xs animate-fadeIn">
-          <p className="text-[10px] font-bold text-[var(--accent,#38bdf8)] uppercase tracking-wider mb-0.5">
+        <div className="absolute top-4 right-4 z-10 bg-[var(--bg-surface)]/95 border border-[var(--accent)] px-4 py-2.5 rounded-xl shadow-xl backdrop-blur-md max-w-xs animate-fadeIn">
+          <p className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-wider mb-0.5">
             Khái niệm chọn
           </p>
-          <p className="text-xs font-semibold text-white leading-snug">
+          <p className="text-xs font-semibold text-[var(--text-primary)] leading-snug">
             {hoverNode.name}
           </p>
         </div>
@@ -105,15 +108,15 @@ export default function ObsidianGraphView({ data }: ObsidianGraphViewProps) {
         <ForceGraph2D
           ref={fgRef}
           graphData={data}
-          backgroundColor="#090d16"
+          backgroundColor={themeColors.bgBase}
           nodeAutoColorBy="group"
           nodeRelSize={5}
           linkWidth={1.5}
-          linkColor={() => 'rgba(56, 189, 248, 0.25)'}
+          linkColor={() => themeColors.accentGlow}
           linkDirectionalParticles={2}
           linkDirectionalParticleSpeed={0.006}
           linkDirectionalParticleWidth={2.5}
-          linkDirectionalParticleColor={() => '#38bdf8'}
+          linkDirectionalParticleColor={() => themeColors.accent}
           onNodeHover={handleNodeHover as any}
           nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
             const label = node.name;
@@ -125,7 +128,7 @@ export default function ObsidianGraphView({ data }: ObsidianGraphViewProps) {
 
             // Glow effect on hover
             if (isHovered) {
-              ctx.shadowColor = '#38bdf8';
+              ctx.shadowColor = themeColors.accent;
               ctx.shadowBlur = 15;
             } else {
               ctx.shadowBlur = 0;
@@ -134,14 +137,14 @@ export default function ObsidianGraphView({ data }: ObsidianGraphViewProps) {
             // Draw Node Circle
             ctx.beginPath();
             ctx.arc(node.x, node.y, nodeRadius, 0, 2 * Math.PI, false);
-            ctx.fillStyle = node.color || (node.group === 0 ? '#38bdf8' : node.group === 1 ? '#818cf8' : '#c084fc');
+            ctx.fillStyle = node.color || (node.group === 0 ? themeColors.accent : node.group === 1 ? themeColors.success : themeColors.warning);
             ctx.fill();
 
             // Reset shadow
             ctx.shadowBlur = 0;
 
             // Draw Node Text Label
-            ctx.fillStyle = isHovered ? '#ffffff' : 'rgba(255, 255, 255, 0.85)';
+            ctx.fillStyle = isHovered ? themeColors.textPrimary : themeColors.textSecondary;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
             ctx.fillText(label, node.x, node.y + nodeRadius + 3);
@@ -150,7 +153,7 @@ export default function ObsidianGraphView({ data }: ObsidianGraphViewProps) {
       </div>
 
       {/* Bottom Tip */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#0e131f]/95 border border-white/5 rounded-full px-4 py-1.5 text-[10px] text-gray-400 shadow-md backdrop-blur-sm flex items-center gap-1.5 select-none pointer-events-none z-10">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[var(--bg-surface)]/95 border border-[var(--border-subtle)] rounded-full px-4 py-1.5 text-[10px] text-[var(--text-secondary)] shadow-md backdrop-blur-sm flex items-center gap-1.5 select-none pointer-events-none z-10">
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
         </svg>

@@ -266,12 +266,12 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
         }
       `}</style>
 
-      <div className="relative w-full max-w-lg bg-[#0e131f] border border-[var(--border-normal,rgba(255,255,255,0.1))] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="relative w-full max-w-lg bg-[var(--bg-base)] border border-[var(--border-normal)] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-[var(--border-subtle,rgba(255,255,255,0.05))] flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-[var(--accent,#38bdf8)] animate-pulse" />
-            <h3 className="text-sm font-bold text-white tracking-wide">
+            <div className="h-2 w-2 rounded-full bg-[var(--accent)] animate-pulse" />
+            <h3 className="text-sm font-bold text-[var(--text-primary)] tracking-wide">
               Thẻ Ghi Nhớ Học Thuật
             </h3>
           </div>
@@ -279,7 +279,7 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
             onClick={onClose}
             id="flashcard-close-btn"
             data-testid="flashcard-close-btn"
-            className="text-gray-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5 cursor-pointer"
+            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors p-1 rounded-lg hover:bg-[var(--bg-elevated)]/40 cursor-pointer"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -290,15 +290,15 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
         {/* ─── SETUP STATE ─── */}
         {phase === 'setup' && (
           <div className="p-8 flex flex-col items-center text-center gap-6" id="flashcard-setup-state">
-            <div className="h-16 w-16 rounded-2xl bg-[var(--accent,#38bdf8)]/10 flex items-center justify-center text-[var(--accent,#38bdf8)]">
+            <div className="h-16 w-16 rounded-2xl bg-[var(--accent-dim)] flex items-center justify-center text-[var(--accent)]">
               <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
               </svg>
             </div>
 
             <div>
-              <h4 className="text-base font-semibold text-white mb-2">Tự Động Sinh Thẻ Ghi Nhớ</h4>
-              <p className="text-xs text-gray-400 max-w-sm leading-relaxed">
+              <h4 className="text-base font-semibold text-[var(--text-primary)] mb-2">Tự Động Sinh Thẻ Ghi Nhớ</h4>
+              <p className="text-xs text-[var(--text-secondary)] max-w-sm leading-relaxed">
                 Hệ thống AI sẽ quét nội dung bài báo khoa học, tự động lọc ra các thuật ngữ chuyên ngành khó để tạo thẻ học song ngữ Anh - Việt.
               </p>
             </div>
@@ -317,7 +317,7 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
 
             <div className="w-full flex flex-col gap-4 mt-2">
               <div className="flex flex-col gap-2 text-left">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
                   Số Lượng Thẻ Muốn Tạo
                 </label>
                 <div className="relative">
@@ -326,13 +326,13 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
                     data-testid="flashcard-count-select"
                     value={requestedCount}
                     onChange={(e) => setRequestedCount(Number(e.target.value))}
-                    className="w-full bg-[#141b2d] border border-[var(--border-normal,rgba(255,255,255,0.1))] text-white text-xs rounded-xl px-4 py-3.5 outline-none focus:border-[var(--accent,#38bdf8)] transition-colors cursor-pointer appearance-none"
+                    className="w-full bg-[var(--bg-surface)] border border-[var(--border-normal)] text-[var(--text-primary)] text-xs rounded-xl px-4 py-3.5 outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none animate-none"
                   >
                     <option value={5}>5 thẻ ghi nhớ</option>
                     <option value={10}>10 thẻ ghi nhớ (Khuyên dùng)</option>
                     <option value={20}>20 thẻ ghi nhớ</option>
                   </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-400">
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-[var(--text-secondary)]">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
@@ -344,7 +344,7 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
                 onClick={() => handleStartGeneration(requestedCount)}
                 id="flashcard-start-btn"
                 data-testid="flashcard-start-btn"
-                className="w-full bg-[var(--accent,#38bdf8)] text-[#080b12] text-xs font-bold py-3.5 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-[var(--accent,#38bdf8)]/20"
+                className="w-full bg-[var(--accent)] text-[var(--bg-base)] text-xs font-bold py-3.5 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-[var(--accent)]/20"
               >
                 Bắt đầu tạo thẻ với AI
               </button>
@@ -357,9 +357,9 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
           <div className="p-12 flex flex-col items-center text-center gap-6" id="flashcard-loading-state">
             <div className="relative flex items-center justify-center">
               {/* Outer spin */}
-              <div className="h-16 w-16 rounded-full border-2 border-[var(--border-normal,rgba(255,255,255,0.1))] border-t-[var(--accent,#38bdf8)] animate-spin" />
+              <div className="h-16 w-16 rounded-full border-2 border-[var(--border-normal)] border-t-[var(--accent)] animate-spin" />
               {/* Inner pulsed logo */}
-              <div className="absolute h-8 w-8 rounded-lg bg-[var(--accent,#38bdf8)]/10 flex items-center justify-center text-[var(--accent,#38bdf8)] animate-pulse">
+              <div className="absolute h-8 w-8 rounded-lg bg-[var(--accent-dim)] flex items-center justify-center text-[var(--accent)] animate-pulse">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
@@ -367,15 +367,15 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
             </div>
 
             <div className="flex flex-col gap-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
                 AI LUMINARY IS GENERATING
               </h4>
-              <p className="text-sm font-semibold text-white animate-pulse min-h-[1.5rem]">
+              <p className="text-sm font-semibold text-[var(--text-primary)] animate-pulse min-h-[1.5rem]">
                 {loadingText}
               </p>
             </div>
 
-            <p className="text-[10px] text-gray-500 max-w-xs leading-relaxed">
+            <p className="text-[10px] text-[var(--text-muted)] max-w-xs leading-relaxed">
               Quá trình xử lý bài báo khoa học nâng cao có thể mất từ 15 đến 30 giây để đảm bảo độ chính xác học thuật của các thuật ngữ.
             </p>
           </div>
@@ -399,26 +399,26 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
 
             {/* Pagination header & progress */}
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-400 font-medium">
-                Thẻ <span className="text-white font-bold">{currentIdx + 1}</span> / {flashcards.length}
+              <span className="text-[var(--text-secondary)] font-medium">
+                Thẻ <span className="text-[var(--text-primary)] font-bold">{currentIdx + 1}</span> / {flashcards.length}
               </span>
-              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+              <span className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-wider">
                 Space hoặc Click để lật thẻ
               </span>
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full h-1 bg-[#141b2d] rounded-full overflow-hidden flex gap-0.5">
+            <div className="w-full h-1 bg-[var(--bg-surface)] rounded-full overflow-hidden flex gap-0.5">
               {flashcards.map((_, i) => (
                 <div
                   key={i}
                   className="flex-1 h-full transition-all duration-300"
                   style={{
                     backgroundColor: i === currentIdx
-                      ? 'var(--accent, #38bdf8)'
+                      ? 'var(--accent)'
                       : i < currentIdx
-                      ? 'rgba(56, 189, 248, 0.4)'
-                      : 'rgba(255, 255, 255, 0.05)'
+                      ? 'var(--accent-glow)'
+                      : 'var(--border-subtle)'
                   }}
                 />
               ))}
@@ -431,18 +431,18 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
             >
-              <div className={`flashcard-inner relative w-full h-full rounded-2xl border border-[var(--border-normal,rgba(255,255,255,0.1))] shadow-lg ${isFlipped ? 'flipped' : ''}`}>
+              <div className={`flashcard-inner relative w-full h-full rounded-2xl border border-[var(--border-normal)] shadow-lg ${isFlipped ? 'flipped' : ''}`}>
                 
                 {/* FRONT SIDE (Term & Pronunciation) */}
-                <div className="flashcard-front bg-[#111726] rounded-2xl p-6 flex flex-col items-center justify-center text-center gap-4">
-                  <div className="absolute top-4 right-4 text-[9px] font-bold text-gray-500 uppercase tracking-widest bg-white/5 px-2.5 py-1 rounded-full border border-white/5">
+                <div className="flashcard-front bg-[var(--bg-surface)] rounded-2xl p-6 flex flex-col items-center justify-center text-center gap-4">
+                  <div className="absolute top-4 right-4 text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-widest bg-[var(--bg-elevated)]/60 px-2.5 py-1 rounded-full border border-[var(--border-subtle)]">
                     Mặt trước (Term)
                   </div>
 
                   <h1
                     id="flashcard-term"
                     data-testid="flashcard-term"
-                    className="text-2xl md:text-3xl font-extrabold text-white leading-tight px-4"
+                    className="text-2xl md:text-3xl font-extrabold text-[var(--text-primary)] leading-tight px-4"
                     dangerouslySetInnerHTML={{ __html: renderWithKatex(currentCard.term) }}
                   />
 
@@ -450,13 +450,13 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
                     <div 
                       id="flashcard-pronunciation"
                       data-testid="flashcard-pronunciation"
-                      className="text-sm text-[var(--accent,#38bdf8)] font-medium tracking-wide bg-[var(--accent,#38bdf8)]/5 border border-[var(--accent,#38bdf8)]/10 px-3.5 py-1 rounded-full"
+                      className="text-sm text-[var(--accent)] font-medium tracking-wide bg-[var(--accent-dim)] border border-[var(--accent-glow)] px-3.5 py-1 rounded-full"
                     >
                       {currentCard.pronunciation}
                     </div>
                   )}
 
-                  <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-2">
+                  <div className="text-[10px] text-[var(--text-secondary)] flex items-center gap-1 mt-2">
                     <svg className="h-3.5 w-3.5 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 15.89M9 11l3 3L22 4" />
                     </svg>
@@ -465,42 +465,42 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
                 </div>
 
                 {/* BACK SIDE (Translation & Definition) */}
-                <div className="flashcard-back bg-[#141b2d] rounded-2xl p-6 flex flex-col justify-between border-2 border-[var(--accent,#38bdf8)]/20">
+                <div className="flashcard-back bg-[var(--bg-surface)] rounded-2xl p-6 flex flex-col justify-between border-2 border-[var(--accent-glow)]">
                   <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-bold text-[var(--accent,#38bdf8)] uppercase tracking-widest bg-[var(--accent,#38bdf8)]/10 px-2.5 py-1 rounded-full">
+                    <span className="text-[9px] font-bold text-[var(--accent)] uppercase tracking-widest bg-[var(--accent-dim)] px-2.5 py-1 rounded-full">
                       Mặt sau (Definition)
                     </span>
-                    <span className="text-[10px] text-gray-400 font-semibold" dangerouslySetInnerHTML={{ __html: renderWithKatex(currentCard.term) }} />
+                    <span className="text-[10px] text-[var(--text-secondary)] font-semibold" dangerouslySetInnerHTML={{ __html: renderWithKatex(currentCard.term) }} />
                   </div>
 
                   {/* Body translation + definition */}
                   <div className="my-auto flex flex-col gap-4 py-2">
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] block mb-1">
                         Bản dịch
                       </span>
                       <h2
                         id="flashcard-translation"
                         data-testid="flashcard-translation"
-                        className="text-lg font-bold text-white leading-snug"
+                        className="text-lg font-bold text-[var(--text-primary)] leading-snug"
                         dangerouslySetInnerHTML={{ __html: renderWithKatex(currentCard.translation) }}
                       />
                     </div>
 
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] block mb-1">
                         Định nghĩa song ngữ
                       </span>
                       <div
                         id="flashcard-definition"
                         data-testid="flashcard-definition"
-                        className="text-xs text-gray-300 leading-relaxed font-medium overflow-y-auto max-h-24 pr-1"
+                        className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium overflow-y-auto max-h-24 pr-1"
                         dangerouslySetInnerHTML={{ __html: renderWithKatex(currentCard.definition) }}
                       />
                     </div>
                   </div>
 
-                  <div className="text-[9px] text-gray-500 text-center">
+                  <div className="text-[9px] text-[var(--text-muted)] text-center">
                     Click chuột hoặc chạm để quay lại mặt trước
                   </div>
                 </div>
@@ -514,7 +514,7 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
                 onClick={(e) => { e.stopPropagation(); handlePrev(); }}
                 id="flashcard-prev-btn"
                 data-testid="flashcard-prev-btn"
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-[var(--border-normal,rgba(255,255,255,0.1))] text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-[var(--border-normal)] text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]/40 transition-all cursor-pointer"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -524,7 +524,7 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
 
               <button
                 onClick={(e) => { e.stopPropagation(); setIsFlipped(f => !f); }}
-                className="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-white hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-[var(--bg-elevated)]/60 border border-[var(--border-normal)] text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] active:scale-95 transition-all cursor-pointer"
               >
                 Lật thẻ
               </button>
@@ -533,7 +533,7 @@ export function FlashcardModal({ isOpen, jobId, onClose }: FlashcardModalProps) 
                 onClick={(e) => { e.stopPropagation(); handleNext(); }}
                 id="flashcard-next-btn"
                 data-testid="flashcard-next-btn"
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--accent-dim,rgba(56,189,248,0.1))] border border-[var(--accent-glow,rgba(56,189,248,0.2))] text-[var(--accent,#38bdf8)] text-xs font-bold hover:bg-[var(--accent,#38bdf8)] hover:text-[#080b12] active:scale-95 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--accent-dim)] border border-[var(--accent-glow)] text-[var(--accent)] text-xs font-bold hover:bg-[var(--accent)] hover:text-[var(--bg-base)] active:scale-95 transition-all cursor-pointer"
               >
                 Tiếp theo
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

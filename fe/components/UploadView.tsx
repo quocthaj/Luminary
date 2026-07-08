@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { createUploadUrl, uploadFile, ApiError, getJobs, JobStatus } from '../lib/api';
 import { useSession, signOut } from 'next-auth/react';
 import { LoginModal } from './LoginModal';
+import { ProfileModal } from './ProfileModal';
 
 export function UploadView({ onJobCreated }: { onJobCreated: (jobId: string) => void }) {
   const { data: session, status } = useSession();
@@ -17,6 +18,7 @@ export function UploadView({ onJobCreated }: { onJobCreated: (jobId: string) => 
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [networkError, setNetworkError] = useState(false);
   const [pendingJobId, setPendingJobId] = useState<string | null>(null);
   const [pendingUploadUrl, setPendingUploadUrl] = useState<string | null>(null);
@@ -229,74 +231,91 @@ export function UploadView({ onJobCreated }: { onJobCreated: (jobId: string) => 
       setLoading(false);
     }
   };
-
-  const canSubmit = !!file && !loading && !isBlocked;
+const canSubmit = !!file && !loading && !isBlocked;
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-6 animate-fade-in"
+      className="min-h-screen flex flex-col justify-between animate-fade-in relative"
       style={{ background: 'var(--bg-base)' }}
     >
       <div aria-hidden className="dot-grid pointer-events-none fixed inset-0" />
 
-      {/* Floating Auth Status top right */}
-      <div className="absolute top-6 right-6 z-40">
-        {status === 'authenticated' ? (
-          <div className="flex items-center gap-3 bg-[var(--bg-surface)] border border-[var(--border-normal)] px-4 py-2 rounded-full shadow-sm">
-            <a
-              href="/explore"
-              className="text-xs text-[var(--accent)] hover:underline font-bold mr-1 transition-all"
-            >
-              Khám phá
-            </a>
-            <div aria-hidden className="w-[1px] h-4 bg-[var(--border-normal)] mr-0.5" />
-            <a
-              href="/library"
-              className="text-xs text-[var(--accent)] hover:underline font-bold mr-1 transition-all"
-            >
-              Thư viện
-            </a>
-            <div aria-hidden className="w-[1px] h-4 bg-[var(--border-normal)] mr-0.5" />
-            <div className="flex flex-col text-right">
-              <span className="text-xs font-semibold text-[var(--text-primary)] max-w-[150px] truncate">
-                {session?.user?.email}
-              </span>
-              <span className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider">
-                Thành viên
-              </span>
-            </div>
-            {session?.user?.image ? (
-              <img 
-                src={session.user.image} 
-                alt="Avatar" 
-                className="h-8 w-8 rounded-full border border-[var(--border-subtle)]"
-              />
-            ) : (
-              <div className="h-8 w-8 rounded-full bg-[var(--accent)] text-[#080b12] flex items-center justify-center text-xs font-bold uppercase">
-                {session?.user?.email?.[0] || 'U'}
-              </div>
-            )}
-            <button
-              onClick={() => signOut({ redirect: false })}
-              className="text-xs text-[var(--text-muted)] hover:text-red-400 font-medium ml-1 transition-colors border-none bg-transparent cursor-pointer"
-            >
-              Đăng xuất
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowLoginModal(true)}
-            className="flex items-center gap-2 bg-[var(--bg-surface)] border border-[var(--border-normal)] px-5 py-2.5 rounded-full shadow-sm text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-all cursor-pointer"
-          >
-            <svg className="h-4 w-4 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-            </svg>
-            Đăng nhập
-          </button>
-        )}
-      </div>
+      {/* Top Header Row */}
+      <header className="w-full px-6 py-4 grid grid-cols-3 items-center z-40 flex-shrink-0">
+        {/* Left Spacer */}
+        <div />
 
-      <div className="relative w-full max-w-md animate-fade-up">
+        {/* Center: Main navigation links */}
+        <div className="flex items-center justify-center gap-6">
+          <a
+            href="/explore"
+            className="text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] font-bold transition-all uppercase tracking-wider"
+          >
+            Khám phá
+          </a>
+          <div aria-hidden className="w-[1px] h-3 bg-[var(--border-normal)]" />
+          <a
+            href="/library"
+            className="text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] font-bold transition-all uppercase tracking-wider"
+          >
+            Thư viện
+          </a>
+        </div>
+
+        {/* Right Corner: User avatar & Logout button */}
+        <div className="flex items-center justify-end gap-3 pr-14">
+          {status === 'authenticated' ? (
+            <div className="flex items-center gap-3 bg-[var(--bg-surface)] border border-[var(--border-normal)] px-3 py-1.5 rounded-full shadow-sm">
+              <button
+                type="button"
+                onClick={() => setShowProfileModal(true)}
+                className="flex items-center gap-3 hover:opacity-85 transition-opacity cursor-pointer bg-transparent border-none p-0 text-left"
+              >
+                <div className="hidden lg:flex flex-col text-right">
+                  <span className="text-xs font-bold text-[var(--text-primary)] max-w-[120px] truncate leading-tight">
+                    {session?.user?.name || session?.user?.email?.split('@')[0] || 'Thành viên'}
+                  </span>
+                  <span className="text-[9px] text-[var(--text-muted)] max-w-[120px] truncate leading-tight">
+                    {session?.user?.email}
+                  </span>
+                </div>
+                {session?.user?.image ? (
+                  <img 
+                    src={session.user.image} 
+                    alt="Avatar" 
+                    className="h-8 w-8 rounded-full border border-[var(--border-subtle)]"
+                  />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-[var(--accent)] text-[#080b12] flex items-center justify-center text-xs font-bold uppercase">
+                    {session?.user?.name?.[0] || session?.user?.email?.[0] || 'U'}
+                  </div>
+                )}
+              </button>
+              <div aria-hidden className="w-[1px] h-4 bg-[var(--border-normal)]" />
+              <button
+                onClick={() => signOut({ redirect: false })}
+                className="text-xs text-[var(--text-muted)] hover:text-red-400 font-medium transition-colors border-none bg-transparent cursor-pointer"
+              >
+                Đăng xuất
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowLoginModal(true)}
+              className="flex items-center gap-2 bg-[var(--bg-surface)] border border-[var(--border-normal)] px-5 py-2.5 rounded-full shadow-sm text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-all cursor-pointer"
+            >
+              <svg className="h-4 w-4 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+              </svg>
+              Đăng nhập
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Main Upload Card */}
+      <div className="flex-1 flex items-center justify-center p-6 w-full max-w-md mx-auto -mt-6">
+        <div className="relative w-full animate-fade-up">
 
         {/* Brand */}
         <div className="text-center mb-10">
@@ -612,6 +631,7 @@ export function UploadView({ onJobCreated }: { onJobCreated: (jobId: string) => 
           </div>
         )}
       </div>
+      </div>
 
       {/* Login Requirement Modal */}
       <LoginModal 
@@ -727,6 +747,11 @@ export function UploadView({ onJobCreated }: { onJobCreated: (jobId: string) => 
           </div>
         </div>
       )}
+      {/* Profile Modal */}
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createExploreJob, getExploreJobStatus, fetchPreviewContent, getResultUrl, getJobs, JobStatus } from '../../lib/api';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import { ProfileModal } from '../../components/ProfileModal';
 
 // Progressive loading stages for Explore Mode
 const LOADING_STAGES = [
@@ -311,7 +312,7 @@ function generateRoadmapForTopic(topicTitle: string) {
       papers: [
         {
           id: "paper-3",
-          title: `Med-${cleanTitle.replace(/[^a-zA-Z0-9]/g, '') || 'SOTA'}: Ứng dụng lai SOTA của ${cleanTitle} trong y học & công nghiệp`,
+          title: `Med-${slugify(cleanTitle).replace(/-/g, '').toUpperCase().slice(0, 8) || 'SOTA'}: Ứng dụng lai SOTA của ${cleanTitle} trong y học & công nghiệp`,
           authors: "VietAI Scholar Team, 2024",
           abstract: `Nghiên cứu mới nhất kết hợp các kỹ thuật học sâu tiên tiến cùng ${cleanTitle} để xây dựng công cụ chẩn đoán đa năng độ chính xác cao. Hệ thống được tinh chỉnh để chạy mượt mà dưới 1.5 giây.`,
           math: `\\mathbf{y} = \\sigma\\left( \\mathbf{W}_2 \\cdot \\max(0, \\mathbf{W}_1 \\mathbf{x} + \\mathbf{b}_1) + \\mathbf{b}_2 \\right)`,
@@ -348,6 +349,8 @@ function ExplorePageContent() {
   const [progress, setProgress] = useState(0);
   const [stageIndex, setStageIndex] = useState(0);
   const [error, setError] = useState('');
+  const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   // Explore 2.0 Multi-source Discovery State
   const [isSearchingSources, setIsSearchingSources] = useState(false);
@@ -743,32 +746,52 @@ function ExplorePageContent() {
   };
 
   // 8.3. Create dynamic Research Session and Redirect
-  const handleStartResearchSession = (topicTitle: string) => {
-    const slug = slugify(topicTitle);
-    const sessionId = `session-${slug}-${Math.random().toString(36).substring(2, 7)}`;
-    
-    // Dynamically generate the 4-stage roadmap for this topic
-    const roadmap = generateRoadmapForTopic(topicTitle);
-    
-    // Save to localStorage
-    const sessionData = {
-      sessionId,
-      topic: topicTitle,
-      roadmap,
-      notes: [
-        {
-          noteId: 'note-initial',
-          noteContent: `Khởi tạo không gian nghiên cứu cho đề tài: ${topicTitle}. Bạn có thể bôi đen văn bản ở cột giữa và lưu trích dẫn, hoặc tự ghi chú vào sổ tay.`,
-          citation: 'Hệ thống tự động',
-          createdAt: new Date().toISOString()
-        }
-      ]
-    };
-    
-    localStorage.setItem(`vietai-research-session-${sessionId}`, JSON.stringify(sessionData));
-    
-    // Redirect to studio
-    router.push(`/explore/studio/${sessionId}`);
+  const handleStartResearchSession = async (topicTitle: string) => {
+    try {
+      setIsGeneratingRoadmap(true);
+      setError('');
+      
+      const response = await fetch('/api/explore/roadmap', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ topic: topicTitle })
+      });
+
+      if (!response.ok) {
+        throw new Error('Không thể khởi tạo lộ trình nghiên cứu AI.');
+      }
+
+      const roadmap = await response.json();
+      const slug = slugify(topicTitle);
+      const sessionId = `session-${slug}-${Math.random().toString(36).substring(2, 7)}`;
+      
+      // Save to localStorage
+      const sessionData = {
+        sessionId,
+        topic: topicTitle,
+        roadmap,
+        notes: [
+          {
+            noteId: 'note-initial',
+            noteContent: `Khởi tạo không gian nghiên cứu cho đề tài: ${topicTitle}. Bạn có thể bôi đen văn bản ở cột giữa và lưu trích dẫn, hoặc tự ghi chú vào sổ tay.`,
+            citation: 'Hệ thống tự động',
+            createdAt: new Date().toISOString()
+          }
+        ]
+      };
+      
+      localStorage.setItem(`vietai-research-session-${sessionId}`, JSON.stringify(sessionData));
+      
+      // Redirect to studio
+      router.push(`/explore/studio/${sessionId}`);
+    } catch (err: any) {
+      console.error('Failed to start research session:', err);
+      setError(err.message || 'Lỗi kết nối API lộ trình nghiên cứu.');
+    } finally {
+      setIsGeneratingRoadmap(false);
+    }
   };
 
   // Scroll to heading on TOC click
@@ -802,6 +825,14 @@ function ExplorePageContent() {
     >
       <div aria-hidden className="no-print dot-grid pointer-events-none fixed inset-0" />
 
+      {isGeneratingRoadmap && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex flex-col items-center justify-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+          <p className="text-sm font-semibold text-indigo-400 animate-pulse">⏳ Đang tổng hợp các bài báo & thiết lập lộ trình nghiên cứu AI...</p>
+          <p className="text-xs text-slate-400">Quá trình này có thể mất 3-5 giây</p>
+        </div>
+      )}
+
       {/* ─── HEADER ─── */}
       <div className="no-print flex items-center justify-between w-full max-w-5xl mx-auto mb-10 z-10">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push('/')}>
@@ -822,9 +853,18 @@ function ExplorePageContent() {
             Thư viện cá nhân
           </button>
           <div aria-hidden className="w-[1px] h-4 bg-[var(--border-normal)]" />
-          <span className="text-xs font-semibold text-[var(--text-muted)] truncate max-w-[160px]">
-            {session?.user?.email}
-          </span>
+          <button
+            type="button"
+            onClick={() => setShowProfileModal(true)}
+            className="flex flex-col text-right hover:opacity-85 transition-opacity cursor-pointer bg-transparent border-none p-0 text-left"
+          >
+            <span className="text-xs font-bold text-[var(--text-primary)] truncate max-w-[160px] leading-tight">
+              {session?.user?.name || session?.user?.email?.split('@')[0] || 'Thành viên'}
+            </span>
+            <span className="text-[9px] text-[var(--text-muted)] truncate max-w-[160px] leading-tight">
+              {session?.user?.email}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -1030,14 +1070,14 @@ function ExplorePageContent() {
               <div className="flex flex-wrap gap-4 justify-center">
                 <button
                   onClick={() => handleStartExplore()}
-                  disabled={loading || !topic.trim()}
+                  disabled={loading}
                   className="bg-[var(--bg-elevated)] hover:bg-[var(--border-normal)] border border-[var(--border-normal)] text-[var(--text-primary)] text-xs font-bold px-6 py-3.5 rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   📖 Biên soạn bài giảng (Explore 1.0)
                 </button>
                 <button
                   onClick={() => handleStartMultiSourceDiscovery()}
-                  disabled={loading || !topic.trim()}
+                  disabled={loading}
                   className="bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white text-xs font-bold px-6 py-3.5 rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-indigo-950/50"
                 >
                   🚀 Khai phá Đa nguồn (Explore 2.0)
@@ -1460,6 +1500,11 @@ function ExplorePageContent() {
           }
         }
       `}</style>
+      {/* Profile Modal */}
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+      />
     </div>
   );
 }

@@ -1,55 +1,155 @@
 {
   "workflow_version": "1.2.0",
   "timestamps": {
-    "started": "2026-06-06T23:03:11+07:00",
-    "last_updated": "2026-06-06T23:11:00+07:00",
-    "completed": "2026-06-06T23:11:00+07:00"
+    "started": "2026-07-07T14:50:40+07:00",
+    "completed": "2026-07-07T14:56:40+07:00",
+    "last_updated": "2026-07-07T14:56:40+07:00"
   },
-  "mode": "initial_scan",
-  "scan_level": "exhaustive",
+  "mode": "full_rescan",
+  "scan_level": "deep",
+  "status": "completed",
   "project_root": "d:\\AI\\viet-ai-scholar",
   "project_knowledge": "d:\\AI\\viet-ai-scholar\\docs",
   "completed_steps": [
-    {"step": "step_0.5", "status": "completed", "timestamp": "2026-06-06T23:03:15+07:00", "summary": "Documentation requirements loaded for 12 project types"},
-    {"step": "step_1", "status": "completed", "timestamp": "2026-06-06T23:04:30+07:00", "summary": "Classified as multi-part with 2 parts: backend (infra) and frontend (web)"},
-    {"step": "step_2", "status": "completed", "timestamp": "2026-06-06T23:04:45+07:00", "summary": "Found 2 existing docs (README.md in be/ and fe/)"},
-    {"step": "step_3", "status": "completed", "timestamp": "2026-06-06T23:05:00+07:00", "summary": "Tech stack: AWS CDK + Lambda (TypeScript) backend, Next.js 16 + React 19 frontend"},
-    {"step": "step_4", "status": "completed", "timestamp": "2026-06-06T23:05:30+07:00", "summary": "Conditional analysis: 3 API endpoints, 1 DynamoDB table, 4 UI components, 5 agents"},
-    {"step": "step_5", "status": "completed", "timestamp": "2026-06-06T23:05:45+07:00", "summary": "Source tree documented with 10+ critical folders"},
-    {"step": "step_6", "status": "completed", "timestamp": "2026-06-06T23:06:30+07:00", "summary": "Dev/deployment guides written"},
-    {"step": "step_7", "status": "completed", "timestamp": "2026-06-06T23:07:00+07:00", "summary": "Integration architecture: 6 integration points documented"},
-    {"step": "step_8", "status": "completed", "timestamp": "2026-06-06T23:08:00+07:00", "summary": "Architecture docs written for 2 parts (be + fe)"},
-    {"step": "step_9", "status": "completed", "timestamp": "2026-06-06T23:09:00+07:00", "summary": "All supporting docs written: project-overview, api-contracts, data-models, dev guide, deployment guide"},
-    {"step": "step_10", "status": "completed", "timestamp": "2026-06-06T23:10:00+07:00", "summary": "Master index generated"},
-    {"step": "step_11", "status": "completed", "timestamp": "2026-06-06T23:10:30+07:00", "summary": "Validation complete, no incomplete markers found"},
-    {"step": "step_12", "status": "completed", "timestamp": "2026-06-06T23:11:00+07:00", "summary": "Workflow complete"}
+    {
+      "step": "step_1",
+      "status": "completed",
+      "timestamp": "2026-07-07T14:51:30+07:00",
+      "summary": "Classified as multi-part with 2 parts: backend (infra) and frontend (web)"
+    },
+    {
+      "step": "step_2",
+      "status": "completed",
+      "timestamp": "2026-07-07T14:52:40+07:00",
+      "summary": "Found 3 existing docs (be/README.md, fe/README.md, DESIGN.md)"
+    },
+    {
+      "step": "step_3",
+      "status": "completed",
+      "timestamp": "2026-07-07T14:52:50+07:00",
+      "summary": "Tech stack: AWS CDK (v2) + TypeScript backend, Next.js 16.2.7 + React 19.2.4 frontend"
+    },
+    {
+      "step": "step_4",
+      "status": "completed",
+      "timestamp": "2026-07-07T14:53:40+07:00",
+      "summary": "Generated api-contracts-be.md and data-models-be.md containing all backend routes and database schemas"
+    },
+    {
+      "step": "step_5",
+      "status": "completed",
+      "timestamp": "2026-07-07T14:54:00+07:00",
+      "summary": "Generated source-tree-analysis.md detailing all folder structures, backend handlers, and frontend routing pages"
+    },
+    {
+      "step": "step_6",
+      "status": "completed",
+      "timestamp": "2026-07-07T14:55:00+07:00",
+      "summary": "Updated architecture-be.md, architecture-fe.md, integration-architecture.md, project-overview.md, and index.md with all new features (Thesis Defense, Qdrant, Google TTS, next-auth)"
+    },
+    {
+      "step": "step_7",
+      "status": "completed",
+      "timestamp": "2026-07-07T14:55:30+07:00",
+      "summary": "Updated project-summary.md detailing monorepo tech summary, config/setup commands, and milestones for Epics 1 to 5"
+    },
+    {
+      "step": "step_8",
+      "status": "completed",
+      "timestamp": "2026-07-07T14:55:50+07:00",
+      "summary": "Updated development-guide.md detailing environment variables, AWS secrets setups, local testing with Playwright, and compilation rules"
+    },
+    {
+      "step": "step_9",
+      "status": "completed",
+      "timestamp": "2026-07-07T14:56:00+07:00",
+      "summary": "Updated deployment-guide.md detailing S3/DynamoDB tables creation, Next-Auth Vercel config, and CloudWatch/Qdrant monitoring guidelines"
+    },
+    {
+      "step": "step_10",
+      "status": "completed",
+      "timestamp": "2026-07-07T14:56:20+07:00",
+      "summary": "Updated techlead-team-guide.md detailing product core features, system architecture flow, task status updates, and next features guidelines"
+    },
+    {
+      "step": "step_11",
+      "status": "completed",
+      "timestamp": "2026-07-07T14:56:30+07:00",
+      "summary": "Generated index.md cataloging all documentation paths and Quick Start references"
+    },
+    {
+      "step": "step_12",
+      "status": "completed",
+      "timestamp": "2026-07-07T14:56:40+07:00",
+      "summary": "Finalized scan and saved full monorepo state analysis"
+    }
   ],
   "current_step": "completed",
   "project_types": [
-    {"part_id": "be", "project_type_id": "infra", "display_name": "AWS CDK Infrastructure + Lambda Backend"},
-    {"part_id": "fe", "project_type_id": "web", "display_name": "Next.js 16 Web Frontend"}
+    {
+      "part_id": "be",
+      "project_type_id": "infra",
+      "display_name": "AWS CDK Infrastructure + Lambda Backend"
+    },
+    {
+      "part_id": "fe",
+      "project_type_id": "web",
+      "display_name": "Next.js Web Frontend"
+    }
   ],
   "findings": {
-    "project_classification": "Multi-part: be (infra/backend) + fe (web)",
-    "technology_stack": "TypeScript, AWS CDK, Lambda, DynamoDB, S3, Step Functions, Next.js 16, React 19, TailwindCSS 4",
-    "api_count": 3,
-    "component_count": 4,
-    "agent_count": 5,
-    "table_count": 1,
-    "total_source_files": 28,
-    "total_lines_scanned": "~3200+"
+    "project_classification": "Multi-part: be (infra) + fe (web)",
+    "existing_documentation": [
+      "be/README.md",
+      "fe/README.md",
+      "DESIGN.md"
+    ],
+    "technology_stack": {
+      "be": {
+        "framework": "AWS CDK v2",
+        "language": "TypeScript (~5.9.3)",
+        "dependencies": [
+          "aws-cdk-lib",
+          "@aws-sdk/client-dynamodb",
+          "@aws-sdk/client-s3",
+          "@aws-sdk/client-lambda",
+          "@aws-sdk/client-secrets-manager",
+          "@aws-sdk/client-sfn",
+          "@google/generative-ai",
+          "@mistralai/mistralai",
+          "groq-sdk",
+          "openai",
+          "@qdrant/js-client-rest"
+        ]
+      },
+      "fe": {
+        "framework": "Next.js 16.2.7 + React 19.2.4",
+        "language": "TypeScript (^5)",
+        "styling": "TailwindCSS v4",
+        "dependencies": [
+          "next-auth",
+          "mermaid",
+          "katex",
+          "dompurify",
+          "react-force-graph-2d"
+        ]
+      }
+    }
   },
   "outputs_generated": [
     "project-scan-report.json",
-    "index.md",
-    "project-overview.md",
+    "api-contracts-be.md",
+    "data-models-be.md",
     "source-tree-analysis.md",
     "architecture-be.md",
     "architecture-fe.md",
-    "api-contracts-be.md",
-    "data-models-be.md",
     "integration-architecture.md",
+    "project-overview.md",
+    "index.md",
+    "project-summary.md",
     "development-guide.md",
-    "deployment-guide.md"
-  ]
+    "deployment-guide.md",
+    "techlead-team-guide.md"
+  ],
+  "resume_instructions": "Scan successfully completed. No resume instructions needed."
 }

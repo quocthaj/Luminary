@@ -10,6 +10,7 @@ import { FlashcardModal } from './FlashcardModal';
 import { MindmapModal } from './MindmapModal';
 import { DefenseModal } from './DefenseModal';
 import { usePodcastPlayer } from './PodcastPlayer';
+import { ProfileModal } from './ProfileModal';
 
 
 type Lang = 'en' | 'vi';
@@ -214,6 +215,7 @@ export function WorkspaceView({
 
   // Authentication and modal states
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [pendingDownload, setPendingDownload] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
 
@@ -417,6 +419,44 @@ export function WorkspaceView({
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
   }, [jobId]);
+
+  // Sync bilingual highlights on hover (Coupled paragraph highlighting)
+  useEffect(() => {
+    const handleMouseOver = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const paragraph = target.closest('[data-chunk]');
+      if (!paragraph) return;
+      const chunkId = paragraph.getAttribute('data-chunk');
+      if (!chunkId) return;
+
+      const elements = document.querySelectorAll(`[data-chunk="${chunkId}"]`);
+      elements.forEach(el => {
+        el.classList.add('bilingual-hover-highlight');
+      });
+    };
+
+    const handleMouseOut = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const paragraph = target.closest('[data-chunk]');
+      if (!paragraph) return;
+      const chunkId = paragraph.getAttribute('data-chunk');
+      if (!chunkId) return;
+
+      const elements = document.querySelectorAll(`[data-chunk="${chunkId}"]`);
+      elements.forEach(el => {
+        el.classList.remove('bilingual-hover-highlight');
+      });
+    };
+
+    const container = document.body;
+    container.addEventListener('mouseover', handleMouseOver);
+    container.addEventListener('mouseout', handleMouseOut);
+
+    return () => {
+      container.removeEventListener('mouseover', handleMouseOver);
+      container.removeEventListener('mouseout', handleMouseOut);
+    };
+  }, []);
 
   const fetchCopilot = useCallback(async () => {
     if (!jobId || status !== 'authenticated') return;
@@ -737,6 +777,13 @@ export function WorkspaceView({
           background-size: 200% 100%;
           animation: shimmer 1.5s infinite linear;
         }
+        .bilingual-hover-highlight {
+          background-color: var(--accent-dim) !important;
+          border-left: 3px solid var(--accent) !important;
+          padding-left: 8px !important;
+          border-radius: 4px;
+          transition: all 0.20s ease-in-out;
+        }
       `}} />
 
       {/* ── LEFT SIDEBAR (15% on Desktop, collapsible) ── */}
@@ -747,7 +794,7 @@ export function WorkspaceView({
         {/* Brand Header */}
         <div className="p-5 border-b border-[var(--border-subtle)] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold tracking-wider text-[var(--accent)]" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>
+            <span className="text-lg font-bold tracking-wider" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: '#cc785c' }}>
               Luminary
             </span>
             <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded border border-[var(--border-normal)] text-[var(--text-secondary)]">
@@ -916,17 +963,23 @@ export function WorkspaceView({
               </button>
 
               {/* Hội thoại AI (Podcast) */}
-              <div
-                className={`p-2.5 rounded-xl border transition-all flex flex-col gap-2 ${activeJobId === jobId && podcastPlayerStatus === 'COMPLETED'
-                    ? 'border-[var(--success)]/30 bg-[var(--success-dim)]'
-                    : 'border-[var(--border-subtle)] bg-transparent'
+              <button
+                onClick={() => {
+                  const currentTitle = libraryJobs.find(j => j.jobId === jobId)?.fileName || 'Tài liệu học thuật';
+                  playPodcast(jobId, currentTitle, podcastHdMode);
+                }}
+                disabled={loading || (activeJobId === jobId && podcastPlayerStatus === 'GENERATING')}
+                title="Nghe podcast hội thoại phân tích bài báo"
+                className={`text-left p-2.5 rounded-xl border transition-all flex flex-col gap-0.5 cursor-pointer relative group disabled:opacity-40 disabled:cursor-not-allowed ${activeJobId === jobId && podcastPlayerStatus === 'COMPLETED'
+                    ? 'border-[var(--success)]/30 bg-[var(--success-dim)] hover:bg-[var(--success-dim)]/80'
+                    : 'border-[var(--border-subtle)] bg-transparent hover:bg-[var(--bg-elevated)]'
                   }`}
               >
                 <div className="flex items-center justify-between w-full">
                   <span className="text-xs font-semibold text-[var(--text-primary)]">Hội thoại AI (Podcast)</span>
                   {activeJobId === jobId && podcastPlayerStatus === 'COMPLETED' && (
                     <span className="text-[8px] bg-[var(--success-dim)] text-[var(--success)] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                      Sẵn sàng
+                      {isPodcastPlaying ? 'Đang phát' : 'Sẵn sàng'}
                     </span>
                   )}
                   {activeJobId === jobId && podcastPlayerStatus === 'GENERATING' && (
@@ -936,71 +989,10 @@ export function WorkspaceView({
                     </span>
                   )}
                 </div>
-
-                <span className="text-[10px] text-[var(--text-secondary)] opacity-75 leading-normal">
-                  Nghe cuộc đối thoại ngắn giữa 2 chuyên gia phân tích bài báo này.
+                <span className="text-[10px] text-[var(--text-secondary)] opacity-75">
+                  {activeJobId === jobId && isPodcastPlaying ? 'Nhấn để tạm dừng nghe podcast' : 'Nghe cuộc đối thoại phân tích bài báo'}
                 </span>
-
-                <div className="flex items-center justify-between mt-1 text-[10px]">
-                  <span className="text-[var(--text-secondary)]">Chất lượng cao (HD)</span>
-                  <label className="relative inline-flex items-center cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={podcastHdMode}
-                      onChange={(e) => setPodcastHdMode(e.target.checked)}
-                      disabled={activeJobId === jobId && podcastPlayerStatus === 'GENERATING'}
-                      className="sr-only peer"
-                    />
-                    <div className="w-7 h-4 bg-[var(--border-normal)] rounded-full peer peer-checked:after:translate-x-[12px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[var(--text-primary)] after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[var(--accent)]" />
-                  </label>
-                </div>
-
-                <button
-                  onClick={() => {
-                    const currentTitle = libraryJobs.find(j => j.jobId === jobId)?.fileName || 'Tài liệu học thuật';
-                    playPodcast(jobId, currentTitle, podcastHdMode);
-                  }}
-                  disabled={loading || (activeJobId === jobId && podcastPlayerStatus === 'GENERATING')}
-                  className="w-full mt-1.5 py-1.5 rounded-lg bg-[var(--accent)] hover:opacity-90 disabled:opacity-50 text-[#080b12] text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  {activeJobId === jobId ? (
-                    podcastPlayerStatus === 'GENERATING' ? (
-                      <>
-                        <span className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent border-[var(--bg-surface)] animate-spin" />
-                        Đang tạo...
-                      </>
-                    ) : podcastPlayerStatus === 'COMPLETED' ? (
-                      isPodcastPlaying ? (
-                        <>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-                          </svg>
-                          Tạm dừng nghe
-                        </>
-                      ) : (
-                        <>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M8 5v14l11-7z" />
-                          </svg>
-                          Tiếp tục nghe
-                        </>
-                      )
-                    ) : podcastPlayerStatus === 'FAILED' ? (
-                      'Thử lại'
-                    ) : (
-                      'Nghe Podcast'
-                    )
-                  ) : (
-                    <>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-                        <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
-                      </svg>
-                      Nghe Podcast
-                    </>
-                  )}
-                </button>
-              </div>
+              </button>
             </div>
           </div>
         </div>
@@ -1009,18 +1001,27 @@ export function WorkspaceView({
         <div className="p-4 border-t border-[var(--border-subtle)] bg-[var(--bg-elevated)]/20 flex items-center justify-between">
           {status === 'authenticated' ? (
             <div className="flex items-center gap-2 w-full justify-between">
-              <div className="flex items-center gap-2 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowProfileModal(true)}
+                className="flex items-center gap-2 overflow-hidden hover:opacity-80 transition-opacity bg-transparent border-none p-0 text-left cursor-pointer"
+              >
                 {session?.user?.image ? (
                   <img src={session.user.image} alt="Avatar" className="h-7 w-7 rounded-full flex-shrink-0" />
                 ) : (
                   <div className="h-7 w-7 rounded-full bg-[var(--accent)] text-[#080b12] flex items-center justify-center text-[10px] font-bold uppercase flex-shrink-0">
-                    {session?.user?.email?.[0] || 'U'}
+                    {session?.user?.name?.[0] || session?.user?.email?.[0] || 'U'}
                   </div>
                 )}
-                <span className="text-xs font-medium text-[var(--text-primary)] truncate max-w-[120px]">
-                  {session?.user?.email}
-                </span>
-              </div>
+                <div className="flex flex-col text-left overflow-hidden">
+                  <span className="text-xs font-bold text-[var(--text-primary)] truncate max-w-[120px] leading-tight">
+                    {session?.user?.name || session?.user?.email?.split('@')[0] || 'Thành viên'}
+                  </span>
+                  <span className="text-[9px] text-[var(--text-secondary)] truncate max-w-[120px] leading-tight">
+                    {session?.user?.email}
+                  </span>
+                </div>
+              </button>
               <button
                 onClick={() => signOut({ redirect: false })}
                 className="text-[10px] text-[var(--text-secondary)] hover:text-red-400 font-semibold transition-colors bg-transparent border-none cursor-pointer"
@@ -1090,70 +1091,42 @@ export function WorkspaceView({
               <span className="text-xs text-[var(--error)] font-medium">Lỗi kết nối</span>
             ) : downloadUrl ? (
               <>
+                {/* Focus Mode Toggle */}
+                <button
+                  onClick={() => {
+                    const nextCollapsed = !(isLeftCollapsed && isRightCollapsed);
+                    setIsLeftCollapsed(nextCollapsed);
+                    setIsRightCollapsed(nextCollapsed);
+                  }}
+                  title="Chế độ tập trung (Focus Mode) - Ẩn hiện các thanh bên"
+                  className={`flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-all cursor-pointer h-9 ${
+                    isLeftCollapsed && isRightCollapsed
+                      ? 'bg-[var(--accent)] text-[var(--bg-base)] border-[var(--accent)] hover:opacity-90'
+                      : 'border-[var(--border-normal)] bg-[var(--bg-elevated)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-subtle)]'
+                  }`}
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  {isLeftCollapsed && isRightCollapsed ? 'Đóng Tập trung' : 'Tập trung'}
+                </button>
+
                 <button
                   onClick={handleDownloadClick}
-                  className="flex items-center gap-1.5 rounded-lg bg-[var(--success)] text-[#080b12] px-3.5 py-1.5 text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+                  className="flex items-center justify-center gap-1.5 rounded-xl bg-[var(--accent)] text-[var(--bg-base)] px-4 py-2 text-xs font-bold hover:opacity-90 transition-all cursor-pointer shadow-sm h-9"
                 >
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  Tải về Markdown
-                </button>
-
-                <button
-                  onClick={() => {
-                    const currentTitle = libraryJobs.find(j => j.jobId === jobId)?.fileName || 'Tài liệu học thuật';
-                    playPodcast(jobId, currentTitle, podcastHdMode);
-                  }}
-                  disabled={loading || (activeJobId === jobId && podcastPlayerStatus === 'GENERATING')}
-                  className="flex items-center gap-1.5 rounded-lg border border-[var(--border-normal)] bg-[var(--bg-elevated)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-subtle)] px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer"
-                  title="Nghe podcast hội thoại phân tích bài báo"
-                >
-                  {activeJobId === jobId && podcastPlayerStatus === 'GENERATING' ? (
-                    <>
-                      <span className="inline-block w-3 h-3 rounded-full border border-t-transparent border-[var(--text-secondary)] animate-spin" />
-                      Đang tạo...
-                    </>
-                  ) : activeJobId === jobId && isPodcastPlaying ? (
-                    <>
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--success)] opacity-75 animate-duration-1000"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--success)]"></span>
-                      </span>
-                      Tạm dừng nghe
-                    </>
-                  ) : (
-                    <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)]">
-                        <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-                        <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
-                      </svg>
-                      Nghe Podcast
-                    </>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => {
-                    setIsRightCollapsed(false);
-                    setRightTab('tutor');
-                    handleSendMessage("Tìm các bài viết liên quan đến tài liệu này");
-                  }}
-                  disabled={loading || isSending}
-                  className="flex items-center gap-1.5 rounded-lg border border-[var(--border-normal)] bg-[var(--bg-elevated)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-subtle)] px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer"
-                  data-testid="header-find-related-btn"
-                >
-                  <svg className="h-3.5 w-3.5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  Tìm liên quan
+                  Tải về
                 </button>
 
                 <button
                   onClick={handleReprocessClick}
                   disabled={reprocessing}
                   data-authenticated={status === 'authenticated'}
-                  className="flex items-center gap-1.5 rounded-lg border border-[var(--border-normal)] bg-[var(--bg-elevated)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-subtle)] px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer"
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--border-normal)] bg-[var(--bg-elevated)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-subtle)] px-4 py-2 text-xs font-bold transition-all cursor-pointer h-9"
                 >
                   {reprocessing ? (
                     <>
@@ -1169,7 +1142,6 @@ export function WorkspaceView({
                     </>
                   )}
                 </button>
-
               </>
             ) : null}
           </div>
@@ -1275,14 +1247,10 @@ export function WorkspaceView({
             ) : sections?.hasEN ? (
               <>
                 {/* Desktop Side-by-Side Synced Scrolling View */}
-                <div className="hidden lg:grid lg:grid-cols-2 lg:divide-x lg:divide-[var(--border-subtle)] h-full overflow-hidden">
-                  {/* English original column */}
-                  <div
-                    ref={leftScrollRef}
-                    onScroll={handleScrollLeft}
-                    className="overflow-y-auto px-8 py-6 h-full scrollbar-thin relative"
-                  >
-                    <div className="sticky top-0 z-20 bg-[var(--bg-base)] pb-2 mb-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
+                <div className="hidden lg:flex lg:flex-col h-full overflow-hidden">
+                  {/* Fixed Header Row */}
+                  <div className="grid grid-cols-2 divide-x divide-[var(--border-subtle)] border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/60 backdrop-blur-sm flex-shrink-0">
+                    <div className="flex items-center justify-between px-8 py-2.5">
                       <span className="text-[10px] font-bold tracking-wider text-[var(--accent)] uppercase">EN · English Version</span>
                       <button
                         onClick={() => handleCopyText(sections.en, 'en')}
@@ -1295,19 +1263,7 @@ export function WorkspaceView({
                         )}
                       </button>
                     </div>
-                    <div
-                      className="markdown-preview animate-fade-in"
-                      dangerouslySetInnerHTML={{ __html: renderMarkdown(sections.en) }}
-                    />
-                  </div>
-
-                  {/* Vietnamese translation column */}
-                  <div
-                    ref={rightScrollRef}
-                    onScroll={handleScrollRight}
-                    className="overflow-y-auto px-8 py-6 h-full scrollbar-thin relative"
-                  >
-                    <div className="sticky top-0 z-20 bg-[var(--bg-base)] pb-2 mb-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
+                    <div className="flex items-center justify-between px-8 py-2.5">
                       <span className="text-[10px] font-bold tracking-wider text-[var(--success)] uppercase">VI · Bản dịch tiếng Việt</span>
                       <button
                         onClick={() => handleCopyText(sections.vi, 'vi')}
@@ -1320,10 +1276,33 @@ export function WorkspaceView({
                         )}
                       </button>
                     </div>
+                  </div>
+
+                  {/* Scrollable Column Content */}
+                  <div className="grid grid-cols-2 divide-x divide-[var(--border-subtle)] flex-1 overflow-hidden h-full">
+                    {/* English original column */}
                     <div
-                      className="markdown-preview animate-fade-in"
-                      dangerouslySetInnerHTML={{ __html: renderMarkdown(sections.vi) }}
-                    />
+                      ref={leftScrollRef}
+                      onScroll={handleScrollLeft}
+                      className="overflow-y-auto px-8 py-6 h-full scrollbar-thin relative"
+                    >
+                      <div
+                        className="markdown-preview animate-fade-in"
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(sections.en) }}
+                      />
+                    </div>
+
+                    {/* Vietnamese translation column */}
+                    <div
+                      ref={rightScrollRef}
+                      onScroll={handleScrollRight}
+                      className="overflow-y-auto px-8 py-6 h-full scrollbar-thin relative"
+                    >
+                      <div
+                        className="markdown-preview animate-fade-in"
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(sections.vi) }}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1348,20 +1327,20 @@ export function WorkspaceView({
             {status === 'authenticated' && copilotSuggestions.length > 0 && (
               <div className="absolute bottom-4 right-4 z-30 max-w-sm w-full transition-all duration-300">
                 {isCopilotOpen ? (
-                  <div className="bg-[#0e131f]/95 border border-white/10 rounded-2xl p-4 shadow-2xl backdrop-blur-md flex flex-col gap-3">
-                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <div className="bg-[var(--bg-surface)]/95 border border-[var(--border-normal)] rounded-2xl p-4 shadow-2xl backdrop-blur-md flex flex-col gap-3">
+                    <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
                       <div className="flex items-center gap-2">
                         <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--accent)]"></span>
                         </span>
-                        <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">
+                        <h4 className="text-[11px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
                           Research Copilot
                         </h4>
                       </div>
                       <button
                         onClick={() => setIsCopilotOpen(false)}
-                        className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/5 cursor-pointer"
+                        className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 rounded-lg hover:bg-[var(--bg-elevated)]/40 cursor-pointer"
                       >
                         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1371,11 +1350,11 @@ export function WorkspaceView({
 
                     <div className="flex flex-col gap-2 max-h-48 overflow-y-auto scrollbar-thin">
                       {copilotSuggestions.map((s, idx) => (
-                        <div key={idx} className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left flex flex-col gap-2">
+                        <div key={idx} className="p-2.5 rounded-xl bg-[var(--bg-elevated)]/50 hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] transition-all text-left flex flex-col gap-2">
                           <div>
-                            <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">[{s.action}]</span>
-                            <h5 className="text-[11px] font-bold text-white leading-snug mt-0.5">{s.title}</h5>
-                            <p className="text-[10px] text-gray-400 leading-normal mt-0.5">{s.description}</p>
+                            <span className="text-[9px] font-bold text-[var(--accent)] uppercase tracking-widest">[{s.action}]</span>
+                            <h5 className="text-[11px] font-bold text-[var(--text-primary)] leading-snug mt-0.5">{s.title}</h5>
+                            <p className="text-[10px] text-[var(--text-secondary)] leading-normal mt-0.5">{s.description}</p>
                           </div>
                           <div className="flex justify-end">
                             <button
@@ -1394,7 +1373,7 @@ export function WorkspaceView({
                                   alert(`Đang thực hiện hành động: ${s.action} - ${s.payload}`);
                                 }
                               }}
-                              className="bg-red-600 hover:bg-red-500 text-white text-[9px] font-bold px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+                              className="bg-[var(--accent)] hover:opacity-90 text-[var(--bg-base)] text-[9px] font-bold px-2.5 py-1 rounded-lg transition-all cursor-pointer"
                             >
                               Thực hiện
                             </button>
@@ -1406,12 +1385,12 @@ export function WorkspaceView({
                 ) : (
                   <button
                     onClick={() => setIsCopilotOpen(true)}
-                    className="h-10 w-10 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-xl hover:scale-105 transition-all cursor-pointer border-none"
+                    className="h-10 w-10 rounded-full bg-[var(--accent)] hover:opacity-90 text-[var(--bg-base)] flex items-center justify-center shadow-xl hover:scale-105 transition-all cursor-pointer border-none"
                     title="Mở gợi ý từ Research Copilot"
                   >
                     <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--bg-base)] opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-[var(--bg-base)]"></span>
                     </span>
                   </button>
                 )}
@@ -1766,41 +1745,41 @@ export function WorkspaceView({
         <div
           id="mindmap-toast"
           data-testid="mindmap-toast"
-          className="fixed bottom-5 right-5 z-50 max-w-sm w-full bg-[#0e131f]/95 border border-[var(--border-normal,rgba(255,255,255,0.1))] rounded-2xl p-4 shadow-2xl backdrop-blur-md animate-fade-in flex flex-col gap-3"
+          className="fixed bottom-5 right-5 z-50 max-w-sm w-full bg-[var(--bg-surface)]/95 border border-[var(--border-normal)] rounded-2xl p-4 shadow-2xl backdrop-blur-md animate-fade-in flex flex-col gap-3"
         >
           <div className="flex items-start gap-3">
             {mindmapToast.type === 'generating' && (
-              <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 flex-shrink-0 animate-pulse">
+              <div className="h-8 w-8 rounded-lg bg-[var(--accent-dim)] flex items-center justify-center text-[var(--accent)] flex-shrink-0 animate-pulse">
                 <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89" />
                 </svg>
               </div>
             )}
             {mindmapToast.type === 'success' && (
-              <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400 flex-shrink-0">
+              <div className="h-8 w-8 rounded-lg bg-[var(--success-dim)] flex items-center justify-center text-[var(--success)] flex-shrink-0">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
             )}
             {mindmapToast.type === 'failed' && (
-              <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400 flex-shrink-0">
+              <div className="h-8 w-8 rounded-lg bg-[var(--error-dim)] flex items-center justify-center text-[var(--error)] flex-shrink-0">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
             )}
             <div className="flex-1">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+              <h4 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">
                 {mindmapToast.type === 'generating' && 'Đang vẽ sơ đồ tư duy'}
                 {mindmapToast.type === 'success' && 'Hoàn thành sơ đồ'}
                 {mindmapToast.type === 'failed' && 'Lỗi tiến trình'}
               </h4>
-              <p className="text-[11px] text-gray-300 leading-relaxed mt-0.5">{mindmapToast.message}</p>
+              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed mt-0.5">{mindmapToast.message}</p>
             </div>
             <button
               onClick={() => setMindmapToast({ type: null, message: '' })}
-              className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/5 cursor-pointer"
+              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 rounded-lg hover:bg-[var(--bg-elevated)]/40 cursor-pointer"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1815,7 +1794,7 @@ export function WorkspaceView({
               }}
               id="toast-open-mindmap-btn"
               data-testid="toast-open-mindmap-btn"
-              className="w-full bg-green-500 text-[#080b12] text-xs font-bold py-2 rounded-xl hover:opacity-90 active:scale-95 transition-all cursor-pointer text-center"
+              className="w-full bg-[var(--accent)] text-[var(--bg-base)] text-xs font-bold py-2 rounded-xl hover:opacity-90 active:scale-95 transition-all cursor-pointer text-center"
             >
               Mở sơ đồ tư duy ngay
             </button>
@@ -1844,6 +1823,11 @@ export function WorkspaceView({
           </div>
         </div>
       )}
+      {/* Profile Modal */}
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+      />
     </div>
   );
 }

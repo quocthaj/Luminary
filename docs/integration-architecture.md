@@ -1,106 +1,100 @@
-# Kiến Trúc Tích Hợp — VietAI Scholar
+# Kiến Trúc Tích Hợp (Integration Architecture) — VietAI Scholar
 
-> Tự động tạo bởi BMad Document Project · 2026-06-06
+> Tài liệu mô tả cách thức liên kết, luồng dữ liệu end-to-end và cơ chế tích hợp giữa Frontend (Next.js), Backend (AWS CDK + Lambda), Qdrant Cloud và các mô hình AI.  
+> Cập nhật mới nhất: 2026-07-07
 
-## Tổng Quan Tích Hợp
+---
 
-VietAI Scholar là hệ thống multi-part với 2 phần chính giao tiếp qua REST API:
+## 1. Sơ Đồ Kiến Trúc Tích Hợp Tổng Quan
 
-```
-┌──────────────────┐         REST API          ┌──────────────────────┐
-│                  │  ────────────────────────► │                      │
-│   Frontend (fe)  │       API Gateway         │   Backend (be)       │
-│   Next.js 16     │  ◄──────────────────────  │   Lambda + SFN       │
-│   Vercel         │                            │   AWS                │
-└──────────────────┘                            └──────────────────────┘
-         │                                               │
-         │ Preview proxy                                 │
-         └──────────── S3 Presigned URL ─────────────────┘
-```
-
-## Điểm Tích Hợp
-
-### 1. Frontend → Backend (REST API)
-
-| Từ | Đến | Loại | Protocol | Endpoint |
-|----|-----|------|----------|----------|
-| `fe/lib/api.ts` | API Gateway | REST | HTTPS | `POST /upload` |
-| `fe/lib/api.ts` | API Gateway | REST | HTTPS | `GET /job/{jobId}` |
-| `fe/lib/api.ts` | API Gateway | REST | HTTPS | `GET /result/{jobId}` |
-
-### 2. Frontend → S3 (Direct Upload)
-
-| Từ | Đến | Loại | Protocol | Chi tiết |
-|----|-----|------|----------|----------|
-| `fe/components/UploadView.tsx` | S3 Uploads Bucket | Presigned PUT | HTTPS | PDF upload trực tiếp (5 min TTL) |
-
-### 3. Frontend Preview Proxy → S3 (Server-side)
-
-| Từ | Đến | Loại | Protocol | Chi tiết |
-|----|-----|------|----------|----------|
-| `fe/app/api/preview/[jobId]/route.ts` | Backend API | REST | HTTPS | Lấy download URL |
-| `fe/app/api/preview/[jobId]/route.ts` | S3 Results Bucket | Presigned GET | HTTPS | Fetch content cho preview |
-
-**Lý do proxy:** Tránh CORS issues khi client fetch trực tiếp từ S3 presigned URL.
-
-### 4. S3 → Lambda (Event Trigger)
-
-| Từ | Đến | Loại | Trigger |
-|----|-----|------|---------|
-| S3 Uploads Bucket | Orchestrator Lambda | S3 Event | `OBJECT_CREATED` prefix `uploads/` |
-
-### 5. Lambda → Step Functions
-
-| Từ | Đến | Loại | Chi tiết |
-|----|-----|------|----------|
-| Orchestrator Lambda | Step Functions State Machine | SDK call | `StartExecutionCommand` |
-| Orchestrator Lambda (Direct mode) | Agents in-process | Function call | `Promise.allSettled` |
-
-### 6. Inter-Agent Communication (via S3)
-
-Agents không giao tiếp trực tiếp. Thay vào đó:
+Hệ thống VietAI Scholar tích hợp các dịch vụ thông qua cơ chế API bất đồng bộ bảo mật bằng JWT Authorizer:
 
 ```
-Extract → S3 (chunks/*.txt) → Translate → S3 (chunks/translated_*.txt)
-Extract → S3 (formulas) → LaTeX → S3 (latex.json)
-                                                    ↓
-                                              Merge ← S3 (all results)
-                                                    ↓
-                                              S3 (analysis.md)
+                  ┌──────────────────────────────────────────────┐
+                  │            Next.js Frontend (fe)             │
+                  │  (Library, Workspace, Thesis Defense Studio) │
+                  └──────────────────────┬───────────────────────┘
+                                         │
+                                         │ REST API + JWT
+                                         ▼
+                             ┌───────────────────────┐
+                             │  AWS API Gateway      │
+                             │  (Token Authorizer)   │
+                             └───────────┬───────────┘
+                                         │
+                   ┌─────────────────────┴─────────────────────┐
+                   ▼                                           ▼
+       ┌──────────────────────┐                     ┌─────────────────────┐
+       │ vietai-orchestrator  │                     │   vietai-defense    │
+       │ (Main REST Endpoints)│                     │  (Defense Copilot)  │
+       └──────────┬───────────┘                     └──────────┬──────────┘
+                  │                                            │
+                  ├──────────────────────┬─────────────────────┤
+                  ▼                      ▼                     ▼
+         ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+         │ DynamoDB Tables  │  │    S3 Buckets    │  │   Qdrant Cloud   │
+         │ (Jobs, Sessions) │  │(Uploads, Results)│  │ (RAG Vector DB)  │
+         └──────────────────┘  └──────────────────┘  └──────────────────┘
 ```
 
-## Luồng Dữ Liệu End-to-End
+---
+
+## 2. Các Điểm Tích Hợp Kỹ Thuật
+
+### 2.1. Xác thực & Phân quyền (Auth Integration)
+*   **Frontend:** Khi học viên đăng nhập thành công qua `LoginModal`, token JWT sẽ được lưu trữ. Tất cả các yêu cầu gửi đến các endpoint bảo mật của backend đều đính kèm tiêu đề: `Authorization: Bearer <JWT_TOKEN>`.
+*   **Backend:** API Gateway sử dụng Lambda **`vietai-jwt-authorizer`** kiểm tra chữ ký token bằng mã khóa bí mật cấu hình trong Secrets Manager. Nếu hợp lệ, thông tin `userId` sẽ được gửi kèm trong ngữ cảnh request để chuyển tiếp cho các Lambda xử lý nghiệp vụ (`vietai-orchestrator` hoặc `vietai-defense-copilot`).
+
+### 2.2. Giao tiếp giữa các Lambda Agents (Luồng S3 & Step Functions)
+Các tác vụ phân tích tài liệu nặng không giao tiếp trực tiếp để tránh chiếm dụng RAM và timeout. Thay vào đó, chúng truyền tải trạng thái thông qua các tệp trung gian đặt trên **S3 Results Bucket**:
+1.  **Extract Agent** tải PDF từ Uploads Bucket, trích xuất văn bản thô, chia thành các chunks nhỏ (tối đa 7000 ký tự) và ghi vào `results/{jobId}/chunks/chunk_{n}.txt`. Đồng thời lưu các mảng placeholders thô.
+2.  **Translate Agent** chạy song song (Map state) đọc từng chunk thô, dịch thuật và lưu lại dưới tên `results/{jobId}/chunks/translated_{n}.txt`.
+3.  **LaTeX Agent** xử lý các biểu thức toán học và lưu vào `results/{jobId}/latex.json`.
+4.  **Merge Agent** đọc toàn bộ các tệp dịch và tệp JSON từ S3, lắp ghép lại và lưu tệp kết quả cuối cùng `results/{jobId}/analysis.md`.
+5.  **Ingest Agent** đọc tệp `analysis.md` từ S3, tạo vector embeddings thông qua Gemini Embedding API và cập nhật trực tiếp lên bộ sưu tập của Qdrant Cloud.
+
+### 2.3. Tích hợp RAG & Thesis Defense Studio
+Phòng phản biện ảo (Thesis Defense) kết nối chặt chẽ giữa học viên, cơ sở dữ liệu vector và mô hình ngôn ngữ lớn (Gemini 2.5 Flash / Llama 3.3):
+1.  Học viên nhập câu trả lời trên giao diện Studio. Giao diện gọi API `POST /explore/defense/answer`.
+2.  Lambda `vietai-defense-copilot` nhận dữ liệu, thực hiện tìm kiếm ngữ cảnh khoa học bằng cách tạo vector embedding câu hỏi và truy vấn dữ liệu tham chiếu tương ứng từ **Qdrant Cloud** (RAG).
+3.  Kết quả RAG được đưa vào prompt gửi cho LLM đóng vai trò **Evaluator** để chấm điểm mức độ thuyết phục và phát hiện lỗ hổng (`gaps`).
+4.  Tiếp theo, kết quả chấm điểm được gửi cho LLM đóng vai trò **Planner** để sinh câu hỏi đào sâu hoặc đổi chủ đề phản biện.
+5.  Khi kết thúc phiên (`POST /explore/defense/session/close`), các lỗ hổng kiến thức được đúc kết thành các `SessionFact` và ghi nhận lâu dài vào bảng DynamoDB `vietai-user-competency-profile`.
+
+---
+
+## 3. Luồng Dữ Liệu End-to-End đầy đủ
 
 ```
-1. User drag-drop PDF → UploadView
-2. createUploadUrl() → POST /upload → Lambda → DynamoDB (pending) + S3 presigned URL
-3. uploadFile() → PUT S3 presigned URL → PDF lên S3
-4. S3 event trigger → Lambda Orchestrator
-5. [SFN mode] → StartExecution → Step Functions pipeline
-   [Direct mode] → supervisorHandler() → Promise.allSettled(agents)
-6. Extract: S3 (PDF) → pdfjs/Textract → text → placeholders → S3 (chunks)
-7. Parallel:
-   a. Translate: S3 (chunks) → Mistral/Groq/Gemini → S3 (translated chunks)
-   b. LaTeX: formulas → Groq/Gemini → S3 (latex.json)
-8. Merge: S3 (all results) → bilingual Markdown → S3 (analysis.md) → DynamoDB (completed)
-9. ProcessingView polling: GET /job/{jobId} → status updates → stepper animation
-10. ResultView: GET /result/{jobId} → presigned download URL → preview + download
+[Học viên] ──► Upload PDF ──► API POST /upload ──► Sinh Presigned S3 URL
+    │
+    ▼
+Tải trực tiếp PDF lên S3 Uploads Bucket
+    │
+    ▼ Kích hoạt S3 Object Created Event
+Lambda Orchestrator ──► Khởi chạy AWS Step Functions Pipeline
+    │
+    ▼
+1. Extract (pdfjs / Textract) ──► Lưu các chunks lên S3
+2. Parallel Processing:
+   - Map: Dịch song song các chunks (Mistral / Groq / Gemini) ──► Lưu S3
+   - LaTeX: Nhận diện & chuẩn hóa công thức toán học ──► Lưu S3
+3. Merge ──► Gộp tất cả thành tệp Markdown song ngữ (analysis.md) ──► Lưu S3
+4. Ingest ──► Sinh Vector Embeddings ──► Upload lên Qdrant Cloud
+    │
+    ▼ Cập nhật trạng thái job thành 'completed'
+[Học viên Dashboard] ──► Polling GET /job/{jobId} ──► Nhận kết quả & Mở Workspace
+    │
+    ├─► Chat RAG bài báo (Truy vấn Qdrant Cloud)
+    ├─► Sinh Trắc nghiệm / Flashcards / Mindmap / Podcast TTS (Lưu kết quả S3)
+    └─► Bắt đầu Thesis Defense Studio (Đọc RAG Qdrant + Vòng lặp Evaluator/Planner)
 ```
 
-## Shared Dependencies
+---
 
-| Dependency | Backend | Frontend |
-|-----------|---------|----------|
-| TypeScript | ~5.9.3 | ^5 |
-| API Base URL | Defined in API Gateway | Hardcoded in `lib/api.ts` |
-| S3 bucket names | Environment variables | N/A (via API) |
-| DynamoDB table | Environment variable | N/A (via API) |
+## 4. Ranh giới Triển khai (Deployment Boundaries)
 
-## Deployment Boundaries
-
-| Component | Platform | Region |
-|-----------|----------|--------|
-| Backend (CDK Stack) | AWS | ap-southeast-1 |
-| Frontend (Next.js) | Vercel | Global CDN |
-| API Gateway | AWS | ap-southeast-1 |
-| S3 Buckets | AWS | ap-southeast-1 |
+*   **Next.js Web Frontend:** Triển khai trên nền tảng **Vercel** để phân phối qua Global CDN có độ trễ thấp.
+*   **Backend Serverless (CDK):** Triển khai tại khu vực **AWS Singapore (`ap-southeast-1`)** để đảm bảo tốc độ truyền tải tối ưu về Việt Nam.
+*   **Vector Database:** Cơ sở dữ liệu Qdrant Cloud được cấu hình chạy trên cụm Cloud để xử lý tìm kiếm ngữ cảnh thời gian thực.
+*   **External AI APIs:** Tích hợp trực tiếp tới các máy chủ API của Google AI (Gemini) và Groq Cloud qua HTTPS an toàn.

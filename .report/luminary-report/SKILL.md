@@ -1077,3 +1077,64 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 #### Build status:
 - npm run build: Pass
 - TypeScript errors: 0
+
+---
+
+### ✅ Story 5.6 & 5.7: Explore 2.0 (Multi-source Discovery) & AI Research Studio (Phòng Nghiên cứu 3 cột)
+**Status:** Done  
+**Time:** 16 hours  
+**Date:** 2026-07-03  
+
+#### Đã làm:
+1. **Explore 2.0 (Multi-source Discovery) - Backend & Integration:**
+   - Hoàn thiện handler `be/lambda/handlers/explore.ts` chế độ `discovery` gọi Gemini AI để thu thập và phân tích từ khóa, nhóm thành 3 mục: Hot Trends, Niche Gaps, và Cross-domain.
+   - Sửa đổi API `/api/explore/sources/status/route.ts` để gọi thực tế lên AWS Lambda thay vì trả dữ liệu tĩnh.
+   - Khắc phục triệt để logic mock ở máy local: Thay thế việc kiểm tra `process.env.NODE_ENV !== 'production'` bằng việc chỉ kiểm tra mock qua header Playwright (`x-playwright-test` / `PLAYWRIGHT_TEST`) hoặc tiền tố `mock-` của topic, cho phép môi trường phát triển local truy vấn trực tiếp lên AWS AI.
+2. **AI Research Studio (Phòng Nghiên cứu 3 cột) - Backend & UI:**
+   - Xây dựng API `/api/explore/roadmap/route.ts` để gọi backend Lambda chế độ `roadmap`, sinh lộ trình 4 chặng nghiên cứu từ tổng quan, kinh điển, SOTA đến thách thức mở bằng AI.
+   - Nâng cấp giao diện Explore (`fe/app/explore/page.tsx`) với overlay chờ Glassmorphism cùng spinner trong suốt 3-5 giây chờ AI tổng hợp lộ trình.
+   - Tích hợp phòng nghiên cứu 3 cột tương tác tại `/explore/studio/[sessionId]` hiển thị Lộ trình timeline (Cột 1), Nội dung bài báo đính kèm LaTeX công thức toán học (Cột 2) và Nhật ký nghiên cứu lưu trữ đồng bộ DynamoDB (Cột 3).
+3. **Kiểm thử E2E & Thực tế:**
+   - Thực hiện 2 lượt chạy bằng Browser Subagent, đăng nhập bằng OTP và thực hiện luồng E2E thực tế trên máy local kết nối AWS Backend thành công: Sinh bản đồ đề tài và thiết lập thành công phòng nghiên cứu 3 cột hiển thị LaTeX/Note panel.
+
+#### Kết quả kiểm thử:
+- **E2E Browser Validation:** PASS 100%. Đã chụp và kiểm chứng trực quan 2 ảnh giao diện: Bản đồ khai phá tài liệu và Phòng nghiên cứu 3 cột được kết xuất hoàn chỉnh.
+
+#### Files thay đổi:
+- `be/lambda/handlers/explore.ts` - Xử lý logic Gemini sinh đề tài phân nhóm và lộ trình nghiên cứu.
+- `fe/app/api/explore/sources/status/route.ts` - Gọi trực tiếp AWS Lambda cho chế độ Discovery.
+- `fe/app/api/explore/roadmap/route.ts` - (NEW) Proxy gọi live backend sinh lộ trình nghiên cứu.
+- `fe/app/explore/page.tsx` - Tích hợp overlay chờ và gọi API roadmap bất đồng bộ.
+
+#### Build status:
+- npm run build: Pass
+- TypeScript errors: 0
+
+---
+
+### ✅ Story 5.7: Hệ thống phản biện luận án Agentic & Copilot đề xuất gợi ý (Agentic Thesis Defense & Research Copilot) - Tinh chỉnh báo cáo năng lực
+**Status:** Done  
+**Time:** 6 hours  
+**Date:** 2026-07-08
+
+#### Đã làm:
+1. **Backend – Cập nhật cấu trúc báo cáo (Report Structure in `be/lambda/handlers/defense.ts`):**
+   - Nâng cấp API đóng phiên phản biện (`handleCloseSession`) để tự động phân tích và trích xuất điểm số tổng quan (`overallScore`), nhận xét chung của hội đồng (`overallComment`), danh sách điểm mạnh nổi bật (`strengths`) và điểm yếu/điểm cần cải thiện (`weaknesses`).
+   - Cập nhật kiểu dữ liệu `DefenseReport` và lưu trữ báo cáo đầy đủ cấu trúc vào DynamoDB session.
+2. **Frontend – Hiển thị widgets báo cáo năng lực cao cấp (`fe/components/DefenseModal.tsx`):**
+   - Thiết kế giao diện báo cáo sau khi kết thúc phản biện (`phase === 'closed'`) hiển thị điểm số tổng quan bằng biểu đồ vòng tròn (radial progress gauge) trực quan, có màu sắc thay đổi động theo khoảng điểm (xanh lá, vàng, đỏ).
+   - Tích hợp khung hiển thị nhận xét chung từ Hội đồng phản biện với phong cách glassmorphic cao cấp.
+   - Thêm grid hiển thị song song hai danh sách: **Điểm mạnh nổi bật** (icon check xanh lá) và **Điểm cần hoàn thiện** (icon warning đỏ) giúp người dùng dễ dàng định vị các lỗ hổng kiến thức.
+3. **Biên dịch & Xác minh (Compilation Validation):**
+   - Chạy `npm run build` ở backend (`be`) biên dịch thành công 100% không lỗi.
+   - Chạy `npm run build` ở frontend (`fe`) đồng bộ loại và tạo bản dựng Next.js thành công 100% không phát sinh lỗi TypeScript.
+
+#### Files thay đổi:
+- `be/lambda/handlers/defense.ts` – Cập nhật prompt và structured JSON schema của Gemini để sinh đầy đủ overallScore, overallComment, strengths, weaknesses; cập nhật kiểu `DefenseReport`.
+- `fe/components/DefenseModal.tsx` – Thêm JSX render radial score gauge, overall comment card và grid điểm mạnh/điểm yếu trong closed phase.
+
+#### Build status:
+- npm run build (Backend & Frontend): Pass
+- TypeScript errors: 0
+
+

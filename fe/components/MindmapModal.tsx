@@ -104,11 +104,11 @@ function convertTreeToGraph(root: TreeNode, competencyProfile?: CompetencyProfil
       if (matchKey) {
         const status = competencyProfile[matchKey].status;
         if (status === 'MASTERED') {
-          color = '#22c55e'; // Green
+          color = '#5db872'; // Green
         } else if (status === 'WARNING') {
-          color = '#eab308'; // Yellow
+          color = '#d4a017'; // Yellow
         } else if (status === 'GAP') {
-          color = '#ef4444'; // Red
+          color = '#c64545'; // Red
         }
       } else {
         console.warn(`⚠️ [Mindmap Heatmap Match] Concept "${node.label}" was not matched to any key in competency profile. Profile keys:`, Object.keys(competencyProfile));
@@ -141,9 +141,9 @@ function convertTreeToGraph(root: TreeNode, competencyProfile?: CompetencyProfil
 
 function RenderTextTree({ node }: { node: TreeNode }) {
   return (
-    <div className="pl-4 border-l border-white/10 my-1">
-      <div className="flex items-center gap-2 text-sm text-gray-300 py-1">
-        <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent,#38bdf8)] flex-shrink-0" />
+    <div className="pl-4 border-l border-[var(--border-subtle)] my-1">
+      <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] py-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] flex-shrink-0" />
         <span className="font-medium">{node.label}</span>
       </div>
       {node.children.map((child, i) => (
@@ -512,39 +512,39 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
           user-select: none;
         }
         .mindmap-viewport svg g.node rect {
-          fill: #141b2d !important;
-          stroke: var(--accent, #38bdf8) !important;
+          fill: var(--bg-surface) !important;
+          stroke: var(--accent) !important;
           stroke-width: 1.5px !important;
         }
         .mindmap-viewport svg g.node text {
-          fill: #ffffff !important;
+          fill: var(--text-primary) !important;
           font-weight: 500 !important;
         }
         .mindmap-viewport svg path.edge {
-          stroke: rgba(56, 189, 248, 0.4) !important;
+          stroke: var(--accent-glow) !important;
           stroke-width: 2px !important;
         }
       `}</style>
 
-      <div className="relative w-full max-w-5xl h-[88vh] bg-[#0e131f] border border-[var(--border-normal,rgba(255,255,255,0.1))] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="relative w-full max-w-5xl h-[88vh] bg-[var(--bg-base)] border border-[var(--border-normal)] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-3.5 border-b border-[var(--border-subtle,rgba(255,255,255,0.05))] flex items-center justify-between">
+        <div className="px-6 py-3.5 border-b border-[var(--border-subtle)] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-2.5 w-2.5 rounded-full bg-[var(--accent,#38bdf8)] animate-pulse" />
-            <h3 className="text-sm font-bold text-white tracking-wide">
+            <div className="h-2.5 w-2.5 rounded-full bg-[var(--accent)] animate-pulse" />
+            <h3 className="text-sm font-bold text-[var(--text-primary)] tracking-wide">
               Sơ Đồ Tư Duy Bài Báo (Mindmap)
             </h3>
           </div>
 
           {/* Mode Switcher */}
           {phase === 'viewing' && (
-            <div className="flex items-center bg-[#090d16] border border-white/10 rounded-xl p-1 gap-1">
+            <div className="flex items-center bg-[var(--bg-elevated)]/60 border border-[var(--border-normal)] rounded-xl p-1 gap-1">
               <button
                 onClick={() => setViewMode('graph')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                   viewMode === 'graph'
-                    ? 'bg-[var(--accent,#38bdf8)] text-[#080b12] shadow-md font-bold'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    ? 'bg-[var(--accent)] text-[var(--bg-base)] shadow-md font-bold'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]/40'
                 }`}
               >
                 <span>🕸️</span>
@@ -554,8 +554,8 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
                 onClick={() => setViewMode('tree')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                   viewMode === 'tree'
-                    ? 'bg-[var(--accent,#38bdf8)] text-[#080b12] shadow-md font-bold'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    ? 'bg-[var(--accent)] text-[var(--bg-base)] shadow-md font-bold'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]/40'
                 }`}
               >
                 <span>🌿</span>
@@ -568,7 +568,7 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
             onClick={onClose}
             id="mindmap-close-btn"
             data-testid="mindmap-close-btn"
-            className="text-gray-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5 cursor-pointer"
+            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors p-1.5 rounded-lg hover:bg-[var(--bg-elevated)]/40 cursor-pointer"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -577,19 +577,19 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-hidden relative bg-[#090d16] flex flex-col justify-center items-center">
+        <div className="flex-1 overflow-hidden relative bg-[var(--bg-base)] flex flex-col justify-center items-center">
           {/* ─── SETUP STATE ─── */}
           {phase === 'setup' && (
             <div className="p-8 flex flex-col items-center text-center gap-6 max-w-md" id="mindmap-setup-state">
-              <div className="h-16 w-16 rounded-2xl bg-[var(--accent,#38bdf8)]/10 flex items-center justify-center text-[var(--accent,#38bdf8)]">
+              <div className="h-16 w-16 rounded-2xl bg-[var(--accent-dim)] flex items-center justify-center text-[var(--accent)]">
                 <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
                 </svg>
               </div>
 
               <div>
-                <h4 className="text-base font-semibold text-white mb-2">Tạo Mạng Lưới Tri Thức AI</h4>
-                <p className="text-xs text-gray-400 leading-relaxed">
+                <h4 className="text-base font-semibold text-[var(--text-primary)] mb-2">Tạo Mạng Lưới Tri Thức AI</h4>
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                   Trình tạo sơ đồ AI sẽ trực quan hóa cấu trúc bài báo dưới dạng đồ thị tri thức Obsidian sinh động và sơ đồ tư duy phân cấp.
                 </p>
               </div>
@@ -610,7 +610,7 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
                 onClick={handleStartGeneration}
                 id="mindmap-start-btn"
                 data-testid="mindmap-start-btn"
-                className="w-full bg-[var(--accent,#38bdf8)] text-[#080b12] text-xs font-bold py-3.5 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-[var(--accent,#38bdf8)]/20"
+                className="w-full bg-[var(--accent)] text-[var(--bg-base)] text-xs font-bold py-3.5 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-[var(--accent)]/20"
               >
                 Bắt đầu dựng đồ thị tri thức
               </button>
@@ -621,8 +621,8 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
           {phase === 'loading' && (
             <div className="p-12 flex flex-col items-center text-center gap-6" id="mindmap-loading-state">
               <div className="relative flex items-center justify-center">
-                <div className="h-16 w-16 rounded-full border-2 border-[var(--border-normal,rgba(255,255,255,0.1))] border-t-[var(--accent,#38bdf8)] animate-spin" />
-                <div className="absolute h-8 w-8 rounded-lg bg-[var(--accent,#38bdf8)]/10 flex items-center justify-center text-[var(--accent,#38bdf8)] animate-pulse">
+                <div className="h-16 w-16 rounded-full border-2 border-[var(--border-normal)] border-t-[var(--accent)] animate-spin" />
+                <div className="absolute h-8 w-8 rounded-lg bg-[var(--accent-dim)] flex items-center justify-center text-[var(--accent)] animate-pulse">
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
@@ -630,10 +630,10 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
               </div>
 
               <div className="flex flex-col gap-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
                   AI IS SYNTHESIZING KNOWLEDGE GRAPH
                 </h4>
-                <p className="text-sm font-semibold text-white animate-pulse min-h-[1.5rem]">
+                <p className="text-sm font-semibold text-[var(--text-primary)] animate-pulse min-h-[1.5rem]">
                   {loadingText}
                 </p>
               </div>
@@ -652,33 +652,33 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
                   {/* Controls Overlay */}
                   <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
                     {!renderError && (
-                      <div className="flex items-center bg-[#0e131f]/90 border border-white/10 rounded-xl p-1.5 shadow-lg backdrop-blur-sm">
+                      <div className="flex items-center bg-[var(--bg-surface)]/90 border border-[var(--border-normal)] rounded-xl p-1.5 shadow-lg backdrop-blur-sm">
                         <button
                           onClick={handleZoomIn}
                           title="Phóng to"
-                          className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer"
+                          className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-elevated)]/40 cursor-pointer"
                         >
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                           </svg>
                         </button>
-                        <span className="text-[10px] font-bold text-gray-300 min-w-[32px] text-center">
+                        <span className="text-[10px] font-bold text-[var(--text-primary)] min-w-[32px] text-center">
                           {Math.round(scale * 100)}%
                         </span>
                         <button
                           onClick={handleZoomOut}
                           title="Thu nhỏ"
-                          className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer"
+                          className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-elevated)]/40 cursor-pointer"
                         >
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
                           </svg>
                         </button>
-                        <div className="h-4 w-px bg-white/10 mx-1" />
+                        <div className="h-4 w-px bg-[var(--border-normal)] mx-1" />
                         <button
                           onClick={handleResetZoom}
                           title="Đặt lại zoom"
-                          className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer text-[10px] font-bold px-2.5"
+                          className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-elevated)]/40 cursor-pointer text-[10px] font-bold px-2.5"
                         >
                           Khôi phục
                         </button>
@@ -699,7 +699,7 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
                     {!renderError && (
                       <button
                         onClick={handleDownloadSvg}
-                        className="flex items-center gap-1.5 px-3.5 py-2.5 bg-[#0e131f]/90 hover:bg-[#151b2c] border border-white/10 text-[11px] font-bold text-white rounded-xl shadow-lg backdrop-blur-sm transition-all cursor-pointer"
+                        className="flex items-center gap-1.5 px-3.5 py-2.5 bg-[var(--bg-surface)]/90 hover:bg-[var(--bg-elevated)]/85 border border-[var(--border-normal)] text-[11px] font-bold text-[var(--text-primary)] rounded-xl shadow-lg backdrop-blur-sm transition-all cursor-pointer"
                       >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -731,16 +731,16 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
                     ) : (
                       /* Fallback state: Nested Text Tree */
                       <div className="w-full h-full overflow-y-auto p-12 flex flex-col justify-start">
-                        <div className="max-w-xl mx-auto w-full bg-[#0e131f] border border-white/5 rounded-2xl p-6 shadow-xl">
-                          <div className="border-b border-white/5 pb-3 mb-4 flex items-center justify-between">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                        <div className="max-w-xl mx-auto w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-6 shadow-xl">
+                          <div className="border-b border-[var(--border-subtle)] pb-3 mb-4 flex items-center justify-between">
+                            <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">
                               Sơ đồ cấu trúc dạng cây
                             </span>
                           </div>
                           {parsedTree ? (
                             <RenderTextTree node={parsedTree} />
                           ) : (
-                            <div className="text-xs text-gray-500 py-6 text-center">
+                            <div className="text-xs text-[var(--text-muted)] py-6 text-center">
                               Không thể hiển thị sơ đồ.
                             </div>
                           )}
@@ -751,7 +751,7 @@ export function MindmapModal({ isOpen, jobId, onClose }: MindmapModalProps) {
 
                   {/* Tip banner */}
                   {!renderError && (
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#0e131f]/95 border border-white/5 rounded-full px-4 py-1.5 text-[10px] text-gray-400 shadow-md backdrop-blur-sm flex items-center gap-1.5 select-none pointer-events-none">
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[var(--bg-surface)]/95 border border-[var(--border-subtle)] rounded-full px-4 py-1.5 text-[10px] text-[var(--text-secondary)] shadow-md backdrop-blur-sm flex items-center gap-1.5 select-none pointer-events-none">
                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
                       </svg>
