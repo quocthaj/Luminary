@@ -362,7 +362,7 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
 3. **Backend – Lambda Ingest mới (`be/lambda/handlers/ingest.ts`):**
    - Đọc và phân tích file Markdown song ngữ hoàn chỉnh từ S3, trích xuất chính xác các cặp đoạn văn gốc-dịch dựa trên cú pháp anchor `{#chunk-index}`.
    - Tải API Key cho Google Gemini và gọi batch API `text-embedding-004` (chia nhóm batch 50 items để tránh quá giới hạn request) lấy vector 768 chiều cho toàn bộ văn bản gốc tiếng Anh.
-   - Khởi tạo Qdrant REST Client (`@qdrant/js-client-rest`), tự động tạo collection `vietai-scholar-chunks` nếu chưa tồn tại (distance: Cosine, dimension: 768).
+   - Khởi tạo Qdrant REST Client (`@qdrant/js-client-rest`), tự động tạo collection `luminary-scholar-chunks` nếu chưa tồn tại (distance: Cosine, dimension: 768).
    - Sinh UUIDv5 deterministic cho từng điểm (point) để đảm bảo ghi đè/đồng bộ khi người dùng kích hoạt "Dịch lại".
    - Upsert dữ liệu point gồm vector và payload metadata (`userId`, `jobId`, `chunkIndex`, `text_original`, `text_translated`) lên Qdrant Cloud.
 4. **Backend – DynamoDB Helpers (`be/lambda/utils/dynamodb-helpers.ts`):**
@@ -437,7 +437,7 @@ Tôi đã thực hiện chu trình `bmad-dev-story` (DS) để phát triển và
    - Triển khai handler `handleChatJob` xác thực quyền sở hữu `jobId` với `userId` trong DynamoDB. Trả về `403 Forbidden` nếu người dùng khác truy cập.
    - Sử dụng cơ chế Singleton Qdrant Client và Gemini API Client ngoài global scope để duy trì connection pool và tránh TLS latency do cold start.
    - Sinh vector cho câu hỏi sử dụng Gemini Embedding Model `gemini-embedding-001`.
-   - Tìm kiếm vector tương đồng trên Qdrant Cloud collection `vietai-scholar-chunks` kèm bộ lọc `{ userId, jobId }`.
+   - Tìm kiếm vector tương đồng trên Qdrant Cloud collection `luminary-scholar-chunks` kèm bộ lọc `{ userId, jobId }`.
    - Gọi Gemini `gemini-2.0-flash` sinh phản hồi định dạng Markdown kèm trích dẫn nguồn `[Đoạn X]`.
 2. **Backend – CDK Stack (`be/lib/be-stack.ts`):**
    - Cấu hình route `POST /job/{jobId}/chat` trên API Gateway tích hợp với `OrchestratorLambda` và bảo vệ bằng `authorizer`.

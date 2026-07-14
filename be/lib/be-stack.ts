@@ -609,8 +609,8 @@ export class VietAIScholarStack extends cdk.Stack {
     console.log('🌐 Creating API Gateway...');
 
     const api = new apigateway.RestApi(this, 'VietAIAPI', {
-      restApiName: 'vietai-scholar-api',
-      description: 'API for VietAI Scholar Assistant',
+      restApiName: 'luminary-scholar-api',
+      description: 'API for Luminary Scholar Assistant',
       deployOptions: {
         stageName: 'dev',
         throttlingRateLimit: 100,   // requests per second

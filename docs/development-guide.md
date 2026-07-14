@@ -1,4 +1,4 @@
-# Hướng Dẫn Phát Triển (Development Guide) — VietAI Scholar
+# Hướng Dẫn Phát Triển (Development Guide) — Luminary Scholar
 
 > Tài liệu hướng dẫn lập trình viên thiết lập môi trường, quản lý biến môi trường, thiết lập khóa bảo mật và thực thi kiểm thử.  
 > Cập nhật mới nhất: 2026-07-07

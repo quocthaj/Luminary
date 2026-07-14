@@ -1,4 +1,4 @@
-# PRD Quality Review — VietAI Scholar (Luminary)
+# PRD Quality Review — Luminary Scholar (Luminary)
 
 ## Overall verdict
 Bản thảo PRD v1 (Phase 1 + 2) có độ hoàn thiện cao, bám sát các yêu cầu thực tế của sản phẩm. Các quyết định kiến trúc quan trọng (dùng NextAuth, dùng S3 caching để tối ưu chi phí và tăng tốc tải tài liệu cũ) đã được làm rõ và đưa vào tài liệu. Yêu cầu hiển thị công thức LaTeX và giới hạn file upload được thiết kế chặt chẽ.

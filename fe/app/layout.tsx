@@ -17,7 +17,7 @@ const beVietnamPro = Be_Vietnam_Pro({
 });
 
 export const metadata: Metadata = {
-  title: "VietAI Scholar",
+  title: "Luminary Scholar",
   description: "Dịch tài liệu học thuật PDF sang tiếng Việt với AI",
 };
 

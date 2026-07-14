@@ -67,7 +67,7 @@ test.describe('AI Tutor Chat Panel UI & Source Citations E2E Tests', () => {
 
     // 7. Verify typing indicator disappears and AI answer is loaded with citations
     await expect(typingIndicator).toBeHidden({ timeout: 5000 });
-    const aiAnswer = page.locator('text=Đây là câu trả lời thử nghiệm từ tài liệu mock');
+    const aiAnswer = page.locator('text=Đây là câu trả lời giải thích chi tiết từ AI');
     await expect(aiAnswer).toBeVisible();
 
     // Check citations buttons are rendered

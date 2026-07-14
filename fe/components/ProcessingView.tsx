@@ -161,7 +161,7 @@ export function ProcessingView({
           <p
             className="text-xs font-semibold tracking-[0.22em] uppercase mb-2 text-[var(--accent)]"
           >
-            VietAI Scholar
+            Luminary Scholar
           </p>
 
           {isFailed ? (

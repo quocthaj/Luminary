@@ -228,7 +228,7 @@ Hệ thống tích hợp được chia thành 5 module độc lập:
 ## Project Structure & Boundaries
 
 ### Complete Project Directory Structure
-Dưới đây là sơ đồ cây cấu trúc thư mục hoàn chỉnh của dự án VietAI Scholar sau khi tích hợp Phase 2:
+Dưới đây là sơ đồ cây cấu trúc thư mục hoàn chỉnh của dự án Luminary Scholar sau khi tích hợp Phase 2:
 
 ```text
 viet-ai-scholar/
@@ -413,7 +413,7 @@ viet-ai-scholar/
 ### 1. Vector Database Integration: Qdrant Cloud
 - **Hosting Model:** Qdrant Cloud (Managed Serverless Free Tier / Pay-As-You-Go).
 - **Communication Pattern:** AWS Lambda gọi Qdrant Cloud HTTPS API sử dụng `@qdrant/js-client-sdk`.
-- **Namespace Strategy:** Cách ly dữ liệu vector (Multi-tenancy) bằng cách sử dụng `collection` duy nhất (ví dụ: `vietai-scholar-chunks`) và lọc bằng payload filter trên trường `userId` và `jobId`.
+- **Namespace Strategy:** Cách ly dữ liệu vector (Multi-tenancy) bằng cách sử dụng `collection` duy nhất (ví dụ: `luminary-scholar-chunks`) và lọc bằng payload filter trên trường `userId` và `jobId`.
 - **Payload Schema:**
   ```json
   {

@@ -53,7 +53,7 @@ This document provides the complete epic and story breakdown for viet-ai-scholar
 - **ADD-4 (JWT Web Crypto Lambda Authorizer):** Lambda Authorizer decodes JWT token using Node.js 20 native Web Crypto API (HS256) with secret `AUTH_SECRET` to keep bundle size < 10KB.
 - **ADD-5 (S3 Streaming Proxy):** Next.js server route `/api/preview/[jobId]` validates session using NextAuth, streams Markdown content from AWS S3 using AWS SDK.
 - **ADD-6 (Types Sync Script):** Script `fe/scripts/sync-types.js` copies shared types from `be/lambda/types.ts` to `fe/types/jobs.ts` during prebuild.
-- **ADD-7 (Qdrant Multi-tenancy Filter):** Sử dụng chung một collection `vietai-scholar-chunks`, lọc bảo mật bằng điều kiện payload filter chứa `userId` và `jobId` trên mọi request.
+- **ADD-7 (Qdrant Multi-tenancy Filter):** Sử dụng chung một collection `luminary-scholar-chunks`, lọc bảo mật bằng điều kiện payload filter chứa `userId` và `jobId` trên mọi request.
 - **ADD-8 (Structured JSON Output Mode):** Sử dụng tính năng Structured Outputs của Gemini API để đảm bảo cấu trúc JSON trả về cho Quiz/Flashcards luôn đúng định nghĩa.
 - **ADD-9 (Dynamic Mermaid Rendering):** Tích hợp thư viện `@mermaid-js/mermaid` client-side ở frontend để render động mã Mermaid thành đồ họa tương tác.
 

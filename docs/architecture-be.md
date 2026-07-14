@@ -1,4 +1,4 @@
-# Kiến Trúc Backend — VietAI Scholar
+# Kiến Trúc Backend — Luminary Scholar
 
 > Tài liệu mô tả cấu trúc hệ thống, cơ sở hạ tầng Cloud và kiến trúc xử lý của phần Backend (AWS CDK + Lambda).  
 > Cập nhật mới nhất: 2026-07-07
@@ -7,7 +7,7 @@
 
 ## 1. Tổng Quan
 
-Phần Backend của VietAI Scholar được xây dựng theo kiến trúc **Serverless** trên nền tảng Amazon Web Services (AWS), sử dụng **AWS CDK** (Infrastructure as Code) viết bằng TypeScript để quản lý tài nguyên. Hệ thống sử dụng mô hình **Multi-Agent** để xử lý song song các tác vụ phân tích, dịch thuật, xử lý LaTeX bài báo khoa học thông qua **AWS Step Functions**.
+Phần Backend của Luminary Scholar được xây dựng theo kiến trúc **Serverless** trên nền tảng Amazon Web Services (AWS), sử dụng **AWS CDK** (Infrastructure as Code) viết bằng TypeScript để quản lý tài nguyên. Hệ thống sử dụng mô hình **Multi-Agent** để xử lý song song các tác vụ phân tích, dịch thuật, xử lý LaTeX bài báo khoa học thông qua **AWS Step Functions**.
 
 ---
 

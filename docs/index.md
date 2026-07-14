@@ -1,4 +1,4 @@
-# VietAI Scholar — Tài Liệu Dự Án
+# Luminary Scholar — Tài Liệu Dự Án
 
 > Tự động tạo bởi BMad Document Project · 2026-07-07  
 > Scan level: Deep | Mode: Full Rescan
@@ -7,7 +7,7 @@
 
 ## 1. Tổng Quan Dự Án
 
-*   **Tên dự án:** VietAI Scholar
+*   **Tên dự án:** Luminary Scholar
 *   **Mô hình mã nguồn:** Multi-part (Monorepo) — Backend + Frontend độc lập.
 *   **Ngôn ngữ lập trình:** TypeScript (đồng bộ ở cả 2 đầu).
 *   **Kiến trúc hệ thống:** Đường ống (pipeline) xử lý song song Serverless Multi-Agent chạy trên AWS Step Functions kết hợp cùng RAG Vector DB (Qdrant Cloud) và phòng phản biện ảo Thesis Defense.

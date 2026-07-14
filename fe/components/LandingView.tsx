@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { UploadView } from './UploadView';
 import { LoginModal } from './LoginModal';
@@ -12,6 +12,15 @@ export function LandingView({ onJobCreated }: LandingViewProps) {
   const { data: session, status } = useSession();
   const [showUpload, setShowUpload] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const trialUsed = localStorage.getItem('guest_trial_used') === 'true' || document.cookie.includes('guest_trial_used=true');
+      if (trialUsed) {
+        setShowUpload(true);
+      }
+    }
+  }, []);
 
   const isUserAuthenticated = status === 'authenticated';
 

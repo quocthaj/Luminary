@@ -1,4 +1,4 @@
-# VietAI Scholar — Tổng quan
+# Luminary Scholar — Tổng quan
 
 ## Một câu mô tả
 

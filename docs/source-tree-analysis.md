@@ -1,6 +1,6 @@
-# Phân Tích Cây Mã Nguồn (Source Tree Analysis) — VietAI Scholar
+# Phân Tích Cây Mã Nguồn (Source Tree Analysis) — Luminary Scholar
 
-> Mô tả chi tiết cấu trúc thư mục, các tệp mã nguồn và các điểm phân phối chính (entry points) của hệ thống monorepo VietAI Scholar.  
+> Mô tả chi tiết cấu trúc thư mục, các tệp mã nguồn và các điểm phân phối chính (entry points) của hệ thống monorepo Luminary Scholar.  
 > Cập nhật mới nhất: 2026-07-07
 
 ---
@@ -79,7 +79,7 @@ viet-ai-scholar/
 │   │   └── synthesis/
 │   │       └── page.tsx         # Giao diện Tổng hợp & Đối chiếu liên bài báo (Cross-Paper Synthesis)
 │   ├── components/              # Các thành phần giao diện React có tính tái sử dụng cao
-│   │   ├── LandingView.tsx      # Giao diện giới thiệu VietAI Scholar
+│   │   ├── LandingView.tsx      # Giao diện giới thiệu Luminary Scholar
 │   │   ├── LoginModal.tsx       # Hộp thoại đăng nhập & lấy JWT token
 │   │   ├── UploadView.tsx       # Khung kéo thả tệp PDF và xử lý URL tải lên
 │   │   ├── ProcessingView.tsx   # Hiệu ứng nạp tệp và các bước xử lý tiến trình

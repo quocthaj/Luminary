@@ -5,8 +5,12 @@ test.describe('NextAuth Stateless Email OTP Authentication Flow', () => {
     // 1. Navigate to homepage with test_mode=true
     await page.goto('/?test_mode=true');
 
-    // Verify page title/brand is loaded
-    await expect(page.locator('h1')).toHaveText('VietAI Scholar');
+    // Verify page title/brand is loaded on welcome screen, then enter experience
+    await expect(page.locator('h1')).toHaveText('Luminary');
+    await page.click('text="Trải nghiệm ngay"');
+
+    // Verify upload screen title/brand is loaded
+    await expect(page.locator('h1')).toHaveText('Luminary Scholar');
 
     // Verify initially we are NOT blocked (status: Guest, "Bắt đầu dịch" visible)
     const ctaButton = page.locator('#cta-translation-btn');
@@ -26,7 +30,7 @@ test.describe('NextAuth Stateless Email OTP Authentication Flow', () => {
     await ctaButton.click();
 
     // Verify modal is visible
-    const modalTitle = page.locator('h3:has-text("Chào mừng đến với VietAI")');
+    const modalTitle = page.locator('h3:has-text("Chào mừng đến với Luminary Scholar")');
     await expect(modalTitle).toBeVisible();
 
     // 4. Fill in email and request OTP

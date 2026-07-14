@@ -1,4 +1,4 @@
-# RAG Architecture — VietAI Scholar
+# RAG Architecture — Luminary Scholar
 
 ## Pattern đang dùng: Agentic RAG (Story 3.6) — upgrade từ Naive RAG
 

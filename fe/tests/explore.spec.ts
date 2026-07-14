@@ -292,24 +292,28 @@ test.describe('Explore Mode - E2E Tests (Story 5.2)', () => {
     // Navigate to user library with test bypass
     await page.goto('/library?test_mode=true');
 
-    // Confirm both documents are displayed
-    await expect(page.locator('text=Học máy lượng tử')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('text=Tài liệu thường.pdf')).toBeVisible();
+    // Confirm standard document is displayed by default
+    await expect(page.locator('text=Tài liệu thường.pdf')).toBeVisible({ timeout: 15000 });
 
-    // Verify Explore job has "Khám phá" badge and normal job has "Tài liệu dịch" badge
-    await expect(page.locator('span:has-text("Khám phá")')).toBeVisible();
-    await expect(page.locator('span:has-text("Tài liệu dịch")')).toBeVisible();
-
-    // Verify standard job has selection checkbox container
+    // Verify standard job has selection checkbox container (w-4 h-4 in the new layout)
     const standardJobCard = page.locator('.group', { hasText: 'Tài liệu thường.pdf' }).first();
-    await expect(standardJobCard.locator('.w-5.h-5')).toBeVisible();
+    await expect(standardJobCard.locator('.w-4.h-4')).toBeVisible();
+
+    // Click on Explore & Synthesis tab to view explore jobs
+    const exploreTabBtn = page.locator('button:has-text("Khám phá & Tổng hợp")');
+    await expect(exploreTabBtn).toBeVisible();
+    await exploreTabBtn.click();
+
+    // Confirm explore document is displayed
+    await expect(page.locator('text=Học máy lượng tử')).toBeVisible({ timeout: 15000 });
 
     // Verify Explore job is not selectable for synthesis (no checkbox shown next to it)
     const exploreJobCard = page.locator('.group', { hasText: 'Học máy lượng tử' }).first();
-    await expect(exploreJobCard.locator('.w-5.h-5')).not.toBeVisible();
+    await expect(exploreJobCard.locator('.w-4.h-4')).not.toBeVisible();
     
-    // Verify "Xem kết quả" button for explore job has link pointing to explore page
+    // Verify "Vào Studio" button for explore job has link pointing to explore page
     const exploreResultBtn = page.locator('a[href*="/explore?jobId=exp-mock-123"]');
     await expect(exploreResultBtn).toBeVisible();
+    await expect(exploreResultBtn).toContainText('Vào Studio');
   });
 });

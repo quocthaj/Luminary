@@ -16,7 +16,7 @@ test.describe('Reprocess Job Flow', () => {
     await reprocessBtn.click();
 
     // 4. Verify login modal appears
-    const modalTitle = page.locator('h3:has-text("Chào mừng đến với VietAI")');
+    const modalTitle = page.locator('h3:has-text("Chào mừng đến với Luminary Scholar")');
     await expect(modalTitle).toBeVisible();
 
     // 5. Fill email and request OTP

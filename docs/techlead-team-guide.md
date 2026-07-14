@@ -1,4 +1,4 @@
-# Hướng Dẫn Kỹ Thuật & Phân Công Nhiệm Vụ Dự Án VietAI Scholar (Luminary)
+# Hướng Dẫn Kỹ Thuật & Phân Công Nhiệm Vụ Dự Án Luminary Scholar (Luminary)
 
 > Tài liệu onboarding, phân chia công việc nội bộ và kế hoạch phát triển dài hạn dành cho đội ngũ phát triển.  
 > Cập nhật mới nhất: 2026-07-07
@@ -7,7 +7,7 @@
 
 ## 1. Ý Tưởng & Chức Năng Cốt Lõi Của Ứng Dụng (Product Overview)
 
-**VietAI Scholar** (tên nội bộ: *Luminary*) không phải là một công cụ dịch thuật PDF thông thường (như Google Translate hay các tool dịch file phổ thông). Đây là một **Không gian làm việc thông minh (Bilingual Workspace) tích hợp Trợ lý AI dành riêng cho người đọc, nghiên cứu tài liệu học thuật & bài báo khoa học tiếng Anh.**
+**Luminary Scholar** (tên nội bộ: *Luminary*) không phải là một công cụ dịch thuật PDF thông thường (như Google Translate hay các tool dịch file phổ thông). Đây là một **Không gian làm việc thông minh (Bilingual Workspace) tích hợp Trợ lý AI dành riêng cho người đọc, nghiên cứu tài liệu học thuật & bài báo khoa học tiếng Anh.**
 
 ### 1.1. Các vấn đề sản phẩm giải quyết:
 *   **Rào cản ngôn ngữ chuyên ngành**: Đọc bài báo khoa học tiếng Anh tốn nhiều thời gian.
@@ -90,7 +90,7 @@ Dành cho giai đoạn phát triển tiếp theo (Epic 6), các nhóm lập trì
 
 ### 🎨 Nhóm 2: Trải nghiệm người dùng & Học tập Cộng tác (Frontend)
 *   **Task 2.1: Nhóm học tập cộng tác (Collaborative Study Groups)**: Cho phép nhiều học viên tham gia cùng một phiên phản biện luận án ảo hoặc cùng đóng góp vào một note nghiên cứu chung.
-*   **Task 2.2: Đồng bộ hóa Obsidian App**: Phát triển Obsidian plugin chính thức cho phép tự động đồng bộ note nghiên cứu và Markdown song ngữ từ thư viện VietAI Scholar về máy tính cá nhân.
+*   **Task 2.2: Đồng bộ hóa Obsidian App**: Phát triển Obsidian plugin chính thức cho phép tự động đồng bộ note nghiên cứu và Markdown song ngữ từ thư viện Luminary Scholar về máy tính cá nhân.
 *   **Task 2.3: Offline Reader**: Hỗ trợ lưu trữ bản dịch song ngữ dưới dạng IndexedDB ở client để học viên có thể tiếp tục đọc nghiên cứu khi mất kết nối mạng.
 
 ---

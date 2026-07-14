@@ -1,4 +1,4 @@
-# Kiến Trúc Tích Hợp (Integration Architecture) — VietAI Scholar
+# Kiến Trúc Tích Hợp (Integration Architecture) — Luminary Scholar
 
 > Tài liệu mô tả cách thức liên kết, luồng dữ liệu end-to-end và cơ chế tích hợp giữa Frontend (Next.js), Backend (AWS CDK + Lambda), Qdrant Cloud và các mô hình AI.  
 > Cập nhật mới nhất: 2026-07-07
@@ -7,7 +7,7 @@
 
 ## 1. Sơ Đồ Kiến Trúc Tích Hợp Tổng Quan
 
-Hệ thống VietAI Scholar tích hợp các dịch vụ thông qua cơ chế API bất đồng bộ bảo mật bằng JWT Authorizer:
+Hệ thống Luminary Scholar tích hợp các dịch vụ thông qua cơ chế API bất đồng bộ bảo mật bằng JWT Authorizer:
 
 ```
                   ┌──────────────────────────────────────────────┐

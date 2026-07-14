@@ -18,7 +18,7 @@ interface IngestOutput {
 }
 
 const MY_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
-const COLLECTION_NAME = 'vietai-scholar-chunks';
+const COLLECTION_NAME = 'luminary-scholar-chunks';
 
 export const handler = async (event: IngestInput): Promise<IngestOutput> => {
   const { jobId, outputKey, chunksCount } = event;

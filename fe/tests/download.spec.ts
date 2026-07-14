@@ -9,14 +9,14 @@ test.describe('Download Login Wall & Post-Login Auto-Download', () => {
     await expect(page.locator('span:text-is("Song Ngữ")')).toBeVisible({ timeout: 30000 });
 
     // 2. Locate the download button
-    const downloadBtn = page.locator('button:has-text("Tải về Markdown")');
+    const downloadBtn = page.locator('button:has-text("Tải về")').first();
     await expect(downloadBtn).toBeVisible({ timeout: 30000 });
 
     // 3. Click the download button (user is guest/unauthenticated)
     await downloadBtn.click();
 
     // 4. Verify login modal appears
-    const modalTitle = page.locator('h3:has-text("Chào mừng đến với VietAI")');
+    const modalTitle = page.locator('h3:has-text("Chào mừng đến với Luminary Scholar")');
     await expect(modalTitle).toBeVisible();
 
     // 5. Fill email and request OTP

@@ -26,7 +26,7 @@ so that tôi nhận được câu trả lời chính xác dựa trên nội dung
    - Lấy cấu hình Qdrant Cloud (`url`, `apiKey`) và Gemini API Key từ AWS Secrets Manager.
    - Sử dụng Singleton Qdrant Client và Gemini API Client để tránh TLS latency do cold start.
    - Sinh vector cho câu hỏi của người dùng sử dụng Gemini Embedding Model `gemini-embedding-001` (hoặc `text-embedding-004`).
-   - Gọi Qdrant Cloud API thực hiện tìm kiếm tương đồng (Vector Search) trên collection `vietai-scholar-chunks` với bộ lọc payload bắt buộc: `{ userId: userId, jobId: jobId }` để đảm bảo phân quyền dữ liệu tuyệt đối (ADD-7).
+   - Gọi Qdrant Cloud API thực hiện tìm kiếm tương đồng (Vector Search) trên collection `luminary-scholar-chunks` với bộ lọc payload bắt buộc: `{ userId: userId, jobId: jobId }` để đảm bảo phân quyền dữ liệu tuyệt đối (ADD-7).
    - Lấy top 4 chunks tương quan nhất, ghép thành Prompt làm Context và gọi Gemini (`gemini-2.5-flash` hoặc `gemini-1.5-flash`) để tạo câu trả lời. Câu trả lời của AI phải định dạng dạng Markdown và chèn số trích dẫn của đoạn tương ứng (ví dụ: `[Đoạn X]` hoặc `[Đoạn Y]`).
 5. **And** Thời gian phản hồi trung bình của API phải dưới 3 giây (đáp ứng NFR-5).
 
@@ -56,7 +56,7 @@ so that tôi nhận được câu trả lời chính xác dựa trên nội dung
 ## Dev Notes
 
 - **Secrets Safety:** Không lưu secrets nhạy cảm (`QDRANT_URL`, `QDRANT_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) trên Vercel/Next.js. Next.js FE chỉ chứa `API_BASE` công khai và các NextAuth configurations. Các credentials backend được quản lý an toàn ở AWS Secrets Manager và truy xuất bởi Lambda.
-- **Qdrant Payload Schema:** Dữ liệu trong collection `vietai-scholar-chunks` có định dạng payload như sau (đã được đẩy lên ở Story 3.2):
+- **Qdrant Payload Schema:** Dữ liệu trong collection `luminary-scholar-chunks` có định dạng payload như sau (đã được đẩy lên ở Story 3.2):
   ```typescript
   {
     userId: string,

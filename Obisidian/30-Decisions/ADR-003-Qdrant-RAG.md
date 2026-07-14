@@ -7,7 +7,7 @@
 
 ## Quyết định
 
-Dùng **Qdrant Cloud** (managed) với một collection duy nhất `vietai-scholar-chunks`, lọc multi-tenant bằng payload filter `userId + jobId`.
+Dùng **Qdrant Cloud** (managed) với một collection duy nhất `luminary-scholar-chunks`, lọc multi-tenant bằng payload filter `userId + jobId`.
 
 ## Bối cảnh
 

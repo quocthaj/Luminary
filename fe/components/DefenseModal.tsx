@@ -313,7 +313,7 @@ export function DefenseModal({ isOpen, jobId, onClose, fileName }: DefenseModalP
               
               <div>
                 <h4 className="text-xl font-medium tracking-tight text-white mb-2" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>
-                  Thách thức phản biện cùng Agentic AI
+                  Thách thức phản biện với Agentic AI
                 </h4>
                 <p className="text-xs text-slate-400 leading-relaxed font-light max-w-md mx-auto">
                   Đối mặt với hội đồng phản biện luận án tự động. AI sẽ phân tích sâu tài liệu khoa học, đặt ra các câu hỏi phản biện sắc bén để thử thách độ thuyết phục trong lập luận của bạn, đồng thời cập nhật tức thời hồ sơ năng lực học tập.

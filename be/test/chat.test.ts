@@ -182,7 +182,7 @@ describe('Chat Handler - RAG QA Assistant', () => {
     expect(result.answer).toBe('Câu trả lời trích xuất từ tài liệu [Đoạn 5].');
     expect(mockGetJobItem).toHaveBeenCalledWith('job-abc');
     expect(mockGetEmbeddingsBatch).toHaveBeenCalledWith(['machine learning'], 'search_query');
-    expect(mockSearch).toHaveBeenCalledWith('vietai-scholar-chunks', {
+    expect(mockSearch).toHaveBeenCalledWith('luminary-scholar-chunks', {
       vector: [0.1, 0.2, 0.3],
       filter: {
         must: [
@@ -271,7 +271,7 @@ describe('Chat Handler - RAG QA Assistant', () => {
 
     const result = await handleChatJob(event);
     expect(result.answer).toBe('Đoạn lân cận chứa thông tin bổ sung [Đoạn 4].');
-    expect(mockScroll).toHaveBeenCalledWith('vietai-scholar-chunks', {
+    expect(mockScroll).toHaveBeenCalledWith('luminary-scholar-chunks', {
       filter: {
         must: [
           { key: 'jobId', match: { value: 'job-abc' } },

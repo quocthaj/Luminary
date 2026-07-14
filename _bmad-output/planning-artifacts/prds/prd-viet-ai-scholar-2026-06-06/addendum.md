@@ -1,4 +1,4 @@
-# Addendum — VietAI Scholar / Luminary
+# Addendum — Luminary Scholar / Luminary
 
 Tài liệu này lưu trữ các quyết định kỹ thuật, phương án cân nhắc và nội dung chuyên sâu nằm ngoài phạm vi cốt lõi của PRD v1.
 

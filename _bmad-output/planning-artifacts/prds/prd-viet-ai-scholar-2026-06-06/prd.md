@@ -1,20 +1,20 @@
 ---
-title: VietAI Scholar PRD
+title: Luminary Scholar PRD
 status: final
 created: 2026-06-06
 updated: 2026-06-06
 ---
 
-# Product Requirements Document (PRD) — VietAI Scholar (Luminary)
+# Product Requirements Document (PRD) — Luminary Scholar (Luminary)
 
 ## 0. Document Purpose
-Tài liệu này định nghĩa các yêu cầu sản phẩm cho **VietAI Scholar** (tên thương mại: **Luminary**), nền tảng dịch thuật và phân tích tài liệu học thuật PDF từ tiếng Anh sang tiếng Việt. 
+Tài liệu này định nghĩa các yêu cầu sản phẩm cho **Luminary Scholar** (tên thương mại: **Luminary**), nền tảng dịch thuật và phân tích tài liệu học thuật PDF từ tiếng Anh sang tiếng Việt. 
 Tài liệu tập trung chi tiết vào việc hoàn thiện **Phase 1 (Core Pipeline & LaTeX rendering)** và **Phase 2 (Auth & Session)** nhằm chuẩn bị cho bản phát hành rộng rãi đầu tiên (**Public Launch / Production**). 
 
 ---
 
 ## 1. Vision
-**VietAI Scholar** hướng đến việc phá bỏ rào cản ngôn ngữ và kỹ thuật đối với học sinh, sinh viên, nghiên cứu sinh và các học giả Việt Nam khi tiếp cận các công bố khoa học quốc tế. 
+**Luminary Scholar** hướng đến việc phá bỏ rào cản ngôn ngữ và kỹ thuật đối với học sinh, sinh viên, nghiên cứu sinh và các học giả Việt Nam khi tiếp cận các công bố khoa học quốc tế. 
 Bằng cách kết hợp sức mạnh của hệ thống dịch thuật đa tác nhân (Multi-agent AI) và khả năng xử lý công thức toán học chuyên sâu, nền tảng giúp chuyển đổi các bài báo học thuật tiếng Anh phức tạp thành tài liệu song ngữ tiếng Việt dễ hiểu nhất, đồng thời giữ nguyên cấu trúc toán học LaTeX chuẩn xác để người dùng đối chiếu, nghiên cứu và học tập hiệu quả.
 
 ---

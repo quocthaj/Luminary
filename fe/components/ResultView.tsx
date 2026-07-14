@@ -395,7 +395,7 @@ export function ResultView({ jobId, onReset, onReprocess }: { jobId: string; onR
       {/* ── Title / Status Header ── */}
       <div className="relative w-full max-w-5xl pt-4 pb-8 text-center animate-fade-up">
         <p className="text-xs font-semibold tracking-[0.22em] uppercase mb-8" style={{ color: 'var(--accent)' }}>
-          VietAI Scholar
+          Luminary Scholar
         </p>
 
         <div className="flex items-center justify-center gap-4 mb-3 animate-ring-in delay-100">

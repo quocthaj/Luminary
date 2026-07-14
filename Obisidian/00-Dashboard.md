@@ -1,4 +1,4 @@
-# VietAI Scholar — Dashboard
+# Luminary Scholar — Dashboard
 
 > Cập nhật lần cuối: 2026-06-16
 

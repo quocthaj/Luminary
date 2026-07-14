@@ -1,4 +1,4 @@
-# Hướng Dẫn Triển Khai (Deployment Guide) — VietAI Scholar
+# Hướng Dẫn Triển Khai (Deployment Guide) — Luminary Scholar
 
 > Tài liệu mô tả cấu trúc triển khai hạ tầng, quy trình publish Backend lên AWS Cloud và Frontend lên Vercel.  
 > Cập nhật mới nhất: 2026-07-07
@@ -7,7 +7,7 @@
 
 ## 1. Tổng Quan Triển Khai
 
-Hệ thống monorepo VietAI Scholar được phân chia thành hai khu vực triển khai chính để tối ưu hóa chi phí và tốc độ tải trang:
+Hệ thống monorepo Luminary Scholar được phân chia thành hai khu vực triển khai chính để tối ưu hóa chi phí và tốc độ tải trang:
 
 | Phân vùng | Nền tảng triển khai | Vùng vật lý (Region) | Phương thức cập nhật |
 | :--- | :--- | :--- | :--- |
@@ -59,7 +59,7 @@ npx cdk deploy       # Triển khai trực tiếp lên AWS
     6.  `vietai-ingest`: Vector hóa và upload dữ liệu lên Qdrant Cloud.
     7.  `vietai-defense-copilot`: Điều phối Thesis Defense và Research Copilot.
     8.  `vietai-jwt-authorizer`: Lambda Custom Authorizer kiểm chứng JWT token.
-*   **API Gateway**: `vietai-scholar-api` (Stage: `dev` hoặc `prod`)
+*   **API Gateway**: `luminary-scholar-api` (Stage: `dev` hoặc `prod`)
 *   **AWS Step Functions**: Đường ống điều phối bất đồng bộ `vietai-processing-pipeline`.
 
 ---
@@ -77,7 +77,7 @@ npx cdk deploy       # Triển khai trực tiếp lên AWS
 
 ### 3.2. Cấu hình biến môi trường trên Vercel Dashboard
 Trước khi kích hoạt build, bạn cần khai báo các biến môi trường sau tại Vercel Settings -> Environment Variables:
-1.  `NEXTAUTH_URL`: Địa chỉ URL trang web của bạn (ví dụ: `https://vietai-scholar.vercel.app` hoặc `http://localhost:3000` cho dev).
+1.  `NEXTAUTH_URL`: Địa chỉ URL trang web của bạn (ví dụ: `https://luminary-scholar.vercel.app` hoặc `http://localhost:3000` cho dev).
 2.  `AUTH_SECRET`: Khóa bí mật dùng để mã hóa session cookie Next-Auth.
 3.  `NEXT_PUBLIC_API_URL`: Địa chỉ API Gateway Endpoint nhận được sau khi chạy lệnh `cdk deploy` ở mục 2.2 (ví dụ: `https://5c2wlnvtsh.execute-api.ap-southeast-1.amazonaws.com/dev`).
 
@@ -106,7 +106,7 @@ Mọi hoạt động và lỗi phát sinh từ Lambda được ghi nhận trực
 *   Tại đây, bạn có thể xem lại lịch sử từng lượt chạy (executions), xem bước nào bị lỗi (failed) và kiểm tra dữ liệu đầu vào/đầu ra của từng State.
 
 ### 4.3. Giám sát Vector Database & AI Services
-*   **Qdrant Cloud:** Đăng nhập vào bảng điều khiển Qdrant Cloud dashboard để kiểm tra số lượng vectors trong collection `vietai-scholar-chunks`, dung lượng lưu trữ và số lượt truy vấn.
+*   **Qdrant Cloud:** Đăng nhập vào bảng điều khiển Qdrant Cloud dashboard để kiểm tra số lượng vectors trong collection `luminary-scholar-chunks`, dung lượng lưu trữ và số lượt truy vấn.
 *   **Google Cloud Console:** Theo dõi hạn ngạch (quotas) và số lượng yêu cầu gọi API dịch thuật Text-to-Speech (TTS).
 
 ---

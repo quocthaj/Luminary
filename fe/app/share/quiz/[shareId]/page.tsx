@@ -124,7 +124,7 @@ export default function PublicQuizPlayerPage({ params }: { params: Promise<{ sha
             href="/"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors shadow-lg shadow-indigo-600/20"
           >
-            Về trang chủ VietAI Scholar
+            Về trang chủ Luminary Scholar
           </a>
         </div>
       </div>
@@ -146,7 +146,7 @@ export default function PublicQuizPlayerPage({ params }: { params: Promise<{ sha
             </svg>
           </div>
           <div>
-            <h1 className="text-base font-extrabold text-white tracking-tight">VietAI Scholar — Quiz Player</h1>
+            <h1 className="text-base font-extrabold text-white tracking-tight">Luminary Scholar — Quiz Player</h1>
             <p className="text-xs text-slate-400 truncate max-w-xs sm:max-w-md">{meta?.title || 'Bài trắc nghiệm ôn tập'}</p>
           </div>
         </div>
@@ -154,7 +154,7 @@ export default function PublicQuizPlayerPage({ params }: { params: Promise<{ sha
           href="/"
           className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors hidden sm:inline-block"
         >
-          Khám phá VietAI Scholar &rarr;
+          Khám phá Luminary Scholar &rarr;
         </a>
       </header>
 
@@ -376,7 +376,7 @@ export default function PublicQuizPlayerPage({ params }: { params: Promise<{ sha
 
       {/* Footer */}
       <footer className="max-w-3xl w-full mx-auto text-center py-6 text-xs text-slate-500 border-t border-slate-800/60 mt-8">
-        Powered by <strong className="text-slate-400">VietAI Scholar</strong> &bull; Nền tảng phân tích và ôn tập tri thức khoa học Serverless.
+        Powered by <strong className="text-slate-400">Luminary Scholar</strong> &bull; Nền tảng phân tích và ôn tập tri thức khoa học Serverless.
       </footer>
     </div>
   );

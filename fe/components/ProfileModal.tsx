@@ -36,7 +36,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   useEffect(() => {
     if (!isOpen) return;
 
-    const saved = localStorage.getItem('vietai-scholar-profile-settings');
+    const saved = localStorage.getItem('luminary-scholar-profile-settings');
     let parsed: Partial<ProfileSettings> = {};
     if (saved) {
       try {
@@ -65,7 +65,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     
     try {
       // Save settings to localStorage
-      localStorage.setItem('vietai-scholar-profile-settings', JSON.stringify(settings));
+      localStorage.setItem('luminary-scholar-profile-settings', JSON.stringify(settings));
       
       // Update session locally if next-auth supports client-side updates
       if (session?.user && settings.name !== session.user.name) {

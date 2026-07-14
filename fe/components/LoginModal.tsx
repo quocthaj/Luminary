@@ -136,7 +136,7 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
             </svg>
           </div>
           <h3 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
-            Chào mừng đến với VietAI
+            Chào mừng đến với Luminary Scholar
           </h3>
           <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-sm">
             Đăng nhập để lưu lịch sử dịch thuật và truy cập Thư viện cá nhân của bạn.

@@ -1,6 +1,6 @@
 # Project Context & Rules for AI Agents
 
-Welcome to the **VietAI Scholar** workspace. This file establishes the persistent rules and context that all AI assistants (including Antigravity, Claude, and BMad agents) must follow when editing this codebase.
+Welcome to the **Luminary Scholar** workspace. This file establishes the persistent rules and context that all AI assistants (including Antigravity, Claude, and BMad agents) must follow when editing this codebase.
 
 ## 🚨 Critical Development Rules
 

@@ -1,12 +1,12 @@
-# VietAI Scholar — Tài Liệu Tổng Quan Hợp Tác Nhóm
+# Luminary Scholar — Tài Liệu Tổng Quan Hợp Tác Nhóm
 
-Tài liệu này cung cấp cái nhìn tổng quan về dự án **VietAI Scholar**, bao gồm công nghệ sử dụng (Tech Stack), hướng dẫn cài đặt và chạy thử nghiệm (Getting Started), cùng với danh sách các tính năng/nhiệm vụ đã hoàn thành để giúp các thành viên mới nhanh chóng làm quen và bắt đầu tham gia phát triển.
+Tài liệu này cung cấp cái nhìn tổng quan về dự án **Luminary Scholar**, bao gồm công nghệ sử dụng (Tech Stack), hướng dẫn cài đặt và chạy thử nghiệm (Getting Started), cùng với danh sách các tính năng/nhiệm vụ đã hoàn thành để giúp các thành viên mới nhanh chóng làm quen và bắt đầu tham gia phát triển.
 
 ---
 
 ## 1. Giới Thiệu Dự Án
 
-**VietAI Scholar** là nền tảng hỗ trợ dịch thuật tài liệu học thuật định dạng PDF từ tiếng Anh sang tiếng Việt sử dụng công nghệ AI. 
+**Luminary Scholar** là nền tảng hỗ trợ dịch thuật tài liệu học thuật định dạng PDF từ tiếng Anh sang tiếng Việt sử dụng công nghệ AI. 
 
 ### Các điểm nổi bật:
 *   **Xử lý PDF thông minh**: Trích xuất nội dung văn bản gốc, giữ nguyên hoặc tối ưu các công thức toán học dưới dạng LaTeX.

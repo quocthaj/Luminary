@@ -1,13 +1,13 @@
-# VietAI Scholar — Tổng Quan Dự Án
+# Luminary Scholar — Tổng Quan Dự Án
 
-> Tài liệu giới thiệu tổng quan mục tiêu, đối tượng sử dụng và các tính năng chính của hệ thống VietAI Scholar.  
+> Tài liệu giới thiệu tổng quan mục tiêu, đối tượng sử dụng và các tính năng chính của hệ thống Luminary Scholar.  
 > Cập nhật mới nhất: 2026-07-07
 
 ---
 
 ## 1. Tóm Tắt Dự Án
 
-**VietAI Scholar** là nền tảng hỗ trợ học thuật và nghiên cứu khoa học chuyên sâu dành cho học viên và nhà nghiên cứu Việt Nam. Hệ thống không chỉ dịch thuật song ngữ Anh-Việt tối ưu cho các bài báo khoa học PDF (giữ nguyên cấu trúc công thức LaTeX và trích dẫn), mà còn cung cấp một hệ sinh thái các công cụ học tập tương tác: Trắc nghiệm (Quiz), Thẻ ghi nhớ (Flashcards), Sơ đồ tư duy (Mindmap), Audio Podcast và đặc biệt là phòng phản biện luận án thử nghiệm (Thesis Defense Studio) giúp đánh giá và phát triển năng lực của học viên dựa trên hồ sơ năng lực thực tế.
+**Luminary Scholar** là nền tảng hỗ trợ học thuật và nghiên cứu khoa học chuyên sâu dành cho học viên và nhà nghiên cứu Việt Nam. Hệ thống không chỉ dịch thuật song ngữ Anh-Việt tối ưu cho các bài báo khoa học PDF (giữ nguyên cấu trúc công thức LaTeX và trích dẫn), mà còn cung cấp một hệ sinh thái các công cụ học tập tương tác: Trắc nghiệm (Quiz), Thẻ ghi nhớ (Flashcards), Sơ đồ tư duy (Mindmap), Audio Podcast và đặc biệt là phòng phản biện luận án thử nghiệm (Thesis Defense Studio) giúp đánh giá và phát triển năng lực của học viên dựa trên hồ sơ năng lực thực tế.
 
 ---
 
@@ -32,7 +32,7 @@
 
 ## 3. Các Phân Hệ Tính Năng Cốt Lõi
 
-Hệ thống VietAI Scholar bao gồm 6 phân hệ tính năng lớn kết hợp chặt chẽ:
+Hệ thống Luminary Scholar bao gồm 6 phân hệ tính năng lớn kết hợp chặt chẽ:
 
 ### 3.1. Đường ống Xử lý & Dịch thuật thông minh (Pipeline)
 *   **Trích xuất PDF:** Sử dụng `pdfjs-dist` chạy cục bộ để trích xuất văn bản nhanh, tự động fallback sang **Amazon Textract** chạy OCR bất đồng bộ nếu tệp PDF dạng ảnh scan hoặc cấu hình layout phức tạp.

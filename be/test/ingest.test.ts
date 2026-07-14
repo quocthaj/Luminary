@@ -199,7 +199,7 @@ describe('Ingest Handler', () => {
 
     // Verify Qdrant collection creation and upsert
     expect(mockGetCollections).toHaveBeenCalled();
-    expect(mockCreateCollection).toHaveBeenCalledWith('vietai-scholar-chunks', {
+    expect(mockCreateCollection).toHaveBeenCalledWith('luminary-scholar-chunks', {
       vectors: {
         size: 768,
         distance: 'Cosine',

@@ -337,7 +337,7 @@ const canSubmit = !!file && !loading && !isBlocked;
               color: 'var(--text-primary)',
             }}
           >
-            VietAI Scholar
+            Luminary Scholar
           </h1>
           <p
             className="mt-3 text-sm delay-300 animate-fade-up"

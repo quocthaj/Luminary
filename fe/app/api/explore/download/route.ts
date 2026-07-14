@@ -13,12 +13,12 @@ export async function GET(req: NextRequest) {
     contentType = 'application/pdf';
     filename += '.pdf';
     // Return a dummy PDF header/content
-    fileContent = new Uint8Array(Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length 40 >>\nstream\nBT /F1 24 Tf 100 700 Td (VietAI Scholar Export) Tj ET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f\n0000000009 00000 n\n0000000058 00000 n\n0000000115 00000 n\n0000000210 00000 n\ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n301\n%%EOF'));
+    fileContent = new Uint8Array(Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length 40 >>\nstream\nBT /F1 24 Tf 100 700 Td (Luminary Scholar Export) Tj ET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f\n0000000009 00000 n\n0000000058 00000 n\n0000000115 00000 n\n0000000210 00000 n\ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n301\n%%EOF'));
   } else if (format === 'word') {
     contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     filename += '.docx';
     // Dummy docx content or simple text
-    fileContent = new Uint8Array(Buffer.from('VietAI Scholar Exported Word Document. Topic: ' + sessionId));
+    fileContent = new Uint8Array(Buffer.from('Luminary Scholar Exported Word Document. Topic: ' + sessionId));
   } else {
     // obsidian zip
     contentType = 'application/zip';

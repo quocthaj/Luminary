@@ -1,4 +1,4 @@
-# Đặc tả Hợp đồng API (API Contracts) — VietAI Scholar Backend
+# Đặc tả Hợp đồng API (API Contracts) — Luminary Scholar Backend
 
 > Tài liệu kỹ thuật chi tiết về các điểm cuối (endpoints) API được triển khai qua API Gateway, Lambda và Step Functions.  
 > Cập nhật mới nhất: 2026-07-07

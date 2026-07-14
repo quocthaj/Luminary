@@ -112,7 +112,7 @@ export default function ResearchStudioPage({ params }: { params: Promise<{ sessi
             {
               id: "paper-3",
               title: `Med-${cleanTopic.replace(/[^a-zA-Z0-9]/g, '') || 'SOTA'}: Ứng dụng lai SOTA của ${cleanTopic} trong y học & công nghiệp`,
-              authors: "VietAI Scholar Team, 2024",
+              authors: "Luminary Scholar Team, 2024",
               abstract: `Nghiên cứu mới nhất kết hợp các kỹ thuật học sâu tiên tiến cùng ${cleanTopic} để xây dựng công cụ chẩn đoán đa năng độ chính xác cao. Hệ thống được tinh chỉnh để chạy mượt mà dưới 1.5 giây.`,
               math: `\\mathbf{y} = \\sigma\\left( \\mathbf{W}_2 \\cdot \\max(0, \\mathbf{W}_1 \\mathbf{x} + \\mathbf{b}_1) + \\mathbf{b}_2 \\right)`,
               gap: `⚠️ Việc tích hợp các thông tin phi cấu trúc bổ trợ (metadata văn bản, lịch sử bệnh án) vào mô hình vẫn chưa đạt độ tối ưu.`

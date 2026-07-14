@@ -963,36 +963,49 @@ export function WorkspaceView({
               </button>
 
               {/* Hội thoại AI (Podcast) */}
-              <button
-                onClick={() => {
-                  const currentTitle = libraryJobs.find(j => j.jobId === jobId)?.fileName || 'Tài liệu học thuật';
-                  playPodcast(jobId, currentTitle, podcastHdMode);
-                }}
-                disabled={loading || (activeJobId === jobId && podcastPlayerStatus === 'GENERATING')}
-                title="Nghe podcast hội thoại phân tích bài báo"
-                className={`text-left p-2.5 rounded-xl border transition-all flex flex-col gap-0.5 cursor-pointer relative group disabled:opacity-40 disabled:cursor-not-allowed ${activeJobId === jobId && podcastPlayerStatus === 'COMPLETED'
-                    ? 'border-[var(--success)]/30 bg-[var(--success-dim)] hover:bg-[var(--success-dim)]/80'
-                    : 'border-[var(--border-subtle)] bg-transparent hover:bg-[var(--bg-elevated)]'
-                  }`}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <span className="text-xs font-semibold text-[var(--text-primary)]">Hội thoại AI (Podcast)</span>
-                  {activeJobId === jobId && podcastPlayerStatus === 'COMPLETED' && (
-                    <span className="text-[8px] bg-[var(--success-dim)] text-[var(--success)] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                      {isPodcastPlaying ? 'Đang phát' : 'Sẵn sàng'}
-                    </span>
-                  )}
-                  {activeJobId === jobId && podcastPlayerStatus === 'GENERATING' && (
-                    <span className="text-[8px] bg-[var(--warning-dim)] text-[var(--warning)] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider animate-pulse flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--warning)] animate-ping" />
-                      Đang tạo
-                    </span>
-                  )}
+              <div className="flex flex-col gap-1.5 w-full">
+                <button
+                  onClick={() => {
+                    const currentTitle = libraryJobs.find(j => j.jobId === jobId)?.fileName || 'Tài liệu học thuật';
+                    playPodcast(jobId, currentTitle, podcastHdMode);
+                  }}
+                  disabled={loading || (activeJobId === jobId && podcastPlayerStatus === 'GENERATING')}
+                  title="Nghe podcast hội thoại phân tích bài báo"
+                  className={`text-left p-2.5 rounded-xl border transition-all flex flex-col gap-0.5 cursor-pointer relative group disabled:opacity-40 disabled:cursor-not-allowed w-full ${activeJobId === jobId && podcastPlayerStatus === 'COMPLETED'
+                      ? 'border-[var(--success)]/30 bg-[var(--success-dim)] hover:bg-[var(--success-dim)]/80'
+                      : 'border-[var(--border-subtle)] bg-transparent hover:bg-[var(--bg-elevated)]'
+                    }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-semibold text-[var(--text-primary)]">Hội thoại AI (Podcast)</span>
+                    {activeJobId === jobId && podcastPlayerStatus === 'COMPLETED' && (
+                      <span className="text-[8px] bg-[var(--success-dim)] text-[var(--success)] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                        {isPodcastPlaying ? 'Đang phát' : 'Sẵn sàng'}
+                      </span>
+                    )}
+                    {activeJobId === jobId && podcastPlayerStatus === 'GENERATING' && (
+                      <span className="text-[8px] bg-[var(--warning-dim)] text-[var(--warning)] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider animate-pulse flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[var(--warning)] animate-ping" />
+                        Đang tạo
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-[var(--text-secondary)] opacity-75">
+                    {activeJobId === jobId && isPodcastPlaying ? 'Nhấn để tạm dừng nghe podcast' : 'Nghe Podcast - Cuộc đối thoại phân tích bài báo'}
+                  </span>
+                </button>
+
+                {/* HD Quality Toggle */}
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[10px] text-[var(--text-secondary)] font-medium">Chất lượng cao (HD Voice)</span>
+                  <input
+                    type="checkbox"
+                    checked={podcastHdMode}
+                    onChange={(e) => setPodcastHdMode(e.target.checked)}
+                    className="cursor-pointer h-3.5 w-3.5 rounded border-[var(--border-normal)] bg-[var(--bg-elevated)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                  />
                 </div>
-                <span className="text-[10px] text-[var(--text-secondary)] opacity-75">
-                  {activeJobId === jobId && isPodcastPlaying ? 'Nhấn để tạm dừng nghe podcast' : 'Nghe cuộc đối thoại phân tích bài báo'}
-                </span>
-              </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1091,6 +1104,38 @@ export function WorkspaceView({
               <span className="text-xs text-[var(--error)] font-medium">Lỗi kết nối</span>
             ) : downloadUrl ? (
               <>
+                {/* Scholar Search Agent Button */}
+                <button
+                  onClick={() => {
+                    setIsRightCollapsed(false);
+                    setRightTab('tutor');
+                    handleSendMessage('Tìm các bài viết liên quan đến tài liệu này');
+                  }}
+                  data-testid="header-find-related-btn"
+                  title="Tìm kiếm các bài viết liên quan qua Scholar Search Agent"
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--border-normal)] bg-[var(--bg-elevated)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-subtle)] px-3 py-2 text-xs font-bold transition-all cursor-pointer h-9"
+                >
+                  <svg className="h-4 w-4 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Tìm tài liệu liên quan
+                </button>
+
+                {/* Podcast Header Button */}
+                <button
+                  onClick={() => {
+                    const currentTitle = libraryJobs.find(j => j.jobId === jobId)?.fileName || 'Tài liệu học thuật';
+                    playPodcast(jobId, currentTitle, podcastHdMode);
+                  }}
+                  title="Nghe podcast phân tích"
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--border-normal)] bg-[var(--bg-elevated)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-subtle)] px-3 py-2 text-xs font-bold transition-all cursor-pointer h-9"
+                >
+                  <svg className="h-4 w-4 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                  </svg>
+                  Nghe Podcast
+                </button>
+
                 {/* Focus Mode Toggle */}
                 <button
                   onClick={() => {
@@ -1545,6 +1590,17 @@ export function WorkspaceView({
 
               {/* Chat input box */}
               <div className="border-t border-[var(--border-subtle)] pt-4 flex-shrink-0">
+                <div className="flex gap-2 mb-2">
+                  <button
+                    type="button"
+                    data-testid="chat-find-related-btn"
+                    onClick={() => handleSendMessage('Tìm các bài viết liên quan đến tài liệu này')}
+                    disabled={loading || isSending}
+                    className="px-3 py-1.5 rounded-lg border border-[var(--border-normal)] bg-[var(--bg-elevated)] text-[10px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-subtle)] transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    🔍 Tìm liên quan
+                  </button>
+                </div>
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();

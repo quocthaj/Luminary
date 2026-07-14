@@ -31,7 +31,7 @@ import {
   applyDecay 
 } from '../utils/competency';
 
-const COLLECTION_NAME = 'vietai-scholar-chunks';
+const COLLECTION_NAME = 'luminary-scholar-chunks';
 let qdrantClientInstance: QdrantClient | null = null;
 let geminiGenAIInstance: GoogleGenerativeAI | null = null;
 

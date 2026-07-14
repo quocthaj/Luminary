@@ -1,4 +1,4 @@
-# Kiến trúc hệ thống — VietAI Scholar
+# Kiến trúc hệ thống — Luminary Scholar
 
 ## Sơ đồ tổng quan
 
@@ -24,7 +24,7 @@ flowchart TD
 
     Merge -->|Save| S3R[(S3 Results\n30-day TTL)]
     Merge -->|Trigger| Embed[Embed Lambda\nGemini text-embedding-004]
-    Embed -->|Upsert vectors| Qdrant[(Qdrant Cloud\nvietai-scholar-chunks)]
+    Embed -->|Upsert vectors| Qdrant[(Qdrant Cloud\nluminary-scholar-chunks)]
 
     FE -->|3. Polling GET /api/jobs/:id| APIGW
     FE -->|4. Stream Markdown| Proxy[Next.js /api/preview\nS3 Streaming Proxy]
@@ -95,7 +95,7 @@ GSI: `userIdIndex` (userId + createdAt) — dùng cho Library listing.
 
 ## Qdrant Multi-tenancy
 
-Collection duy nhất: `vietai-scholar-chunks`
+Collection duy nhất: `luminary-scholar-chunks`
 
 Payload mỗi vector:
 ```json

@@ -8,7 +8,7 @@ import { QdrantClient } from '@qdrant/js-client-rest';
 import { getEmbeddingsBatch } from '../utils/ai-providers';
 import * as crypto from 'crypto';
 
-const COLLECTION_NAME = 'vietai-scholar-chunks';
+const COLLECTION_NAME = 'luminary-scholar-chunks';
 let qdrantClientInstance: QdrantClient | null = null;
 let geminiGenAIInstance: GoogleGenerativeAI | null = null;
 

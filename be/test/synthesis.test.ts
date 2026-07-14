@@ -307,7 +307,7 @@ describe('Synthesis Handler - Cross-Paper Synthesis & Chat', () => {
 
       expect(result.answer).toBe('Câu trả lời so sánh hai bài báo dựa trên [Paper A.pdf - Đoạn 12].');
       expect(mockSearch).toHaveBeenCalledTimes(2);
-      expect(mockSearch).toHaveBeenNthCalledWith(1, 'vietai-scholar-chunks', {
+      expect(mockSearch).toHaveBeenNthCalledWith(1, 'luminary-scholar-chunks', {
         vector: [0.1, 0.2, 0.3],
         filter: {
           must: [
@@ -317,7 +317,7 @@ describe('Synthesis Handler - Cross-Paper Synthesis & Chat', () => {
         },
         limit: 3,
       });
-      expect(mockSearch).toHaveBeenNthCalledWith(2, 'vietai-scholar-chunks', {
+      expect(mockSearch).toHaveBeenNthCalledWith(2, 'luminary-scholar-chunks', {
         vector: [0.1, 0.2, 0.3],
         filter: {
           must: [

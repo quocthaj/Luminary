@@ -66,11 +66,11 @@ aws stepfunctions list-executions \
 curl https://<cluster>.qdrant.io/health
 
 # Xem collection info
-curl https://<cluster>.qdrant.io/collections/vietai-scholar-chunks \
+curl https://<cluster>.qdrant.io/collections/luminary-scholar-chunks \
   -H "api-key: <key>"
 
 # Count vectors
-curl -X POST https://<cluster>.qdrant.io/collections/vietai-scholar-chunks/points/count \
+curl -X POST https://<cluster>.qdrant.io/collections/luminary-scholar-chunks/points/count \
   -H "api-key: <key>" \
   -H "Content-Type: application/json" \
   -d '{"exact": false}'

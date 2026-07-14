@@ -1,4 +1,4 @@
-# Mô hình Dữ liệu (Data Models) — VietAI Scholar Backend
+# Mô hình Dữ liệu (Data Models) — Luminary Scholar Backend
 
 > Mô tả chi tiết cấu trúc lưu trữ cơ sở dữ liệu DynamoDB, cấu trúc tệp tin S3 và các giao diện TypeScript cốt lõi trong hệ thống.  
 > Cập nhật mới nhất: 2026-07-07

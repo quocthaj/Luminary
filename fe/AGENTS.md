@@ -1,4 +1,4 @@
-# VietAI Scholar - Frontend
+# Luminary Scholar - Frontend
 
 ## Stack
 Next.js 14 App Router, TailwindCSS, TypeScript
