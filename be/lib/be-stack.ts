@@ -12,6 +12,8 @@ import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import { Construct } from 'constructs';
 import * as path from 'path';
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 
 class LambdaIntegrationNoPermission extends apigateway.LambdaIntegration {
   public override bind(method: apigateway.Method): apigateway.IntegrationConfig {
@@ -49,6 +51,10 @@ export class VietAIScholarStack extends cdk.Stack {
           expiration: cdk.Duration.days(90),
           prefix: 'temp/',
         },
+        {
+          // Delete original PDF uploads after 30 days
+          expiration: cdk.Duration.days(30),
+        },
       ],
       cors: [
         {
@@ -80,6 +86,41 @@ export class VietAIScholarStack extends cdk.Stack {
         },
       ],
     });
+
+    // CloudFront distribution is temporarily commented out because the AWS account needs verification for CloudFront.
+    // S3 Transfer Accelerate is used instead for edge-optimised downloads.
+    /*
+    const resultsOAC = new cloudfront.CfnOriginAccessControl(this, 'ResultsOAC', {
+      originAccessControlConfig: {
+        name: 'ResultsOACConfig',
+        originAccessControlOriginType: 's3',
+        signingBehavior: 'always',
+        signingProtocol: 'sigv4',
+      },
+    });
+
+    const resultsDistribution = new cloudfront.Distribution(this, 'ResultsDistribution', {
+      defaultBehavior: { origin: new origins.S3Origin(resultsBucket) },
+      comment: 'CDN for Markdown and MP3 files',
+    });
+
+    // Override the default origin to use the OAC
+    const cfnDist = resultsDistribution.node.defaultChild as cloudfront.CfnDistribution;
+    cfnDist.addPropertyOverride('DistributionConfig.Origins.0.OriginAccessControlId', resultsOAC.attrId);
+    cfnDist.addPropertyOverride('DistributionConfig.Origins.0.S3OriginConfig.OriginAccessIdentity', '');
+
+    // Bucket policy to allow CloudFront OAC access
+    resultsBucket.addToResourcePolicy(new iam.PolicyStatement({
+      actions: ['s3:GetObject'],
+      resources: [resultsBucket.arnForObjects('*')],
+      principals: [new iam.ServicePrincipal('cloudfront.amazonaws.com')],
+      conditions: {
+        ArnEquals: {
+          'aws:SourceArn': `arn:aws:cloudfront::${this.account}:distribution/${resultsDistribution.distributionId}`,
+        },
+      },
+    }));
+    */
 
     // Bucket for frontend SPA (React build)
     const frontendBucket = new s3.Bucket(this, 'FrontendBucket', {
