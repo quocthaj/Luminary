@@ -6,43 +6,43 @@
 }
 
 :root {
-  --bg-base:       #faf9f5;
-  --bg-surface:    #efe9de;
-  --bg-elevated:   #e8e0d2;
-  --border-subtle: #ebe6df;
-  --border-normal: #e6dfd8;
-  --text-primary:  #141413;
-  --text-secondary:#3d3d3a;
-  --text-muted:    #6c6a64;
-  --accent:        #cc785c;
-  --accent-dim:    rgba(204, 120, 92, 0.10);
-  --accent-glow:   rgba(204, 120, 92, 0.22);
-  --success:       #5db872;
-  --success-dim:   rgba(93, 184, 114, 0.10);
-  --error:         #c64545;
-  --error-dim:     rgba(198, 69, 69, 0.10);
-  --warning:       #d4a017;
-  --warning-dim:   rgba(212, 160, 23, 0.10);
+  --bg-base:       #f8fafc;
+  --bg-surface:    #f1f5f9;
+  --bg-elevated:   #e2e8f0;
+  --border-subtle: #e2e8f0;
+  --border-normal: #cbd5e1;
+  --text-primary:  #0f172a;
+  --text-secondary:#334155;
+  --text-muted:    #64748b;
+  --accent:        #2563eb;
+  --accent-dim:    rgba(37, 99, 235, 0.08);
+  --accent-glow:   rgba(37, 99, 235, 0.18);
+  --success:       #10b981;
+  --success-dim:   rgba(16, 185, 129, 0.10);
+  --error:         #ef4444;
+  --error-dim:     rgba(239, 68, 68, 0.10);
+  --warning:       #f59e0b;
+  --warning-dim:   rgba(245, 158, 11, 0.10);
 }
 
 .dark {
-  --bg-base:       #181715;
-  --bg-surface:    #1f1e1b;
-  --bg-elevated:   #252320;
+  --bg-base:       #0b0f19;
+  --bg-surface:    #131b2e;
+  --bg-elevated:   #1c2842;
   --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-normal: rgba(255, 255, 255, 0.11);
-  --text-primary:  #faf9f5;
-  --text-secondary:#a09d96;
-  --text-muted:    #6c6a64;
-  --accent:        #cc785c;
-  --accent-dim:    rgba(204, 120, 92, 0.12);
-  --accent-glow:   rgba(204, 120, 92, 0.25);
-  --success:       #5db872;
-  --success-dim:   rgba(93, 184, 114, 0.10);
-  --error:         #c64545;
-  --error-dim:     rgba(198, 69, 69, 0.10);
-  --warning:       #d4a017;
-  --warning-dim:   rgba(212, 160, 23, 0.10);
+  --border-normal: rgba(255, 255, 255, 0.12);
+  --text-primary:  #f8fafc;
+  --text-secondary:#94a3b8;
+  --text-muted:    #64748b;
+  --accent:        #3b82f6;
+  --accent-dim:    rgba(59, 130, 246, 0.12);
+  --accent-glow:   rgba(59, 130, 246, 0.25);
+  --success:       #10b981;
+  --success-dim:   rgba(16, 185, 129, 0.10);
+  --error:         #ef4444;
+  --error-dim:     rgba(239, 68, 68, 0.10);
+  --warning:       #f59e0b;
+  --warning-dim:   rgba(245, 158, 11, 0.10);
 }
 
 body {
