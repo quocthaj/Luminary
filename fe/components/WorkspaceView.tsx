@@ -1438,6 +1438,9 @@ export function WorkspaceView({
                                   setIsRightCollapsed(false);
                                   setRightTab('tutor');
                                   handleSendMessage(`Hãy giải thích chi tiết khái niệm: ${s.payload}`);
+                                } else if (s.action === 'SYNTHESIS_DOCS') {
+                                  alert('Tính năng Tổng hợp yêu cầu ít nhất 2 tài liệu. Hệ thống sẽ chuyển bạn đến Thư viện để chọn thêm tài liệu đối chiếu.');
+                                  window.location.href = '/library';
                                 } else {
                                   alert(`Đang thực hiện hành động: ${s.action} - ${s.payload}`);
                                 }
