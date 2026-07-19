@@ -3,6 +3,7 @@ import { extractPlaceholders } from '../utils/placeholder';
 import { chunkTextByParagraph } from '../utils/prompt-builder';
 import { saveResultToS3 } from '../utils/s3-helpers';
 import { updateJobStatus } from '../utils/dynamodb-helpers';
+import { isValidAcademicEnglish } from '../utils/validation';
 
 interface ExtractInput {
   jobId: string;
@@ -32,6 +33,12 @@ export const handler = async (event: ExtractInput): Promise<ExtractOutput> => {
   await updateJobStatus(jobId, 'extracting');
 
   const rawText = await extractTextFromS3(bucket, key);
+  
+  if (!isValidAcademicEnglish(rawText)) {
+      console.warn(`❌ [extract] Rejected non-academic or non-English document for job ${jobId}`);
+      await updateJobStatus(jobId, 'failed', { error: 'Tài liệu tải lên không phải là văn bản tiếng Anh hoặc không phù hợp để dịch thuật học thuật. Hệ thống ưu tiên xử lý bài báo khoa học và tài liệu tiếng Anh.' });
+      throw new Error('NON_ACADEMIC_OR_ENGLISH_DOCUMENT');
+  }
 
   const { cleanedText, formulas, figures, citations } = extractPlaceholders(rawText);
 

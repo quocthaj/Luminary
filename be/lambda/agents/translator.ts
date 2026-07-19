@@ -19,7 +19,17 @@ export async function translatorAgent(input: AgentInput): Promise<AgentResult> {
     console.log(`🌐 [TranslatorAgent] Starting for job ${input.jobId}`);
 
     try {
-        const chunks = chunkTextByParagraph(input.text, CHUNK_MAX_CHARS);
+        // Detect and split bibliography/references section so we do not translate it
+        const refMatch = input.text.match(/\n+(?:#{1,4}\s+)?(references|bibliography|citations|tài liệu tham khảo)\b[\s\r\n]*\n+/i);
+        let bodyText = input.text;
+        let referencesText = '';
+        if (refMatch && refMatch.index !== undefined) {
+            bodyText = input.text.substring(0, refMatch.index);
+            referencesText = input.text.substring(refMatch.index);
+            console.log(`📚 [TranslatorAgent] Found references section at index ${refMatch.index} (${referencesText.length} chars). It will NOT be translated.`);
+        }
+
+        const chunks = chunkTextByParagraph(bodyText, CHUNK_MAX_CHARS);
         console.log(`🌐 [TranslatorAgent] Split into ${chunks.length} chunks`);
 
         const translatedParts: string[] = [];
@@ -42,7 +52,10 @@ export async function translatorAgent(input: AgentInput): Promise<AgentResult> {
             translatedParts.push(translated);
         }
 
-        const result = translatedParts.join('\n\n');
+        let result = translatedParts.join('\n\n');
+        if (referencesText) {
+            result += '\n\n' + referencesText.trim();
+        }
 
         console.log(`💾 [TranslatorAgent] Saving result to S3...`);
         const outputKey = await saveResultToS3(input.jobId, input.fileName, result, 'translator.txt');

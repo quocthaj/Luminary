@@ -209,7 +209,47 @@ function renderMarkdown(md: string): string {
     .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
     .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
     .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-    .replace(/^---$/gm, '<hr/>')
+    .replace(/^---$/gm, '<hr/>');
+
+  // Parse simple Markdown tables
+  const lines = h.split('\n');
+  let inTable = false;
+  let tableRows: string[] = [];
+  const processedLines = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      if (!inTable) {
+        inTable = true;
+        tableRows = [];
+      }
+      // Check if separator row
+      if (/^[|\s:-]+$/.test(trimmed)) {
+        continue; // skip separator
+      }
+      const cells = trimmed
+        .split('|')
+        .slice(1, -1)
+        .map((c) => c.trim());
+      const cellTag = tableRows.length === 0 ? 'th' : 'td';
+      const rowHtml = `<tr>${cells.map((c) => `<${cellTag} class="px-4 py-2 border border-[var(--border-normal)]">${c}</${cellTag}>`).join('')}</tr>`;
+      tableRows.push(rowHtml);
+    } else {
+      if (inTable) {
+        inTable = false;
+        const fullTable = `<div class="overflow-x-auto my-4"><table class="w-full text-left border-collapse border border-[var(--border-normal)]">${tableRows.join('')}</table></div>`;
+        processedLines.push(fullTable);
+      }
+      processedLines.push(line);
+    }
+  }
+  if (inTable) {
+    const fullTable = `<div class="overflow-x-auto my-4"><table class="w-full text-left border-collapse border border-[var(--border-normal)]">${tableRows.join('')}</table></div>`;
+    processedLines.push(fullTable);
+  }
+  h = processedLines.join('\n');
+
+  h = h
     .split('\n\n')
     .map(block => {
       const t = block.trim();

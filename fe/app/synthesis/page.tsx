@@ -265,7 +265,8 @@ function SynthesisContent() {
     const lines = h.split('\n');
     let inTable = false;
     let tableRows: string[] = [];
-    const processedLines = lines.map((line) => {
+    const processedLines = [];
+    for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
         if (!inTable) {
@@ -274,7 +275,7 @@ function SynthesisContent() {
         }
         // Check if separator row
         if (/^[|\s:-]+$/.test(trimmed)) {
-          return ''; // skip separator
+          continue; // skip separator
         }
         const cells = trimmed
           .split('|')
@@ -283,16 +284,19 @@ function SynthesisContent() {
         const cellTag = tableRows.length === 0 ? 'th' : 'td';
         const rowHtml = `<tr>${cells.map((c) => `<${cellTag} class="px-4 py-2 border border-[var(--border-normal)]">${c}</${cellTag}>`).join('')}</tr>`;
         tableRows.push(rowHtml);
-        return '';
       } else {
         if (inTable) {
           inTable = false;
           const fullTable = `<div class="overflow-x-auto my-4"><table class="w-full text-left border-collapse border border-[var(--border-normal)]">${tableRows.join('')}</table></div>`;
-          return fullTable + '\n' + line;
+          processedLines.push(fullTable);
         }
-        return line;
+        processedLines.push(line);
       }
-    });
+    }
+    if (inTable) {
+      const fullTable = `<div class="overflow-x-auto my-4"><table class="w-full text-left border-collapse border border-[var(--border-normal)]">${tableRows.join('')}</table></div>`;
+      processedLines.push(fullTable);
+    }
     h = processedLines.join('\n');
 
     // Group paragraphs

@@ -30,6 +30,7 @@ import { handleFlashcardPost, handleFlashcardGet } from './handlers/flashcard';
 import { handleMindmapPost, handleMindmapGet } from './handlers/mindmap';
 import { handlePodcastPost, handlePodcastGet } from './handlers/podcast';
 import { handleCreateQuizShare, handleGetPublicQuiz } from './handlers/share';
+import { isValidAcademicEnglish } from './utils/validation';
 
 
 const STATE_MACHINE_ARN = process.env.STATE_MACHINE_ARN || '';
@@ -514,8 +515,14 @@ export const handler = async (event: any) => {
 async function handleGenerateUploadUrl(event: { fileName: string; userId: string }): Promise<any> {
     console.log(`📤 Generating presigned upload URL for user: ${event.userId}...`);
 
-    const jobId = uuidv4();
     const fileName = event.fileName || 'document.pdf';
+    
+    if (!fileName.toLowerCase().endsWith('.pdf')) {
+        console.warn(`❌ Rejecting non-PDF upload attempt: ${fileName}`);
+        return respond(400, { error: 'Chỉ chấp nhận định dạng file PDF.' });
+    }
+
+    const jobId = uuidv4();
     const s3Key = `uploads/${jobId}/${fileName}`;
 
     const command = new PutObjectCommand({
@@ -648,6 +655,10 @@ async function handleS3Upload(event: any): Promise<any> {
         const extractedText = await extractTextFromS3(bucket, key);
         if (!extractedText || extractedText.length < 10) {
             throw new Error('Could not extract readable text from PDF');
+        }
+        if (!isValidAcademicEnglish(extractedText)) {
+            console.warn(`❌ [index] Rejected non-academic or non-English document for job ${jobId}`);
+            throw new Error('Tài liệu tải lên không phải là văn bản tiếng Anh hoặc không phù hợp để dịch thuật học thuật. Hệ thống ưu tiên xử lý bài báo khoa học và tài liệu tiếng Anh.');
         }
         const result = await supervisorHandler({ jobId, fileName, extractedText });
         console.log(`✅ Job ${jobId} → ${result.status}`);

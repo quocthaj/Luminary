@@ -94,12 +94,52 @@ function renderMarkdown(md: string): string {
     .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
     .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
     .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-    .replace(/^---$/gm, '<hr/>')
+    .replace(/^---$/gm, '<hr/>');
+
+  // Parse simple Markdown tables
+  const lines = h.split('\n');
+  let inTable = false;
+  let tableRows: string[] = [];
+  const processedLines = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      if (!inTable) {
+        inTable = true;
+        tableRows = [];
+      }
+      // Check if separator row
+      if (/^[|\s:-]+$/.test(trimmed)) {
+        continue; // skip separator
+      }
+      const cells = trimmed
+        .split('|')
+        .slice(1, -1)
+        .map((c) => c.trim());
+      const cellTag = tableRows.length === 0 ? 'th' : 'td';
+      const rowHtml = `<tr>${cells.map((c) => `<${cellTag} class="px-4 py-2 border border-[var(--border-normal)]">${c}</${cellTag}>`).join('')}</tr>`;
+      tableRows.push(rowHtml);
+    } else {
+      if (inTable) {
+        inTable = false;
+        const fullTable = `<div class="overflow-x-auto my-4"><table class="w-full text-left border-collapse border border-[var(--border-normal)]">${tableRows.join('')}</table></div>`;
+        processedLines.push(fullTable);
+      }
+      processedLines.push(line);
+    }
+  }
+  if (inTable) {
+    const fullTable = `<div class="overflow-x-auto my-4"><table class="w-full text-left border-collapse border border-[var(--border-normal)]">${tableRows.join('')}</table></div>`;
+    processedLines.push(fullTable);
+  }
+  h = processedLines.join('\n');
+
+  h = h
     .split('\n\n')
     .map(block => {
       const t = block.trim();
       if (!t) return '';
-      if (/^<(h[1-6]|pre|ul|ol|blockquote|hr|li)/.test(t)) return t;
+      if (/^<(h[1-6]|pre|ul|ol|blockquote|hr|li|div)/.test(t)) return t;
       const anchorMatch = t.match(/^\{#chunk-(\d+)\}([\s\S]*)$/);
       if (anchorMatch) {
         const chunkIndex = anchorMatch[1];
@@ -1104,22 +1144,6 @@ export function WorkspaceView({
               <span className="text-xs text-[var(--error)] font-medium">Lỗi kết nối</span>
             ) : downloadUrl ? (
               <>
-                {/* Scholar Search Agent Button */}
-                <button
-                  onClick={() => {
-                    setIsRightCollapsed(false);
-                    setRightTab('tutor');
-                    handleSendMessage('Tìm các bài viết liên quan đến tài liệu này');
-                  }}
-                  data-testid="header-find-related-btn"
-                  title="Tìm kiếm các bài viết liên quan qua Scholar Search Agent"
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--border-normal)] bg-[var(--bg-elevated)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-subtle)] px-3 py-2 text-xs font-bold transition-all cursor-pointer h-9"
-                >
-                  <svg className="h-4 w-4 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  Tìm tài liệu liên quan
-                </button>
 
                 {/* Podcast Header Button */}
                 <button
