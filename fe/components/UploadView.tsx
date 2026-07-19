@@ -339,12 +339,7 @@ const canSubmit = !!file && !loading && !isBlocked;
           >
             Luminary Scholar
           </h1>
-          <p
-            className="mt-3 text-sm delay-300 animate-fade-up"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            Dịch PDF học thuật EN → VI · LaTeX · Song ngữ
-          </p>
+
         </div>
 
         {/* Drop zone */}
@@ -547,12 +542,7 @@ const canSubmit = !!file && !loading && !isBlocked;
           )}
         </button>
 
-        <p
-          className="mt-5 text-center text-xs delay-400 animate-fade-up"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          Kết quả xuất ra Markdown song ngữ · LaTeX và citations giữ nguyên
-        </p>
+
 
         {/* Recent Documents Section */}
         {status === 'authenticated' && (recentJobs.length > 0 || loadingJobs) && (
