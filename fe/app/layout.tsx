@@ -23,6 +23,8 @@ export const metadata: Metadata = {
 
 import { SessionProvider } from "next-auth/react";
 import { PodcastPlayerProvider } from "../components/PodcastPlayer";
+import { AssistantProvider } from "../contexts/AssistantContext";
+import { LuminaryAssistant } from "../components/LuminaryAssistant";
 
 export default function RootLayout({
   children,
@@ -45,10 +47,13 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <SessionProvider>
-          <PodcastPlayerProvider>
-            <ThemeToggle />
-            {children}
-          </PodcastPlayerProvider>
+          <AssistantProvider>
+            <PodcastPlayerProvider>
+              <ThemeToggle />
+              {children}
+              <LuminaryAssistant />
+            </PodcastPlayerProvider>
+          </AssistantProvider>
         </SessionProvider>
       </body>
     </html>

@@ -30,7 +30,9 @@ import { handleFlashcardPost, handleFlashcardGet } from './handlers/flashcard';
 import { handleMindmapPost, handleMindmapGet } from './handlers/mindmap';
 import { handlePodcastPost, handlePodcastGet } from './handlers/podcast';
 import { handleCreateQuizShare, handleGetPublicQuiz } from './handlers/share';
+import { handleAssistantChat } from './handlers/assistant';
 import { isValidAcademicEnglish } from './utils/validation';
+import { checkRateLimit, rateLimitResponse } from './utils/rate-limiter';
 
 
 const STATE_MACHINE_ARN = process.env.STATE_MACHINE_ARN || '';
@@ -99,6 +101,30 @@ export const handler = async (event: any) => {
             return await handleListJobs({ userId });
         }
 
+        if (httpMethod === 'POST' && path === '/assistant/chat') {
+            const userId = event.requestContext?.authorizer?.userId;
+            if (!userId) {
+                return respond(401, { error: 'Unauthorized' });
+            }
+
+            const limitCheck = await checkRateLimit(userId, 'chat', 50);
+            if (!limitCheck.allowed) return rateLimitResponse('Chat');
+
+            const body = JSON.parse(event.body || '{}');
+            try {
+                const result = await handleAssistantChat({
+                    userId,
+                    message: body.message,
+                    conversationHistory: body.conversationHistory || [],
+                    context: body.context || { currentPage: 'unknown' }
+                });
+                return respond(200, result);
+            } catch (err: any) {
+                console.error('❌ Assistant chat error:', err);
+                return respond(500, { error: err.message || 'Internal server error' });
+            }
+        }
+
         if (httpMethod === 'POST' && path?.startsWith('/job/') && path?.endsWith('/reprocess')) {
             const userId = event.requestContext?.authorizer?.userId;
             if (!userId) {
@@ -143,6 +169,9 @@ export const handler = async (event: any) => {
 
             try {
                 if (httpMethod === 'POST') {
+                    const limitCheck = await checkRateLimit(userId, 'tools', 20);
+                    if (!limitCheck.allowed) return rateLimitResponse('Quiz');
+
                     const result = await handleQuizPost({ jobId, userId, count });
                     const statusCode = result.status === 'COMPLETED' ? 200 : 202;
                     return respond(statusCode, result);
@@ -220,6 +249,9 @@ export const handler = async (event: any) => {
 
             try {
                 if (httpMethod === 'POST') {
+                    const limitCheck = await checkRateLimit(userId, 'tools', 20);
+                    if (!limitCheck.allowed) return rateLimitResponse('Flashcard');
+
                     const result = await handleFlashcardPost({ jobId, userId, count });
                     const statusCode = result.status === 'COMPLETED' ? 200 : 202;
                     return respond(statusCode, result);
@@ -257,6 +289,9 @@ export const handler = async (event: any) => {
 
             try {
                 if (httpMethod === 'POST') {
+                    const limitCheck = await checkRateLimit(userId, 'tools', 20);
+                    if (!limitCheck.allowed) return rateLimitResponse('Mindmap');
+
                     const result = await handleMindmapPost({ jobId, userId });
                     const statusCode = result.status === 'COMPLETED' ? 200 : 202;
                     return respond(statusCode, result);

@@ -676,6 +676,17 @@ export class VietAIScholarStack extends cdk.Stack {
     );
 
     // ============================================
+    // API Endpoint 1.5: POST /assistant/chat
+    // ============================================
+    const assistantResource = api.root.addResource('assistant');
+    const assistantChatResource = assistantResource.addResource('chat');
+    assistantChatResource.addMethod(
+      'POST',
+      new LambdaIntegrationNoPermission(orchestratorLambda, { proxy: true }),
+      { authorizer }
+    );
+
+    // ============================================
     // API Endpoint 2: GET /job/{jobId}
     // Returns: { status, s3OutputKey, error? }
     // ============================================

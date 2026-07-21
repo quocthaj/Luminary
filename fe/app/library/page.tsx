@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { getJobs, getResultUrl, JobStatus } from '../../lib/api';
 import { ProfileModal } from '../../components/ProfileModal';
+import { useAssistant } from '../../contexts/AssistantContext';
 
 export default function LibraryPage() {
   const { data: session, status } = useSession();
@@ -18,6 +19,12 @@ export default function LibraryPage() {
   const [downloadingJobId, setDownloadingJobId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'translations' | 'explore'>('translations');
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const { setContext } = useAssistant();
+
+  // Set Assistant context
+  useEffect(() => {
+    setContext({ currentPage: 'library' });
+  }, [setContext]);
 
   const handleToggleSelect = (jobId: string) => {
     setSelectedJobIds((prev) =>

@@ -11,6 +11,7 @@ import { MindmapModal } from './MindmapModal';
 import { DefenseModal } from './DefenseModal';
 import { usePodcastPlayer } from './PodcastPlayer';
 import { ProfileModal } from './ProfileModal';
+import { useAssistant } from '../contexts/AssistantContext';
 
 
 type Lang = 'en' | 'vi';
@@ -214,6 +215,21 @@ export function WorkspaceView({
 }) {
   const { data: session, status } = useSession();
   const [jobId, setJobId] = useState(initialJobId);
+  const { setContext } = useAssistant();
+  
+  // Personal Library state
+  const [libraryJobs, setLibraryJobs] = useState<JobStatus[]>([]);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
+
+  // Set Assistant context
+  useEffect(() => {
+    const currentJob = libraryJobs.find(j => j.jobId === jobId);
+    setContext({
+      currentPage: 'workspace',
+      currentJobId: jobId,
+      currentJobTitle: currentJob?.fileName || 'Tài liệu hiện tại'
+    });
+  }, [jobId, libraryJobs, setContext]);
 
   // Podcast Player states
   const {
@@ -259,9 +275,6 @@ export function WorkspaceView({
   const [pendingDownload, setPendingDownload] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
 
-  // Personal Library state
-  const [libraryJobs, setLibraryJobs] = useState<JobStatus[]>([]);
-  const [loadingLibrary, setLoadingLibrary] = useState(false);
 
   // Scroll Sync Refs
   const leftScrollRef = useRef<HTMLDivElement>(null);

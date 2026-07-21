@@ -131,7 +131,7 @@ async function fetchAdjacentParagraphs(
   })).sort((a, b) => a.chunkIndex - b.chunkIndex);
 }
 
-async function readExecutiveSummary(jobItem: Record<string, any>): Promise<any> {
+export async function readExecutiveSummary(jobItem: Record<string, any>): Promise<any> {
   const summaryAttr = jobItem.summary?.M;
   if (!summaryAttr) {
     return { error: 'Không tìm thấy bản tóm tắt Executive Summary của tài liệu này.' };
@@ -145,7 +145,7 @@ async function readExecutiveSummary(jobItem: Record<string, any>): Promise<any> 
   };
 }
 
-async function searchExternalPapers(query: string, limit: number = 5): Promise<any[]> {
+export async function searchExternalPapers(query: string, limit: number = 5): Promise<any[]> {
   try {
     const url = new URL('https://api.semanticscholar.org/graph/v1/paper/search');
     url.searchParams.set('query', query);

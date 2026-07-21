@@ -71,15 +71,104 @@ development_status:
   4-3-tu-dong-ve-so-do-tu-duy-bang-mermaid-js-mermaid-mindmap-generator-interactive-svg-viewer: done
   epic-4-retrospective: optional
 
-  epic-5: done
-  5-1-doi-chieu-tong-hop-cheo-nhieu-tai-lieu-cross-paper-multi-pdf-synthesis-chat: done
-  5-2-che-do-kham-pha-ai-agent-tu-sinh-noi-dung-hoc-thuat-theo-chu-de-explore-mode-topic-based-generation: done
-  5-3-scholar-search-agent-tim-kiem-bai-bao-lien-quan-scholar-search-agent-related-papers-web-search: done
-  5-4-doi-thoai-audio-2-nguoi-tts-podcast-tong-hop-2-person-audio-overview-tts-podcast: done
-  5-5-chia-se-va-lam-bai-trac-nghiem-lien-ket-cong-khai-quiz-sharing-public-quiz-player: done
-  5-6-explore-mode-autonomous-research-studio-multi-source-discovery-roadmap-obsidian-journal: done
-  5-7-he-thong-phan-bien-luan-an-agentic-va-copilot-de-xuat-goi-y-agentic-thesis-defense-research-copilot: done
-  epic-5-retrospective: done
+  epic_5:
+    name: "Multi-PDF Synthesis & Advanced Features"
+    status: in_progress
+    
+    stories:
+      story_5_1:
+        name: "Cross-Paper Synthesis & Chat"
+        status: done
+        verified: true
+        notes: "RAG per-doc top-K verified via CloudWatch"
+      
+      story_5_2:
+        name: "Explore Mode"
+        status: in_progress
+        verified: false
+        notes: |
+          Frontend UI done (Playwright 3/3 pass với mock).
+          Backend handler explore.ts tồn tại nhưng CHƯA 
+          verify qua POST thật trên AWS.
+          PENDING: test trên luminary-pearl.vercel.app 
+          → CloudWatch 2 RequestId tách biệt.
+      
+      story_5_3:
+        name: "Scholar Search Agent"
+        status: done
+        verified: true
+        notes: "Tool call log confirmed: searchExternalPapers"
+      
+      story_5_4:
+        name: "Podcast TTS"
+        status: done
+        verified: true
+        notes: |
+          3-layer fallback: Google TTS → Edge-TTS → Polly.
+          Edge-TTS bị block 403 từ AWS IP → Google TTS primary.
+          hdMode toggle đã xóa hoàn toàn.
+      
+      story_5_5:
+        name: "Thesis Defense AI"
+        status: not_started
+        notes: |
+          Spec drafted. 3-agent loop: Planner → Generator 
+          → Evaluator. Chưa có code thật.
+          Depends on: story_5_8 (rate limiting)
+      
+      story_5_6:
+        name: "Research Studio"
+        status: prototype
+        notes: |
+          UI/UX only — 100% mock data trong Next.js.
+          Không có backend Lambda hay DynamoDB thật.
+          Defer đến sau khi có user feedback.
+      
+      story_5_7:
+        name: "Research Copilot / Next Step Suggestions"
+        status: backlog
+        notes: "Concept only, chưa có spec"
+      
+      story_5_8:
+        name: "Rate Limiting"
+        status: done
+        verified: false
+        priority: critical
+        notes: |
+          Code hoàn thành, CDK đã deploy. 
+          Chờ user verify test bắn 51 requests.
+            - Chat/RAG: 50 req/user/ngày
+            - Explore Mode: 10 topics/user/ngày
+            - Thesis Defense: 5 sessions/user/ngày
+            - Podcast: 3 files/user/ngày
+          Estimate: 1-2 ngày
+      
+      story_5_9:
+        name: "Luminary AI Assistant (Global Chat Bar)"
+        status: not_started
+        priority: high
+        notes: |
+          Global chat bar, không gắn với tài liệu cụ thể.
+          Tool use: searchPapers, guideUser, openWorkspace,
+          startExplore, startDefense.
+          Dùng Gemini 2.5 Flash + Function Calling 
+          (pattern đã verify ở Story 5.3).
+          Depends on: story_5_8
+          Estimate: 1-2 tuần
+
+    pending_verification:
+      - item: "Flashcard count=20"
+        action: "Xóa flashcards-20.json S3 → POST thật → CloudWatch"
+      - item: "Synthesis Report cache-miss"  
+        action: "Xóa synthesis cache S3 → POST thật → CloudWatch"
+      - item: "Explore Mode backend"
+        action: "Test luminary-pearl.vercel.app → CloudWatch 2 RequestId"
+
+    technical_debt:
+      - "Xóa Debug Panel (UploadView.tsx ~dòng 482)"
+      - "ARN hardcode → CDK context variable (be-stack.ts:217)"
+      - "S3 Lifecycle Rules: tự xóa PDF gốc sau 30 ngày"
+      - "CloudWatch Alarms + SNS khi Lambda error rate cao"
 
 
 

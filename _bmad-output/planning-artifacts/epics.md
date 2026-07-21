@@ -439,4 +439,34 @@ So that tôi có thể quản lý và thực hiện toàn bộ quy trình nghiê
 - **And** Khi bôi đen văn bản ở Cột giữa và chọn "Lưu vào Sổ tay", Cột phải tự động ghi nhận thẻ trích dẫn (Auto-Citation) và lưu tự động vào DynamoDB qua `PUT /api/explore/journal/save`.
 - **And** Khi bấm "Đóng gói Nghiên cứu", client gọi `GET /api/explore/export?sessionId=...&format=obsidian`, backend đóng gói toàn bộ Lộ trình và Nhật ký thành file nén `.zip` chứa các file Markdown chuẩn Obsidian Vault để người dùng tải về máy cá nhân.
 
+### Story 5.8: Rate Limiting (DynamoDB counter + TTL)
+As a quản trị viên hệ thống,
+I want áp dụng giới hạn request (Rate Limiting) bằng DynamoDB counter và TTL,
+So that hệ thống được bảo vệ khỏi lạm dụng trước khi triển khai các tính năng Agentic tốn kém.
+
+**Acceptance Criteria:**
+- **Priority:** PHẢI LÀM (Highest) trước mọi Agentic feature.
+- **Estimate:** 1-2 ngày.
+- **Dependencies:** None.
+
+### Story 5.9: Luminary AI Assistant (Global Chat Bar)
+As a người học tự do (Nhóm C),
+I want một trợ lý AI toàn cục có thể trả lời các câu hỏi và hướng dẫn flow nghiên cứu,
+So that tôi được dẫn dắt ngay từ khi chưa biết bắt đầu từ đâu.
+
+**Acceptance Criteria:**
+- **Priority:** Cao (Core feature cho nhóm B+C).
+- **Estimate:** 1-2 tuần.
+- **Dependencies:** Story 5.8 (Rate limit phải có trước).
+
+### Story 5.10: Thesis Defense Agentic Loop
+As a nhà nghiên cứu độc lập (Nhóm B),
+I want một hội đồng AI phản biện các ý tưởng và luận điểm nghiên cứu của tôi,
+So that tôi có thể kiểm chứng ý tưởng nghiên cứu trước các góc nhìn phản biện sâu sắc.
+
+**Acceptance Criteria:**
+- **Priority:** Trung bình.
+- **Estimate:** 1-2 tuần.
+- **Dependencies:** Story 5.8, Story 5.9.
+
 

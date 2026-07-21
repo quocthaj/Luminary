@@ -19,7 +19,23 @@ Bằng cách kết hợp sức mạnh của hệ thống dịch thuật đa tác
 
 ---
 
-## 2. Target User
+## 2. Target Users & Personas
+
+### Nhóm B — Nhà nghiên cứu độc lập (Primary)
+- **Đặc điểm:** Theo dõi literature, so sánh nhiều paper, biết mình tìm gì, cần đi sâu nhanh
+- **Pain point:** Đọc paper tiếng Anh chuyên ngành mất nhiều thời gian, khó tổng hợp nhiều nguồn cùng lúc
+- **Tính năng cốt lõi:** Synthesis, Scholar Search, Explore Mode, Thesis Defense
+- **Thành công khi:** Hiểu được nội dung 3-5 paper liên quan trong 30 phút thay vì 3-5 giờ
+
+### Nhóm C — Người học tự do (Secondary)  
+- **Đặc điểm:** Có topic quan tâm, chưa biết bắt đầu từ đâu, cần được dẫn dắt
+- **Pain point:** Không biết tìm paper gì, không biết dùng tính năng nào trước
+- **Tính năng cốt lõi:** Luminary AI Assistant, Explore Mode, Podcast, Mindmap
+- **Thành công khi:** Từ 1 topic → tìm được paper → hiểu nội dung → nghe podcast tóm tắt, không cần hướng dẫn từ người khác
+
+### Out of scope (hiện tại)
+- Sinh viên luyện bảo vệ luận văn → defer sau khi có user feedback thật
+- Giảng viên tạo tài liệu giảng dạy → không phải focus hiện tại
 
 ### 2.1 Jobs To Be Done (JTBD)
 - **Nhu cầu chức năng:** Dịch nhanh các bài báo nghiên cứu khoa học tiếng Anh sang tiếng Việt với độ chính xác cao về thuật ngữ chuyên ngành và công thức toán học.

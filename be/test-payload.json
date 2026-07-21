@@ -1,0 +1,10 @@
+{
+  "httpMethod": "POST",
+  "path": "/assistant/chat",
+  "requestContext": {
+    "authorizer": {
+      "userId": "test-user-123"
+    }
+  },
+  "body": "{\"message\": \"Tìm bài báo về RAG trong y tế\", \"context\": {\"currentPage\": \"library\"}}"
+}
