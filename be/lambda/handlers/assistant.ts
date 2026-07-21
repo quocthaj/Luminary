@@ -85,7 +85,8 @@ async function executeTool(name: string, args: any, userId: string) {
       return { guide: FEATURE_GUIDES[args.feature] || "Tính năng này chưa có hướng dẫn chi tiết." };
     
     case 'startFeature':
-      return { redirectTo: `/workspace/${args.jobId || 'new'}?feature=${args.feature}` };
+      const targetJobId = args.jobId && args.jobId !== 'new' && args.jobId !== 'Không có' ? args.jobId : null;
+      return { redirectTo: targetJobId ? `/?jobId=${targetJobId}&feature=${args.feature}` : `/?feature=${args.feature}` };
       
     default:
       return { error: `Tool ${name} not found` };
